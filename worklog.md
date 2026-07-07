@@ -68,3 +68,26 @@ Stage Summary:
 - Sector page is fetched as fallback when static HTML has no peer links
 - Build verified clean
 - Other features (Search tab, Suggestions tab, TradingView button) confirmed already working from previous session
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Redesign detail panel to match screener.in style + make peers clickable
+
+Work Log:
+- Studied screener.in's actual page layout: header with name/price/breadcrumbs, flex-space-between ratio list, data-table with fiscal year highlighting, about section, pros/cons
+- Redesigned detail panel with 3-zone layout: sticky header, scrollable content, sticky footer
+- Header: Company name + sector/industry breadcrumbs + BSE/NSE codes + price badge + sector outlook strip
+- Key Ratios: screener-style alternating row list (flex-space-between) instead of grid cards
+- Tables: Custom ScreenerTable/ScreenerRow components with fiscal year end column highlighting
+- Pros/Cons: Side by side layout like screener
+- Shareholding: Period header with colored row strips
+- Peer companies: Clickable rows with name + ticker, instant navigation (no search API needed)
+- Peers now return {name, ticker} objects from scraper for direct navigation
+- handlePeerClick directly sets selectedStock with peer's ticker — detail loads via existing useEffect
+- Sticky footer with Chart + Screener.in action buttons
+
+Stage Summary:
+- Detail panel now visually matches screener.in's clean, data-dense style
+- Clicking any peer company instantly navigates to that company's full detail in the same panel
+- Build verified clean, peers tested with TCS (returns INFY, HCLTECH, WIPRO, TECHM, etc.)

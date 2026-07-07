@@ -76,7 +76,7 @@ interface StockDetail {
     netProfit: string;
     opm: string;
   }[];
-  peers: string[];
+  peers: { name: string; ticker: string }[];
   cached?: boolean;
   pros?: string[];
   cons?: string[];
@@ -189,6 +189,58 @@ interface SuggestionGroup {
   trendKey: string;
   insight?: SectorInsight;
   stocks: (Stock & { matchedSector?: string })[];
+}
+
+// ─── Screener-style Table Components ─────────────────────────────────
+function ScreenerTable({
+  headers,
+  fiscalYearEnds = [],
+  children,
+}: {
+  headers: string[];
+  fiscalYearEnds?: number[];
+  children: React.ReactNode;
+}) {
+  return (
+    <table className="w-full text-[11px] border-collapse">
+      <thead>
+        <tr className="border-b border-border">
+          {headers.map((h, i) => (
+            <th
+              key={i}
+              className={`px-2 py-1.5 font-medium text-muted-foreground whitespace-nowrap ${
+                i === 0 ? "text-left" : "text-right"
+              } ${fiscalYearEnds.includes(i - 1) ? "bg-primary/8" : ""}`}
+            >
+              {h}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>{children}</tbody>
+    </table>
+  );
+}
+
+function ScreenerRow({
+  label,
+  values,
+  highlight = false,
+}: {
+  label: string;
+  values: string[];
+  highlight?: boolean;
+}) {
+  return (
+    <tr className={`border-t border-border/60 ${highlight ? "bg-primary/5" : ""}`}>
+      <td className="px-2 py-1.5 text-muted-foreground font-medium whitespace-nowrap">{label}</td>
+      {values.map((v, i) => (
+        <td key={i} className="px-2 py-1.5 text-right font-mono whitespace-nowrap">
+          {v}
+        </td>
+      ))}
+    </tr>
+  );
 }
 
 // ─── Main Component ──────────────────────────────────────────────────
@@ -399,6 +451,26 @@ export default function Home() {
       isPositive: true,
     });
     setIsSearchedStock(true);
+  }, []);
+
+  // ─── Handle Peer Click (direct navigation with ticker) ──────────
+  const [peerLoading, setPeerLoading] = useState(false);
+  const handlePeerClick = useCallback((peerName: string, peerTicker: string) => {
+    setPeerLoading(true);
+    setStockDetail(null);
+    // Directly select the peer using its ticker — no search needed
+    setSelectedStock({
+      sr: 0,
+      name: peerName,
+      ticker: peerTicker,
+      close: 0,
+      change: 0,
+      volGainPct: 0,
+      isPositive: true,
+    });
+    setIsSearchedStock(true);
+    // Small delay to show the loading state briefly
+    setTimeout(() => setPeerLoading(false), 300);
   }, []);
 
   // ─── Toggle Sort ─────────────────────────────────────────────────
@@ -1168,7 +1240,7 @@ export default function Home() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-background border-l border-border shadow-2xl overflow-y-auto"
+              className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-background border-l border-border shadow-2xl flex flex-col"
             >
               {/* Panel Header */}
               <div className="sticky top-0 z-10 bg-background/90 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
@@ -1223,344 +1295,358 @@ export default function Home() {
               )}
 
               {stockDetail && !detailLoading && !detailError && (
-                <div className="p-4 space-y-5">
-                  {/* Stock Header */}
-                  <div>
-                    <h2 className="text-xl font-bold">{stockDetail.name}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedStock.ticker}
-                      {stockDetail.sector && <span className="ml-2">&middot; {stockDetail.sector}</span>}
-                      {stockDetail.industry && <span className="ml-2 text-xs">({stockDetail.industry})</span>}
-                    </p>
-                    {!isSearchedStock && (
-                      <div className="flex items-center gap-3 mt-2">
-                        <span className="text-2xl font-bold font-mono">{selectedStock.close.toFixed(2)}</span>
-                        <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
-                          <TrendingUp className="w-3 h-3 mr-1" />
-                          +{selectedStock.change.toFixed(2)}%
-                        </Badge>
-                        <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">
-                          <Zap className="w-3 h-3 mr-1" />
-                          Vol: {selectedStock.volGainPct.toFixed(0)}%
-                        </Badge>
+                <div className="flex flex-col">
+                  {/* ═══ SCREENER-STYLE HEADER ═══ */}
+                  <div className="px-4 pt-4 pb-3 border-b border-border">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="text-lg font-bold leading-tight">{stockDetail.name}</h2>
+                        {/* Sector / Industry breadcrumbs like screener */}
+                        <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 mt-1 text-[11px] text-muted-foreground">
+                          {stockDetail.sector && (
+                            <>
+                              <Activity className="w-3 h-3 shrink-0" />
+                              <span className="hover:text-foreground cursor-default">{stockDetail.sector}</span>
+                            </>
+                          )}
+                          {stockDetail.sector && stockDetail.industry && (
+                            <span className="opacity-40">&rsaquo;</span>
+                          )}
+                          {stockDetail.industry && (
+                            <span className="hover:text-foreground cursor-default">{stockDetail.industry}</span>
+                          )}
+                        </div>
+                        {/* BSE / NSE links */}
+                        <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[10px]">
+                          {stockDetail.bseCode && (
+                            <a
+                              href={`https://www.bseindia.com/stock-share-price/`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" />
+                              BSE: {stockDetail.bseCode}
+                            </a>
+                          )}
+                          <span className="text-muted-foreground/60 font-medium uppercase tracking-wide">
+                            NSE: {selectedStock.ticker}
+                          </span>
+                        </div>
+                      </div>
+                      {/* Price badge (for Volume Shockers) */}
+                      {!isSearchedStock && selectedStock.close > 0 && (
+                        <div className="text-right shrink-0">
+                          <p className="text-xl font-bold font-mono leading-none">
+                            <span className="text-xs font-normal text-muted-foreground mr-0.5">&#8377;</span>
+                            {selectedStock.close.toFixed(2)}
+                          </p>
+                          <p className="text-xs text-emerald-400 font-medium mt-0.5">
+                            +{selectedStock.change.toFixed(2)}%
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sector Outlook strip */}
+                    {selectedSectorSuggestion && (
+                      <div className={`mt-3 rounded-lg border px-3 py-2 ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).border}`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${confidenceDot(selectedSectorSuggestion.confidence)}`} />
+                            <span className="text-[11px] font-medium text-foreground truncate">
+                              {selectedSectorSuggestion.sector}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">
+                              &mdash; {selectedSectorSuggestion.description}
+                            </span>
+                          </div>
+                          <Badge variant="secondary" className={`text-[10px] shrink-0 ml-2 ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).text} border-0`}>
+                            {selectedSectorSuggestion.trend}
+                          </Badge>
+                        </div>
                       </div>
                     )}
-                    {isSearchedStock && (
+
+                    {/* Volume shocker badges */}
+                    {!isSearchedStock && selectedStock.volGainPct > 0 && (
                       <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/30">
-                          <Globe className="w-3 h-3 mr-1" />
-                          Screener.in Data
+                        <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px]">
+                          <Zap className="w-3 h-3 mr-1" />
+                          Vol {selectedStock.volGainPct.toFixed(0)}%
                         </Badge>
+                        {isSearchedStock && (
+                          <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/30 text-[10px]">
+                            <Globe className="w-3 h-3 mr-1" />
+                            Screener.in
+                          </Badge>
+                        )}
                       </div>
                     )}
                   </div>
 
-                  {/* Sector Suggestion */}
-                  {selectedSectorSuggestion && (
-                    <Card className={`border ${trendColor(selectedSectorSuggestion.trend).border}`}>
-                      <CardContent className="p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Activity className="w-3.5 h-3.5 text-primary" />
-                          <span className="text-xs font-semibold text-foreground">
-                            Sector Outlook: {selectedSectorSuggestion.sector}
+                  {/* ═══ SCROLLABLE CONTENT ═══ */}
+                  <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+
+                    {/* ──── TOP RATIOS (screener-style flex list) ──── */}
+                    {Object.keys(stockDetail.metrics).length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                          Key Ratios
+                        </h3>
+                        <div className="rounded-lg border border-border overflow-hidden">
+                          {Object.entries(stockDetail.metrics).map(([key, val], idx) => (
+                            <div
+                              key={key}
+                              className={`flex items-center justify-between px-3 py-2 ${
+                                idx % 2 === 0 ? "bg-secondary/40" : "bg-transparent"
+                              }`}
+                            >
+                              <span className="text-xs text-muted-foreground">{key}</span>
+                              <span className="text-xs font-semibold font-mono text-foreground">{val}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ──── ABOUT (screener-style) ──── */}
+                    {stockDetail.about && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                          About
+                        </h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{stockDetail.about}</p>
+                      </div>
+                    )}
+
+                    {/* ──── PROS & CONS (side by side like screener) ──── */}
+                    {((stockDetail.pros && stockDetail.pros.length > 0) || (stockDetail.cons && stockDetail.cons.length > 0)) && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {stockDetail.pros && stockDetail.pros.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1.5">
+                              <CheckCircle className="w-3 h-3 inline mr-1 -mt-0.5" />Pros
+                            </h3>
+                            <ul className="space-y-1">
+                              {stockDetail.pros.map((pro, i) => (
+                                <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+                                  <span className="text-emerald-500 mt-0.5 shrink-0">&bull;</span>
+                                  <span>{pro}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {stockDetail.cons && stockDetail.cons.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-1.5">
+                              <XCircle className="w-3 h-3 inline mr-1 -mt-0.5" />Cons
+                            </h3>
+                            <ul className="space-y-1">
+                              {stockDetail.cons.map((con, i) => (
+                                <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+                                  <span className="text-red-500 mt-0.5 shrink-0">&bull;</span>
+                                  <span>{con}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ──── QUARTERLY RESULTS (screener-style table) ──── */}
+                    {stockDetail.quarters.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                          Quarterly Results
+                          <span className="normal-case tracking-normal font-normal text-muted-foreground/60 ml-1">
+                            (Standalone, Rs. Cr.)
                           </span>
-                          <Badge variant="secondary" className={`text-[10px] ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).text}`}>
-                            {selectedSectorSuggestion.trend}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{selectedSectorSuggestion.description}</p>
-                        <div className="flex items-center gap-1 mt-1.5">
-                          <span className={`w-1.5 h-1.5 rounded-full ${confidenceDot(selectedSectorSuggestion.confidence)}`} />
-                          <span className="text-[10px] text-muted-foreground">Confidence: {selectedSectorSuggestion.confidence}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* About */}
-                  {stockDetail.about && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-1.5 flex items-center gap-1.5">
-                        <Info className="w-3.5 h-3.5 text-primary" /> About
-                      </h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">{stockDetail.about}</p>
-                    </div>
-                  )}
-
-                  <Separator />
-
-                  {/* Key Metrics */}
-                  {Object.keys(stockDetail.metrics).length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                        <BarChart3 className="w-3.5 h-3.5 text-primary" /> Key Ratios
-                      </h3>
-                      <div className="grid grid-cols-2 gap-2">
-                        {Object.entries(stockDetail.metrics).map(([key, val]) => (
-                          <div key={key} className="rounded-lg bg-secondary p-2.5">
-                            <p className="text-[10px] text-muted-foreground truncate">{key}</p>
-                            <p className="text-sm font-semibold font-mono mt-0.5">{val}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Quarterly Results */}
-                  {stockDetail.quarters.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5 text-primary" /> Recent Quarterly Results
-                      </h3>
-                      <div className="rounded-lg border border-border overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-secondary">
-                              <th className="text-left px-3 py-2 font-medium text-muted-foreground">Metric</th>
-                              {stockDetail.quarters.map((q) => (
-                                <th key={q.label} className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
-                                  {q.label}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr className="border-t border-border">
-                              <td className="px-3 py-2 text-muted-foreground">Sales</td>
-                              {stockDetail.quarters.map((q) => (
-                                <td key={q.label} className="text-right px-3 py-2 font-mono">{q.sales}</td>
-                              ))}
-                            </tr>
-                            <tr className="border-t border-border">
-                              <td className="px-3 py-2 text-muted-foreground">Net Profit</td>
-                              {stockDetail.quarters.map((q) => (
-                                <td key={q.label} className="text-right px-3 py-2 font-mono">{q.netProfit}</td>
-                              ))}
-                            </tr>
+                        </h3>
+                        <div className="rounded-lg border border-border overflow-x-auto">
+                          <ScreenerTable
+                            headers={["", ...stockDetail.quarters.map((q) => q.label)]}
+                            fiscalYearEnds={stockDetail.quarters
+                              .map((q, i) => (/Mar/i.test(q.label) ? i : -1))
+                              .filter((i) => i >= 0)}
+                          >
+                            <ScreenerRow label="Sales" values={stockDetail.quarters.map((q) => q.sales)} />
+                            <ScreenerRow label="Net Profit" values={stockDetail.quarters.map((q) => q.netProfit)} />
                             {stockDetail.quarters[0]?.opm && stockDetail.quarters[0].opm !== "-" && (
-                              <tr className="border-t border-border">
-                                <td className="px-3 py-2 text-muted-foreground">OPM</td>
-                                {stockDetail.quarters.map((q) => (
-                                  <td key={q.label} className="text-right px-3 py-2 font-mono">{q.opm}</td>
-                                ))}
-                              </tr>
+                              <ScreenerRow label="OPM %" values={stockDetail.quarters.map((q) => q.opm)} />
                             )}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Peers */}
-                  {stockDetail.peers.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2">Peer Companies</h3>
-                      <div className="flex flex-wrap gap-1.5">
-                        {stockDetail.peers.map((peer) => (
-                          <Badge key={peer} variant="secondary" className="text-xs">{peer}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Pros & Cons */}
-                  {(stockDetail.pros && stockDetail.pros.length > 0) && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Pros
-                      </h3>
-                      <ul className="space-y-1.5">
-                        {stockDetail.pros.map((pro, i) => (
-                          <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                            <CheckCircle className="w-3 h-3 text-emerald-400 mt-0.5 shrink-0" />
-                            <span>{pro}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {(stockDetail.cons && stockDetail.cons.length > 0) && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                        <XCircle className="w-3.5 h-3.5 text-red-400" /> Cons
-                      </h3>
-                      <ul className="space-y-1.5">
-                        {stockDetail.cons.map((con, i) => (
-                          <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                            <XCircle className="w-3 h-3 text-red-400 mt-0.5 shrink-0" />
-                            <span>{con}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Balance Sheet Summary */}
-                  {stockDetail.balanceSheet && stockDetail.balanceSheet.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                        <DollarSign className="w-3.5 h-3.5 text-primary" /> Balance Sheet (in Cr)
-                      </h3>
-                      <div className="rounded-lg border border-border overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-secondary">
-                              <th className="text-left px-2 py-2 font-medium text-muted-foreground">Item</th>
-                              {stockDetail.balanceSheet.map((bs) => (
-                                <th key={bs.label} className="text-right px-2 py-2 font-medium text-muted-foreground whitespace-nowrap">
-                                  {bs.label}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {[
-                              { key: "reserves", label: "Reserves" },
-                              { key: "borrowing", label: "Borrowings" },
-                              { key: "totalLiab", label: "Total Liab." },
-                              { key: "fixedAssets", label: "Fixed Assets" },
-                              { key: "totalAssets", label: "Total Assets" },
-                            ].map((row) => (
-                              <tr key={row.key} className="border-t border-border">
-                                <td className="px-2 py-1.5 text-muted-foreground">{row.label}</td>
-                                {stockDetail.balanceSheet!.map((bs) => (
-                                  <td key={bs.label} className="text-right px-2 py-1.5 font-mono">
-                                    {bs[row.key as keyof typeof bs]}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Cash Flow */}
-                  {stockDetail.cashFlow && stockDetail.cashFlow.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                        <DollarSign className="w-3.5 h-3.5 text-primary" /> Cash Flow (in Cr)
-                      </h3>
-                      <div className="rounded-lg border border-border overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-secondary">
-                              <th className="text-left px-2 py-2 font-medium text-muted-foreground">Type</th>
-                              {stockDetail.cashFlow.map((cf) => (
-                                <th key={cf.label} className="text-right px-2 py-2 font-medium text-muted-foreground whitespace-nowrap">
-                                  {cf.label}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr className="border-t border-border">
-                              <td className="px-2 py-1.5 text-muted-foreground">Operating</td>
-                              {stockDetail.cashFlow.map((cf) => (
-                                <td key={cf.label} className="text-right px-2 py-1.5 font-mono">{cf.operatingCF}</td>
-                              ))}
-                            </tr>
-                            <tr className="border-t border-border">
-                              <td className="px-2 py-1.5 text-muted-foreground">Investing</td>
-                              {stockDetail.cashFlow.map((cf) => (
-                                <td key={cf.label} className="text-right px-2 py-1.5 font-mono">{cf.investingCF}</td>
-                              ))}
-                            </tr>
-                            <tr className="border-t border-border">
-                              <td className="px-2 py-1.5 text-muted-foreground">Financing</td>
-                              {stockDetail.cashFlow.map((cf) => (
-                                <td key={cf.label} className="text-right px-2 py-1.5 font-mono">{cf.financingCF}</td>
-                              ))}
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Shareholding Pattern */}
-                  {stockDetail.shareholding && stockDetail.shareholding.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 text-primary" /> Shareholding Pattern
-                      </h3>
-                      {stockDetail.shareholding.map((sh) => (
-                        <div key={sh.category} className="mb-3 last:mb-0">
-                          <p className="text-[10px] text-muted-foreground mb-1 font-medium">{sh.category}</p>
-                          <div className="space-y-1">
-                            {sh.values.map((v) => (
-                              <div key={v.label} className="flex items-center justify-between text-xs">
-                                <span className="text-muted-foreground truncate mr-2">{v.label}</span>
-                                <span className="font-mono font-medium shrink-0">{v.value}</span>
-                              </div>
-                            ))}
-                          </div>
+                          </ScreenerTable>
                         </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Annual Results */}
-                  {stockDetail.annualResults && stockDetail.annualResults.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                        <BarChart3 className="w-3.5 h-3.5 text-primary" /> Annual Results
-                      </h3>
-                      <div className="rounded-lg border border-border overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-secondary">
-                              <th className="text-left px-3 py-2 font-medium text-muted-foreground">Metric</th>
-                              {stockDetail.annualResults.map((ar) => (
-                                <th key={ar.label} className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
-                                  {ar.label}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr className="border-t border-border">
-                              <td className="px-3 py-2 text-muted-foreground">Sales</td>
-                              {stockDetail.annualResults.map((ar) => (
-                                <td key={ar.label} className="text-right px-3 py-2 font-mono">{ar.sales}</td>
-                              ))}
-                            </tr>
-                            <tr className="border-t border-border">
-                              <td className="px-3 py-2 text-muted-foreground">Net Profit</td>
-                              {stockDetail.annualResults.map((ar) => (
-                                <td key={ar.label} className="text-right px-3 py-2 font-mono">{ar.netProfit}</td>
-                              ))}
-                            </tr>
-                          </tbody>
-                        </table>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Action Buttons */}
-                  <Separator />
-                  <div className="grid grid-cols-2 gap-2">
+                    {/* ──── BALANCE SHEET ──── */}
+                    {stockDetail.balanceSheet && stockDetail.balanceSheet.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                          Balance Sheet
+                          <span className="normal-case tracking-normal font-normal text-muted-foreground/60 ml-1">
+                            (Rs. Cr.)
+                          </span>
+                        </h3>
+                        <div className="rounded-lg border border-border overflow-x-auto">
+                          <ScreenerTable
+                            headers={["", ...stockDetail.balanceSheet.map((bs) => bs.label)]}
+                            fiscalYearEnds={stockDetail.balanceSheet
+                              .map((bs, i) => (/Mar/i.test(bs.label) ? i : -1))
+                              .filter((i) => i >= 0)}
+                          >
+                            <ScreenerRow label="Reserves" values={stockDetail.balanceSheet.map((bs) => bs.reserves)} />
+                            <ScreenerRow label="Borrowings" values={stockDetail.balanceSheet.map((bs) => bs.borrowing)} />
+                            <ScreenerRow label="Other Liab." values={stockDetail.balanceSheet.map((bs) => bs.otherLiab)} />
+                            <ScreenerRow label="Total Liab." values={stockDetail.balanceSheet.map((bs) => bs.totalLiab)} />
+                            <ScreenerRow label="Fixed Assets" values={stockDetail.balanceSheet.map((bs) => bs.fixedAssets)} />
+                            <ScreenerRow label="CWIP" values={stockDetail.balanceSheet.map((bs) => bs.cwip)} />
+                            <ScreenerRow label="Total Assets" values={stockDetail.balanceSheet.map((bs) => bs.totalAssets)} />
+                          </ScreenerTable>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ──── CASH FLOW ──── */}
+                    {stockDetail.cashFlow && stockDetail.cashFlow.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                          Cash Flow
+                          <span className="normal-case tracking-normal font-normal text-muted-foreground/60 ml-1">
+                            (Rs. Cr.)
+                          </span>
+                        </h3>
+                        <div className="rounded-lg border border-border overflow-x-auto">
+                          <ScreenerTable
+                            headers={["", ...stockDetail.cashFlow.map((cf) => cf.label)]}
+                            fiscalYearEnds={stockDetail.cashFlow
+                              .map((cf, i) => (/Mar/i.test(cf.label) ? i : -1))
+                              .filter((i) => i >= 0)}
+                          >
+                            <ScreenerRow label="Operating CF" values={stockDetail.cashFlow.map((cf) => cf.operatingCF)} />
+                            <ScreenerRow label="Investing CF" values={stockDetail.cashFlow.map((cf) => cf.investingCF)} />
+                            <ScreenerRow label="Financing CF" values={stockDetail.cashFlow.map((cf) => cf.financingCF)} />
+                          </ScreenerTable>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ──── SHAREHOLDING PATTERN ──── */}
+                    {stockDetail.shareholding && stockDetail.shareholding.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                          Shareholding Pattern
+                        </h3>
+                        <div className="rounded-lg border border-border overflow-hidden">
+                          {stockDetail.shareholding.map((sh) => (
+                            <div key={sh.category}>
+                              <div className="px-3 py-1.5 bg-primary/10 border-b border-border">
+                                <span className="text-[10px] font-semibold text-primary">{sh.category}</span>
+                              </div>
+                              {sh.values.map((v, vi) => (
+                                <div
+                                  key={v.label}
+                                  className={`flex items-center justify-between px-3 py-1.5 ${
+                                    vi % 2 === 0 ? "bg-secondary/40" : ""
+                                  }`}
+                                >
+                                  <span className="text-[11px] text-muted-foreground truncate mr-2">{v.label}</span>
+                                  <span className="text-[11px] font-mono font-medium shrink-0">{v.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ──── ANNUAL RESULTS ──── */}
+                    {stockDetail.annualResults && stockDetail.annualResults.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                          Annual Results
+                          <span className="normal-case tracking-normal font-normal text-muted-foreground/60 ml-1">
+                            (Rs. Cr.)
+                          </span>
+                        </h3>
+                        <div className="rounded-lg border border-border overflow-x-auto">
+                          <ScreenerTable
+                            headers={["", ...stockDetail.annualResults.map((ar) => ar.label)]}
+                            fiscalYearEnds={stockDetail.annualResults
+                              .map((ar, i) => (/Mar/i.test(ar.label) ? i : -1))
+                              .filter((i) => i >= 0)}
+                          >
+                            <ScreenerRow label="Sales" values={stockDetail.annualResults.map((ar) => ar.sales)} />
+                            <ScreenerRow label="Net Profit" values={stockDetail.annualResults.map((ar) => ar.netProfit)} />
+                          </ScreenerTable>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ──── PEER COMPANIES (clickable, like screener) ──── */}
+                    {stockDetail.peers.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                          Peer Companies
+                        </h3>
+                        <div className="rounded-lg border border-border overflow-hidden">
+                          {stockDetail.peers.map((peer, idx) => (
+                            <button
+                              key={peer.ticker}
+                              disabled={peerLoading}
+                              className={`w-full text-left flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-primary/5 disabled:opacity-50 ${
+                                idx % 2 === 0 ? "bg-secondary/30" : ""
+                              }`}
+                              onClick={() => handlePeerClick(peer.name, peer.ticker)}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-[10px] text-muted-foreground w-4 text-center shrink-0">{idx + 1}</span>
+                                {peerLoading ? (
+                                  <Loader2 className="w-3 h-3 animate-spin text-primary shrink-0" />
+                                ) : null}
+                                <span className="text-xs font-medium text-foreground truncate hover:text-primary transition-colors">
+                                  {peer.name}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground/50 font-mono shrink-0">
+                                  {peer.ticker}
+                                </span>
+                              </div>
+                              <ArrowUpRight className="w-3 h-3 text-muted-foreground/50 shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/50 mt-1.5 text-center">
+                          Click a peer to view its financial data
+                        </p>
+                      </div>
+                    )}
+
+                  </div>
+
+                  {/* ═══ STICKY FOOTER with action buttons ═══ */}
+                  <div className="border-t border-border px-4 py-3 flex items-center gap-2 bg-background/95 backdrop-blur-sm">
                     <a
                       href={tradingViewUrl(selectedStock.ticker)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block"
+                      className="flex-1"
                     >
-                      <Button className="w-full" variant="outline">
-                        <LineChart className="w-4 h-4 mr-2" />
-                        TradingView Chart
+                      <Button className="w-full" variant="outline" size="sm">
+                        <LineChart className="w-3.5 h-3.5 mr-1.5" />
+                        Chart
                       </Button>
                     </a>
                     <a
                       href={`https://www.screener.in/company/${selectedStock.ticker}/`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block"
+                      className="flex-1"
                     >
-                      <Button className="w-full" variant="outline">
-                        <ExternalLink className="w-4 h-4 mr-2" />
+                      <Button className="w-full" variant="outline" size="sm">
+                        <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
                         Screener.in
                       </Button>
                     </a>

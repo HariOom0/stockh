@@ -80,7 +80,7 @@ export interface StockDetail {
     netProfit: string;
     opm: string;
   }[];
-  peers: string[];
+  peers: { name: string; ticker: string }[];
   // Extended data
   pros?: string[];
   cons?: string[];
@@ -434,6 +434,9 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     const $el = $(el);
     const peerName = $el.text().trim();
     const classes = $el.attr("class") || "";
+    const href = $el.attr("href") || "";
+    const tickerMatch = href.match(/\/company\/([A-Z0-9]+)\//);
+    const peerTicker = tickerMatch ? tickerMatch[1] : "";
 
     // Skip benchmark/index links (they have "tag" class)
     if (classes.includes("tag")) return;
@@ -451,7 +454,7 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
       !peerName.includes("Consumer") &&
       peerName !== "Edit Columns"
     ) {
-      detail.peers.push(peerName);
+      detail.peers.push({ name: peerName, ticker: peerTicker || peerName.replace(/[^A-Z0-9]/gi, "").toUpperCase() });
     }
   });
 
@@ -487,7 +490,7 @@ async function fetchSectorPeers(
   const html = await res.text();
   const $ = cheerio.load(html);
 
-  const peers: string[] = [];
+  const peers: { name: string; ticker: string }[] = [];
   const seen = new Set<string>();
 
   // Look for company links in the data table
@@ -510,10 +513,10 @@ async function fetchSectorPeers(
         )
       )
         return;
-      // Deduplicate by name
-      if (!seen.has(name)) {
-        seen.add(name);
-        peers.push(name);
+      // Deduplicate by ticker
+      if (!seen.has(peerTicker)) {
+        seen.add(peerTicker);
+        peers.push({ name, ticker: peerTicker });
       }
     }
   });
