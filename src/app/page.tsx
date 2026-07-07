@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingUp,
@@ -22,6 +22,10 @@ import {
   Clock,
   Info,
   ArrowLeft,
+  LineChart,
+  Sparkles,
+  Star,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +75,15 @@ interface StockDetail {
   cached?: boolean;
 }
 
+interface StockSectorMap {
+  ticker: string;
+  sector?: string;
+  industry?: string;
+  name?: string;
+}
+
+type ViewMode = "list" | "suggestions";
+
 // ─── Trend Colors ─────────────────────────────────────────────────────
 function trendColor(trend: string) {
   switch (trend) {
@@ -96,6 +109,50 @@ function confidenceDot(confidence: string) {
   }
 }
 
+// ─── TradingView URL helper ──────────────────────────────────────────
+function tradingViewUrl(ticker: string): string {
+  return `https://www.tradingview.com/chart/?symbol=NSE:${ticker}`;
+}
+
+// ─── Sector rotation rank (lower = stronger) ─────────────────────────
+function trendRank(trend: string): number {
+  const ranks: Record<string, number> = {
+    "Bullish": 0,
+    "Rotating In": 1,
+    "Neutral": 2,
+    "Bearish": 3,
+    "Rotating Out": 4,
+  };
+  return ranks[trend] ?? 2;
+}
+
+// ─── Match a stock's sector to the nearest sector insight ─────────────
+function matchSectorInsight(
+  stockSector: string | undefined,
+  insights: SectorInsight[]
+): SectorInsight | null {
+  if (!stockSector || insights.length === 0) return null;
+  // Try exact match first, then partial match on first keyword
+  const lower = stockSector.toLowerCase();
+  const exact = insights.find(
+    (s) => s.sector.toLowerCase() === lower
+  );
+  if (exact) return exact;
+  const partial = insights.find((s) => {
+    const keywords = s.sector.toLowerCase().split(/[\s&]+/).filter((w) => w.length > 2);
+    return keywords.some((kw) => lower.includes(kw));
+  });
+  return partial || null;
+}
+
+// ─── Suggestion Group type ────────────────────────────────────────────
+interface SuggestionGroup {
+  trendLabel: string;
+  trendKey: string;
+  insight?: SectorInsight;
+  stocks: (Stock & { matchedSector?: string })[];
+}
+
 // ─── Main Component ──────────────────────────────────────────────────
 export default function Home() {
   const [stocks, setStocks] = useState<Stock[]>([]);
@@ -114,6 +171,13 @@ export default function Home() {
   const [showSectors, setShowSectors] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [stats, setStats] = useState({ total: 0, filtered: 0 });
+
+  // ─── Suggestions state ───────────────────────────────────────────
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [sectorMap, setSectorMap] = useState<Map<string, StockSectorMap>>(new Map());
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
+  const suggestionsFetchedRef = useRef(false);
 
   // ─── Fetch Volume Shockers ───────────────────────────────────────
   const fetchStocks = useCallback(async () => {
@@ -141,11 +205,35 @@ export default function Home() {
       const data = await res.json();
       setSectorInsights(data.insights);
     } catch {
-      // silently fail - sectors are supplementary
+      // silently fail
     } finally {
       setSectorLoading(false);
     }
   }, []);
+
+  // ─── Fetch Sectors for all stocks (batch) ────────────────────────
+  const fetchSuggestions = useCallback(async () => {
+    if (suggestionsFetchedRef.current) return;
+    suggestionsFetchedRef.current = true;
+    setSuggestionsLoading(true);
+    try {
+      const tickers = stocks.map((s) => s.ticker).join(",");
+      const res = await fetch(`/api/stock-sectors?tickers=${tickers}`);
+      const data = await res.json();
+      if (data.stocks) {
+        const map = new Map<string, StockSectorMap>();
+        for (const s of data.stocks) {
+          map.set(s.ticker, s);
+        }
+        setSectorMap(map);
+        setSuggestionsLoaded(true);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }, [stocks]);
 
   useEffect(() => {
     fetchStocks();
@@ -155,8 +243,6 @@ export default function Home() {
   // ─── Filter & Sort ───────────────────────────────────────────────
   useEffect(() => {
     let result = [...stocks];
-
-    // Search filter
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -165,8 +251,6 @@ export default function Home() {
           s.ticker.toLowerCase().includes(q)
       );
     }
-
-    // Sort
     result.sort((a, b) => {
       let cmp = 0;
       if (sortBy === "name") {
@@ -176,7 +260,6 @@ export default function Home() {
       }
       return sortDir === "desc" ? -cmp : cmp;
     });
-
     setFilteredStocks(result);
   }, [stocks, search, sortBy, sortDir]);
 
@@ -193,6 +276,19 @@ export default function Home() {
       .then((data) => {
         if (data.error) throw new Error(data.error);
         setStockDetail(data);
+        // Also update sectorMap if we have sector info
+        if (data.sector) {
+          setSectorMap((prev) => {
+            const next = new Map(prev);
+            next.set(selectedStock.ticker, {
+              ticker: selectedStock.ticker,
+              sector: data.sector,
+              industry: data.industry,
+              name: data.name,
+            });
+            return next;
+          });
+        }
       })
       .catch((err) => {
         setDetailError(err instanceof Error ? err.message : "Failed to load");
@@ -210,7 +306,6 @@ export default function Home() {
     }
   };
 
-  // ─── Sort indicator ──────────────────────────────────────────────
   const SortIcon = ({ field }: { field: typeof sortBy }) => {
     if (sortBy !== field) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
     return sortDir === "desc" ? (
@@ -220,30 +315,78 @@ export default function Home() {
     );
   };
 
-  // ─── Match stock sector to sector insights ──────────────────────
-  const getSectorSuggestion = (stock: Stock) => {
-    if (!stockDetail || !stockDetail.sector || sectorInsights.length === 0) return null;
-    const match = sectorInsights.find((s) =>
-      stockDetail.sector!.toLowerCase().includes(s.sector.split(" ")[0].toLowerCase())
-    );
-    return match || null;
-  };
-
-  // ─── Memoize sector suggestion for selected stock ────────────────
+  // ─── Sector suggestion for selected stock ────────────────────────
   const selectedSectorSuggestion = useMemo(() => {
     if (!selectedStock || !stockDetail) return null;
-    if (!stockDetail.sector || sectorInsights.length === 0) return null;
-    return sectorInsights.find((s) =>
-      stockDetail.sector!.toLowerCase().includes(s.sector.split(" ")[0].toLowerCase())
-    ) || null;
+    return matchSectorInsight(stockDetail.sector, sectorInsights);
   }, [selectedStock, stockDetail, sectorInsights]);
 
+  // ─── Sorted sectors for sector panel ─────────────────────────────
   const sortedSectors = useMemo(() => {
-    const order = { "Bullish": 0, "Rotating In": 1, "Neutral": 2, "Bearish": 3, "Rotating Out": 4 };
     return [...sectorInsights].sort(
-      (a, b) => (order[a.trend as keyof typeof order] ?? 2) - (order[b.trend as keyof typeof order] ?? 2)
+      (a, b) => trendRank(a.trend) - trendRank(b.trend)
     );
   }, [sectorInsights]);
+
+  // ─── Suggestions: group filtered stocks by sector rotation ───────
+  const suggestionGroups = useMemo<SuggestionGroup[]>(() => {
+    if (sectorInsights.length === 0 || sectorMap.size === 0) return [];
+
+    const groups: SuggestionGroup[] = [
+      { trendLabel: "Bullish Sectors", trendKey: "Bullish", stocks: [] },
+      { trendLabel: "Rotating In", trendKey: "Rotating In", stocks: [] },
+      { trendLabel: "Neutral Sectors", trendKey: "Neutral", stocks: [] },
+      { trendLabel: "Bearish / Rotating Out", trendKey: "other", stocks: [] },
+    ];
+
+    // Map each filtered stock to its sector trend
+    for (const stock of filteredStocks) {
+      const info = sectorMap.get(stock.ticker);
+      const insight = matchSectorInsight(info?.sector, sectorInsights);
+
+      let groupIdx: number;
+      if (!insight) {
+        groupIdx = 2; // Neutral (unknown sector)
+      } else if (insight.trend === "Bullish") {
+        groupIdx = 0;
+      } else if (insight.trend === "Rotating In") {
+        groupIdx = 1;
+      } else if (insight.trend === "Neutral") {
+        groupIdx = 2;
+      } else {
+        groupIdx = 3; // Bearish or Rotating Out
+      }
+
+      groups[groupIdx].stocks.push({
+        ...stock,
+        matchedSector: info?.sector,
+      });
+    }
+
+    // Sort stocks within each group by volGainPct descending
+    for (const group of groups) {
+      group.stocks.sort((a, b) => b.volGainPct - a.volGainPct);
+    }
+
+    // Attach the first matching insight to each group for display
+    for (const group of groups) {
+      if (group.stocks.length > 0) {
+        const firstSector = group.stocks[0].matchedSector;
+        group.insight = matchSectorInsight(firstSector, sectorInsights) || undefined;
+      }
+    }
+
+    // Only return groups that have stocks
+    return groups.filter((g) => g.stocks.length > 0);
+  }, [filteredStocks, sectorMap, sectorInsights]);
+
+  // ─── Handle switching to suggestions view ────────────────────────
+  const handleViewSwitch = (mode: ViewMode) => {
+    setViewMode(mode);
+    if (mode === "suggestions" && !suggestionsLoaded && !suggestionsLoading) {
+      fetchSuggestions();
+    }
+  };
 
   return (
     <TooltipProvider>
@@ -315,11 +458,7 @@ export default function Home() {
                           <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground" />
                         )}
                       </CardTitle>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowSectors(false)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => setShowSectors(false)}>
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
@@ -333,10 +472,7 @@ export default function Home() {
                       {sortedSectors.map((s) => {
                         const tc = trendColor(s.trend);
                         return (
-                          <div
-                            key={s.sector}
-                            className={`rounded-lg border p-3 ${tc.bg} ${tc.border}`}
-                          >
+                          <div key={s.sector} className={`rounded-lg border p-3 ${tc.bg} ${tc.border}`}>
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs font-medium text-foreground truncate mr-1">
                                 {s.sector}
@@ -350,9 +486,7 @@ export default function Home() {
                             </p>
                             <div className="flex items-center gap-1 mt-1.5">
                               <span className={`w-1.5 h-1.5 rounded-full ${confidenceDot(s.confidence)}`} />
-                              <span className="text-[10px] text-muted-foreground">
-                                {s.confidence}
-                              </span>
+                              <span className="text-[10px] text-muted-foreground">{s.confidence}</span>
                             </div>
                           </div>
                         );
@@ -385,6 +519,38 @@ export default function Home() {
                   {stats.total} Total on Chartink
                 </span>
               </div>
+            </div>
+          )}
+
+          {/* ─── VIEW TABS ────────────────────────────────────────── */}
+          {!loading && stocks.length > 0 && (
+            <div className="flex items-center gap-1 mb-5 p-1 rounded-lg bg-secondary w-fit">
+              <button
+                onClick={() => handleViewSwitch("list")}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  viewMode === "list"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  All Stocks
+                </span>
+              </button>
+              <button
+                onClick={() => handleViewSwitch("suggestions")}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  viewMode === "suggestions"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Suggestions
+                </span>
+              </button>
             </div>
           )}
 
@@ -436,52 +602,30 @@ export default function Home() {
             </Card>
           )}
 
-          {/* ─── STOCK TABLE ──────────────────────────────────────── */}
-          {!loading && !error && (
+          {/* ═══════════════════════════════════════════════════════════
+              LIST VIEW (original)
+             ═══════════════════════════════════════════════════════════ */}
+          {!loading && !error && viewMode === "list" && (
             <>
               {/* Desktop Table */}
               <div className="hidden md:block rounded-xl border border-border overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-secondary/80">
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-12">
-                        #
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-12">#</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("name")}>
+                        <span className="flex items-center gap-1">Stock <SortIcon field="name" /></span>
                       </th>
-                      <th
-                        className="text-left px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground"
-                        onClick={() => toggleSort("name")}
-                      >
-                        <span className="flex items-center gap-1">
-                          Stock <SortIcon field="name" />
-                        </span>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("close")}>
+                        <span className="flex items-center justify-end gap-1">Close <SortIcon field="close" /></span>
                       </th>
-                      <th
-                        className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground"
-                        onClick={() => toggleSort("close")}
-                      >
-                        <span className="flex items-center justify-end gap-1">
-                          Close <SortIcon field="close" />
-                        </span>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("change")}>
+                        <span className="flex items-center justify-end gap-1">Change <SortIcon field="change" /></span>
                       </th>
-                      <th
-                        className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground"
-                        onClick={() => toggleSort("change")}
-                      >
-                        <span className="flex items-center justify-end gap-1">
-                          Change <SortIcon field="change" />
-                        </span>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("volGainPct")}>
+                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="volGainPct" /></span>
                       </th>
-                      <th
-                        className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground"
-                        onClick={() => toggleSort("volGainPct")}
-                      >
-                        <span className="flex items-center justify-end gap-1">
-                          Vol Gain <SortIcon field="volGainPct" />
-                        </span>
-                      </th>
-                      <th className="text-center px-4 py-3 font-medium text-muted-foreground w-20">
-                        Action
-                      </th>
+                      <th className="text-center px-4 py-3 font-medium text-muted-foreground w-20">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -494,43 +638,24 @@ export default function Home() {
                         className="border-t border-border hover:bg-secondary/50 cursor-pointer transition-colors group"
                         onClick={() => setSelectedStock(stock)}
                       >
-                        <td className="px-4 py-3 text-muted-foreground text-xs">
-                          {stock.sr}
-                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{stock.sr}</td>
                         <td className="px-4 py-3">
-                          <div className="font-medium text-foreground group-hover:text-primary transition-colors">
-                            {stock.name}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {stock.ticker}
-                          </div>
+                          <div className="font-medium text-foreground group-hover:text-primary transition-colors">{stock.name}</div>
+                          <div className="text-xs text-muted-foreground">{stock.ticker}</div>
                         </td>
-                        <td className="px-4 py-3 text-right font-mono">
-                          {stock.close.toFixed(2)}
-                        </td>
+                        <td className="px-4 py-3 text-right font-mono">{stock.close.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right">
                           <span className="inline-flex items-center gap-0.5 text-emerald-400 font-medium">
-                            <ArrowUpRight className="w-3 h-3" />
-                            +{stock.change.toFixed(2)}%
+                            <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <Badge
-                            variant="secondary"
-                            className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono"
-                          >
+                          <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono">
                             {stock.volGainPct.toFixed(0)}%
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedStock(stock);
-                            }}
-                          >
+                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedStock(stock); }}>
                             <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
                           </Button>
                         </td>
@@ -538,12 +663,9 @@ export default function Home() {
                     ))}
                   </tbody>
                 </table>
-
                 {filteredStocks.length === 0 && (
                   <div className="p-12 text-center text-muted-foreground">
-                    {stocks.length === 0
-                      ? "No volume shockers found today."
-                      : "No stocks match your search."}
+                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match your search."}
                   </div>
                 )}
               </div>
@@ -551,41 +673,23 @@ export default function Home() {
               {/* Mobile Cards */}
               <div className="md:hidden space-y-2">
                 {filteredStocks.map((stock, idx) => (
-                  <motion.div
-                    key={stock.ticker}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.03, duration: 0.2 }}
-                  >
-                    <Card
-                      className="border-border hover:border-primary/30 transition-colors cursor-pointer"
-                      onClick={() => setSelectedStock(stock)}
-                    >
+                  <motion.div key={stock.ticker} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03, duration: 0.2 }}>
+                    <Card className="border-border hover:border-primary/30 transition-colors cursor-pointer" onClick={() => setSelectedStock(stock)}>
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="font-medium text-foreground truncate">
-                              {stock.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {stock.ticker}
-                            </p>
+                            <p className="font-medium text-foreground truncate">{stock.name}</p>
+                            <p className="text-xs text-muted-foreground">{stock.ticker}</p>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className="font-mono font-medium">
-                              {stock.close.toFixed(2)}
-                            </p>
+                            <p className="font-mono font-medium">{stock.close.toFixed(2)}</p>
                             <span className="inline-flex items-center gap-0.5 text-emerald-400 text-xs font-medium">
-                              <ArrowUpRight className="w-3 h-3" />
-                              +{stock.change.toFixed(2)}%
+                              <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
                             </span>
                           </div>
                         </div>
                         <div className="flex items-center justify-between mt-2">
-                          <Badge
-                            variant="secondary"
-                            className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-xs"
-                          >
+                          <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-xs">
                             Vol: {stock.volGainPct.toFixed(0)}%
                           </Badge>
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -596,16 +700,145 @@ export default function Home() {
                     </Card>
                   </motion.div>
                 ))}
-
                 {filteredStocks.length === 0 && (
                   <div className="p-12 text-center text-muted-foreground">
-                    {stocks.length === 0
-                      ? "No volume shockers found today."
-                      : "No stocks match your search."}
+                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match your search."}
                   </div>
                 )}
               </div>
             </>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════
+              SUGGESTIONS VIEW (sector-rotation grouped)
+             ═══════════════════════════════════════════════════════════ */}
+          {!loading && !error && viewMode === "suggestions" && (
+            <div className="space-y-6">
+              {/* Loading state */}
+              {suggestionsLoading && (
+                <div className="flex flex-col items-center py-16 gap-4">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  <div className="text-center">
+                    <p className="text-sm font-medium">Loading sector data for all stocks...</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Fetching sector info from Screener.in for {stocks.length} stocks
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state */}
+              {!suggestionsLoading && sectorInsights.length === 0 && (
+                <Card className="border-border">
+                  <CardContent className="p-8 text-center">
+                    <Activity className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm font-medium mb-1">Sector insights not available</p>
+                    <p className="text-xs text-muted-foreground">
+                      Click the <strong>Sectors</strong> button above to load sector rotation data first, then switch back here.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Suggestion groups */}
+              {!suggestionsLoading && suggestionGroups.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                    <p className="text-sm text-muted-foreground">
+                      Stocks rearranged by sector rotation strength. Bullish sectors appear first.
+                    </p>
+                  </div>
+
+                  {suggestionGroups.map((group) => {
+                    const tc = group.insight ? trendColor(group.insight.trend) : trendColor("Neutral");
+                    const isTop = group.trendKey === "Bullish" || group.trendKey === "Rotating In";
+                    const isBottom = group.trendKey === "other";
+
+                    return (
+                      <motion.div
+                        key={group.trendKey}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <Card className={`border ${isTop ? "border-emerald-500/20" : isBottom ? "border-red-500/20" : "border-border"}`}>
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                                {isTop && <Star className="w-4 h-4 text-emerald-400" />}
+                                {isBottom && <AlertTriangle className="w-4 h-4 text-red-400" />}
+                                {group.trendLabel}
+                                <Badge variant="secondary" className={`text-[10px] ${tc.bg} ${tc.text}`}>
+                                  {group.stocks.length} stock{group.stocks.length !== 1 ? "s" : ""}
+                                </Badge>
+                              </CardTitle>
+                              {group.insight && (
+                                <Badge variant="secondary" className={`text-[10px] ${tc.bg} ${tc.text} ${tc.border} border`}>
+                                  {group.insight.trend}
+                                </Badge>
+                              )}
+                            </div>
+                            {group.insight && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {group.insight.description}
+                              </p>
+                            )}
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="space-y-1.5">
+                              {group.stocks.map((stock, idx) => (
+                                <div
+                                  key={stock.ticker}
+                                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 cursor-pointer transition-colors group"
+                                  onClick={() => setSelectedStock(stock)}
+                                >
+                                  <span className="text-xs text-muted-foreground w-5 text-center shrink-0">
+                                    {idx + 1}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                                      {stock.name}
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-muted-foreground">{stock.ticker}</span>
+                                      {stock.matchedSector && (
+                                        <>
+                                          <span className="text-muted-foreground/40">&middot;</span>
+                                          <span className="text-[10px] text-muted-foreground">{stock.matchedSector}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <p className="text-sm font-mono font-medium">{stock.close.toFixed(2)}</p>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-emerald-400 font-medium">+{stock.change.toFixed(2)}%</span>
+                                      <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono px-1.5">
+                                        {stock.volGainPct.toFixed(0)}%
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0" />
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    );
+                  })}
+
+                  {filteredStocks.length === 0 && (
+                    <div className="p-12 text-center text-muted-foreground">
+                      {stocks.length === 0
+                        ? "No volume shockers found today."
+                        : "No stocks match your search."}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
 
           {/* ─── DATA SOURCE FOOTER ───────────────────────────────── */}
@@ -614,12 +847,7 @@ export default function Home() {
               <span className="flex items-center gap-1">
                 <Info className="w-3 h-3" />
                 Data sourced from{" "}
-                <a
-                  href="https://chartink.com/eodscanner/Volume-Shockers.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
+                <a href="https://chartink.com/eodscanner/Volume-Shockers.html" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                   Chartink.com
                 </a>{" "}
                 &middot; Refreshes daily at 7:00 PM IST
@@ -628,12 +856,7 @@ export default function Home() {
               <span className="flex items-center gap-1">
                 <Shield className="w-3 h-3" />
                 Stock details from{" "}
-                <a
-                  href="https://www.screener.in/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
+                <a href="https://www.screener.in/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                   Screener.in
                 </a>
               </span>
@@ -653,24 +876,34 @@ export default function Home() {
             >
               {/* Panel Header */}
               <div className="sticky top-0 z-10 bg-background/90 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedStock(null)}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setSelectedStock(null)}>
                   <ArrowLeft className="w-4 h-4 mr-1" />
                   Back
                 </Button>
-                <a
-                  href={`https://www.screener.in/company/${selectedStock.ticker}/`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button variant="outline" size="sm">
-                    <ExternalLink className="w-4 h-4 mr-1" />
-                    Screener.in
-                  </Button>
-                </a>
+                <div className="flex items-center gap-2">
+                  {/* TradingView Chart Button */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <a
+                        href={tradingViewUrl(selectedStock.ticker)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Button variant="outline" size="sm">
+                          <LineChart className="w-4 h-4 mr-1" />
+                          <span className="hidden sm:inline">Chart</span>
+                        </Button>
+                      </a>
+                    </TooltipTrigger>
+                    <TooltipContent>Open chart on TradingView</TooltipContent>
+                  </Tooltip>
+                  <a href={`https://www.screener.in/company/${selectedStock.ticker}/`} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm">
+                      <ExternalLink className="w-4 h-4 mr-1" />
+                      <span className="hidden sm:inline">Screener.in</span>
+                    </Button>
+                  </a>
+                </div>
               </div>
 
               {detailLoading && (
@@ -687,12 +920,7 @@ export default function Home() {
                 <div className="p-6 text-center">
                   <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
                   <p className="text-sm text-destructive mb-3">{detailError}</p>
-                  <a
-                    href={`https://www.screener.in/company/${selectedStock.ticker}/`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline"
-                  >
+                  <a href={`https://www.screener.in/company/${selectedStock.ticker}/`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
                     View directly on Screener.in &rarr;
                   </a>
                 </div>
@@ -705,21 +933,11 @@ export default function Home() {
                     <h2 className="text-xl font-bold">{stockDetail.name}</h2>
                     <p className="text-sm text-muted-foreground">
                       {selectedStock.ticker}
-                      {stockDetail.sector && (
-                        <span className="ml-2">
-                          &middot; {stockDetail.sector}
-                        </span>
-                      )}
-                      {stockDetail.industry && (
-                        <span className="ml-2 text-xs">
-                          ({stockDetail.industry})
-                        </span>
-                      )}
+                      {stockDetail.sector && <span className="ml-2">&middot; {stockDetail.sector}</span>}
+                      {stockDetail.industry && <span className="ml-2 text-xs">({stockDetail.industry})</span>}
                     </p>
                     <div className="flex items-center gap-3 mt-2">
-                      <span className="text-2xl font-bold font-mono">
-                        {selectedStock.close.toFixed(2)}
-                      </span>
+                      <span className="text-2xl font-bold font-mono">{selectedStock.close.toFixed(2)}</span>
                       <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
                         <TrendingUp className="w-3 h-3 mr-1" />
                         +{selectedStock.change.toFixed(2)}%
@@ -740,21 +958,14 @@ export default function Home() {
                           <span className="text-xs font-semibold text-foreground">
                             Sector Outlook: {selectedSectorSuggestion.sector}
                           </span>
-                          <Badge
-                            variant="secondary"
-                            className={`text-[10px] ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).text}`}
-                          >
+                          <Badge variant="secondary" className={`text-[10px] ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).text}`}>
                             {selectedSectorSuggestion.trend}
                           </Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedSectorSuggestion.description}
-                        </p>
+                        <p className="text-xs text-muted-foreground">{selectedSectorSuggestion.description}</p>
                         <div className="flex items-center gap-1 mt-1.5">
                           <span className={`w-1.5 h-1.5 rounded-full ${confidenceDot(selectedSectorSuggestion.confidence)}`} />
-                          <span className="text-[10px] text-muted-foreground">
-                            Confidence: {selectedSectorSuggestion.confidence}
-                          </span>
+                          <span className="text-[10px] text-muted-foreground">Confidence: {selectedSectorSuggestion.confidence}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -764,12 +975,9 @@ export default function Home() {
                   {stockDetail.about && (
                     <div>
                       <h3 className="text-sm font-semibold mb-1.5 flex items-center gap-1.5">
-                        <Info className="w-3.5 h-3.5 text-primary" />
-                        About
+                        <Info className="w-3.5 h-3.5 text-primary" /> About
                       </h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        {stockDetail.about}
-                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">{stockDetail.about}</p>
                     </div>
                   )}
 
@@ -779,21 +987,13 @@ export default function Home() {
                   {Object.keys(stockDetail.metrics).length > 0 && (
                     <div>
                       <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                        <BarChart3 className="w-3.5 h-3.5 text-primary" />
-                        Key Ratios
+                        <BarChart3 className="w-3.5 h-3.5 text-primary" /> Key Ratios
                       </h3>
                       <div className="grid grid-cols-2 gap-2">
                         {Object.entries(stockDetail.metrics).map(([key, val]) => (
-                          <div
-                            key={key}
-                            className="rounded-lg bg-secondary p-2.5"
-                          >
-                            <p className="text-[10px] text-muted-foreground truncate">
-                              {key}
-                            </p>
-                            <p className="text-sm font-semibold font-mono mt-0.5">
-                              {val}
-                            </p>
+                          <div key={key} className="rounded-lg bg-secondary p-2.5">
+                            <p className="text-[10px] text-muted-foreground truncate">{key}</p>
+                            <p className="text-sm font-semibold font-mono mt-0.5">{val}</p>
                           </div>
                         ))}
                       </div>
@@ -804,21 +1004,15 @@ export default function Home() {
                   {stockDetail.quarters.length > 0 && (
                     <div>
                       <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                        <TrendingUp className="w-3.5 h-3.5 text-primary" />
-                        Recent Quarterly Results
+                        <TrendingUp className="w-3.5 h-3.5 text-primary" /> Recent Quarterly Results
                       </h3>
                       <div className="rounded-lg border border-border overflow-x-auto">
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="bg-secondary">
-                              <th className="text-left px-3 py-2 font-medium text-muted-foreground">
-                                Metric
-                              </th>
+                              <th className="text-left px-3 py-2 font-medium text-muted-foreground">Metric</th>
                               {stockDetail.quarters.map((q) => (
-                                <th
-                                  key={q.label}
-                                  className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap"
-                                >
+                                <th key={q.label} className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
                                   {q.label}
                                 </th>
                               ))}
@@ -826,43 +1020,22 @@ export default function Home() {
                           </thead>
                           <tbody>
                             <tr className="border-t border-border">
-                              <td className="px-3 py-2 text-muted-foreground">
-                                Sales
-                              </td>
+                              <td className="px-3 py-2 text-muted-foreground">Sales</td>
                               {stockDetail.quarters.map((q) => (
-                                <td
-                                  key={q.label}
-                                  className="text-right px-3 py-2 font-mono"
-                                >
-                                  {q.sales}
-                                </td>
+                                <td key={q.label} className="text-right px-3 py-2 font-mono">{q.sales}</td>
                               ))}
                             </tr>
                             <tr className="border-t border-border">
-                              <td className="px-3 py-2 text-muted-foreground">
-                                Net Profit
-                              </td>
+                              <td className="px-3 py-2 text-muted-foreground">Net Profit</td>
                               {stockDetail.quarters.map((q) => (
-                                <td
-                                  key={q.label}
-                                  className="text-right px-3 py-2 font-mono"
-                                >
-                                  {q.netProfit}
-                                </td>
+                                <td key={q.label} className="text-right px-3 py-2 font-mono">{q.netProfit}</td>
                               ))}
                             </tr>
                             {stockDetail.quarters[0]?.opm && stockDetail.quarters[0].opm !== "-" && (
                               <tr className="border-t border-border">
-                                <td className="px-3 py-2 text-muted-foreground">
-                                  OPM
-                                </td>
+                                <td className="px-3 py-2 text-muted-foreground">OPM</td>
                                 {stockDetail.quarters.map((q) => (
-                                  <td
-                                    key={q.label}
-                                    className="text-right px-3 py-2 font-mono"
-                                  >
-                                    {q.opm}
-                                  </td>
+                                  <td key={q.label} className="text-right px-3 py-2 font-mono">{q.opm}</td>
                                 ))}
                               </tr>
                             )}
@@ -878,31 +1051,38 @@ export default function Home() {
                       <h3 className="text-sm font-semibold mb-2">Peer Companies</h3>
                       <div className="flex flex-wrap gap-1.5">
                         {stockDetail.peers.map((peer) => (
-                          <Badge
-                            key={peer}
-                            variant="secondary"
-                            className="text-xs"
-                          >
-                            {peer}
-                          </Badge>
+                          <Badge key={peer} variant="secondary" className="text-xs">{peer}</Badge>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Screener Link */}
+                  {/* Action Buttons */}
                   <Separator />
-                  <a
-                    href={`https://www.screener.in/company/${selectedStock.ticker}/`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block"
-                  >
-                    <Button className="w-full" variant="outline">
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      View Full Details on Screener.in
-                    </Button>
-                  </a>
+                  <div className="grid grid-cols-2 gap-2">
+                    <a
+                      href={tradingViewUrl(selectedStock.ticker)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      <Button className="w-full" variant="outline">
+                        <LineChart className="w-4 h-4 mr-2" />
+                        TradingView Chart
+                      </Button>
+                    </a>
+                    <a
+                      href={`https://www.screener.in/company/${selectedStock.ticker}/`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      <Button className="w-full" variant="outline">
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Screener.in
+                      </Button>
+                    </a>
+                  </div>
                 </div>
               )}
             </motion.div>
