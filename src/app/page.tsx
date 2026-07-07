@@ -1295,7 +1295,7 @@ export default function Home() {
               )}
 
               {stockDetail && !detailLoading && !detailError && (
-                <div className="flex flex-col">
+                <div className="flex flex-col h-full overflow-hidden">
                   {/* ═══ SCREENER-STYLE HEADER ═══ */}
                   <div className="px-4 pt-4 pb-3 border-b border-border">
                     <div className="flex items-start justify-between gap-3">
