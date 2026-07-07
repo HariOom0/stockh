@@ -27,3 +27,25 @@ Stage Summary:
 - All 3 API routes returning 200 with proper caching
 - Dark finance theme with green/amber accent colors
 - Responsive design (desktop table + mobile cards)
+---
+Task ID: 1
+Agent: Main Agent
+Task: Add universal stock search feature - search any stock on screener.in and display comprehensive data
+
+Work Log:
+- Read and analyzed existing codebase (page.tsx, scraper.ts, API routes)
+- Created /api/stock-search/route.ts - searches screener.in's JSON API, extracts ticker from URL pattern, with fallback HTML scraping and 15min cache
+- Enhanced scraper.ts to extract comprehensive data: pros/cons (div.pros/cons ul li), balance sheet (#balance-sheet table), cash flow (#cash-flow table), shareholding pattern (#shareholding table.data-table with dedup), annual results (structure ready, data loaded dynamically)
+- Added "Search" tab to main page UI with debounced search (400ms), quick-pick buttons (RELIANCE, TCS, HDFCBANK, INFY, ITC, SBIN), animated results list
+- Each search result shows company name, ticker, with direct links to Screener.in and TradingView
+- Clicking a result opens the detail panel with full screener.in data
+- Modified detail panel to conditionally hide volume-shocker-specific data (price, change%, vol%) for searched stocks, showing "Screener.in Data" badge instead
+- Added extended data display sections in detail panel: Pros (green checkmarks), Cons (red X marks), Balance Sheet table, Cash Flow table, Shareholding Pattern, Annual Results
+- Fixed view tabs to always show (including Search tab even during initial loading)
+- Added Globe, CheckCircle, XCircle, Users, DollarSign icon imports
+
+Stage Summary:
+- New API: /api/stock-search - searches all NSE/BSE companies via screener.in
+- Enhanced scraper extracts: 9 metrics, 13 quarters, 58 peers, pros, cons, 12 periods of balance sheet, 12 periods of cash flow, shareholding pattern
+- Search tab accessible immediately without waiting for volume shockers to load
+- Comprehensive stock data now available for any Indian stock

@@ -81,6 +81,35 @@ export interface StockDetail {
     opm: string;
   }[];
   peers: string[];
+  // Extended data
+  pros?: string[];
+  cons?: string[];
+  balanceSheet?: {
+    label: string;
+    reserves: string;
+    borrowing: string;
+    otherLiab: string;
+    totalLiab: string;
+    fixedAssets: string;
+    cwip: string;
+    totalAssets: string;
+  }[];
+  shareholding?: {
+    category: string;
+    values: { label: string; value: string }[];
+  }[];
+  annualResults?: {
+    label: string;
+    sales: string;
+    netProfit: string;
+    opm: string;
+  }[];
+  cashFlow?: {
+    label: string;
+    operatingCF: string;
+    investingCF: string;
+    financingCF: string;
+  }[];
 }
 
 export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
@@ -110,6 +139,13 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     .trim()
     .replace(/\s+/g, " ");
 
+  // BSE / NSE codes from the company info area
+  const companyInfoText = $(".company-info-strip").text() || "";
+  const bseMatch = companyInfoText.match(/BSE:\s*(\d+)/);
+  const nseMatch = companyInfoText.match(/NSE:\s*(\w+)/);
+  if (bseMatch) detail.bseCode = bseMatch[1];
+  if (nseMatch) detail.nseCode = nseMatch[1];
+
   // Sector & Industry from peers section (more reliably present)
   const peersSection = $("#peers");
   if (peersSection.length) {
@@ -129,7 +165,7 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     .trim()
     .replace(/\s+/g, " ");
 
-  // Key metrics from the top ratios section
+  // ─── Key metrics from the top ratios section ────────────────────────
   const ratioRows = $("#top-ratios li.flex.flex-space-between");
   ratioRows.each((_, el) => {
     const labelEl = $(el).find(".name");
@@ -141,7 +177,23 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     }
   });
 
-  // Quarterly results table
+  // ─── Pros & Cons ───────────────────────────────────────────────────
+  const prosList: string[] = [];
+  const consList: string[] = [];
+
+  $("div.pros ul li").each((_, el) => {
+    const text = $(el).text().trim();
+    if (text) prosList.push(text);
+  });
+  $("div.cons ul li").each((_, el) => {
+    const text = $(el).text().trim();
+    if (text) consList.push(text);
+  });
+
+  if (prosList.length > 0) detail.pros = prosList;
+  if (consList.length > 0) detail.cons = consList;
+
+  // ─── Quarterly results table ────────────────────────────────────────
   const quarterlyTable = $("#quarters table");
   if (quarterlyTable.length) {
     const headers: string[] = [];
@@ -149,7 +201,7 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
       headers.push($(el).text().trim());
     });
 
-    // Find row indices for Sales and Net Profit
+    // Find row indices for Sales, Net Profit, and OPM
     const rows = quarterlyTable.find("tbody tr");
     let salesRow: cheerio.Cheerio<cheerio.Element> | null = null;
     let profitRow: cheerio.Cheerio<cheerio.Element> | null = null;
@@ -180,12 +232,185 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     }
   }
 
-  // Peers - loaded dynamically, skip category names
-  // The peers table has a placeholder "Loading peers table..."
-  // We look for peer links that point to /company/ paths
+  // ─── Annual results (compounded sales/profit growth) ────────────────
+  // Screener.in shows a "Compounded Sales Growth" and "Compounded Profit Growth" section
+  // Also the "Financials > Quarterly Results" table has yearly data
+  const annualTable = $("table#annual-results-table, #annual table");
+  if (annualTable.length) {
+    const annHeaders: string[] = [];
+    annualTable.find("thead th").each((_, el) => {
+      annHeaders.push($(el).text().trim());
+    });
+
+    const annRows = annualTable.find("tbody tr");
+    let annSalesRow: cheerio.Cheerio<cheerio.Element> | null = null;
+    let annProfitRow: cheerio.Cheerio<cheerio.Element> | null = null;
+
+    annRows.each((_, el) => {
+      const firstCell = $(el).find("td").first().text().trim().toLowerCase();
+      if (firstCell.includes("sales") || firstCell.includes("revenue")) {
+        annSalesRow = $(el);
+      }
+      if (firstCell.includes("net profit") || firstCell.includes("profit for")) {
+        annProfitRow = $(el);
+      }
+    });
+
+    if (annSalesRow || annProfitRow) {
+      const annualResults: StockDetail["annualResults"] = [];
+      for (let i = 1; i < annHeaders.length; i++) {
+        annualResults.push({
+          label: annHeaders[i],
+          sales: annSalesRow ? annSalesRow.find("td").eq(i).text().trim() : "-",
+          netProfit: annProfitRow ? annProfitRow.find("td").eq(i).text().trim() : "-",
+          opm: "-",
+        });
+      }
+      if (annualResults.length > 0) detail.annualResults = annualResults;
+    }
+  }
+
+  // ─── Balance Sheet data ────────────────────────────────────────────
+  const bsTable = $("#balance-sheet table");
+  if (bsTable.length) {
+    const bsHeaders: string[] = [];
+    bsTable.find("thead th").each((_, el) => {
+      bsHeaders.push($(el).text().trim());
+    });
+
+    const bsRows = bsTable.find("tbody tr");
+    const bsData: Record<string, cheerio.Cheerio<cheerio.Element>> = {};
+
+    bsRows.each((_, el) => {
+      const firstCell = $(el).find("td").first().text().trim().toLowerCase();
+      if (
+        firstCell.includes("reserves") ||
+        firstCell.includes("borrowing") ||
+        firstCell.includes("other liabilities") ||
+        firstCell.includes("total liabilities") ||
+        firstCell.includes("fixed assets") ||
+        firstCell.includes("cwip") ||
+        firstCell.includes("total assets")
+      ) {
+        bsData[firstCell] = $(el);
+      }
+    });
+
+    const balanceSheet: StockDetail["balanceSheet"] = [];
+    for (let i = 1; i < bsHeaders.length; i++) {
+      const getCell = (key: string) => bsData[key] ? bsData[key].find("td").eq(i).text().trim() : "-";
+      balanceSheet.push({
+        label: bsHeaders[i],
+        reserves: getCell("reserves"),
+        borrowing: getCell("borrowing"),
+        otherLiab: getCell("other liabilities"),
+        totalLiab: getCell("total liabilities"),
+        fixedAssets: getCell("fixed assets"),
+        cwip: getCell("cwip"),
+        totalAssets: getCell("total assets"),
+      });
+    }
+    if (balanceSheet.length > 0) detail.balanceSheet = balanceSheet;
+  }
+
+  // ─── Cash Flow data ────────────────────────────────────────────────
+  const cfTable = $("#cash-flow table");
+  if (cfTable.length) {
+    const cfHeaders: string[] = [];
+    cfTable.find("thead th").each((_, el) => {
+      cfHeaders.push($(el).text().trim());
+    });
+
+    const cfRows = cfTable.find("tbody tr");
+    let cfOperRow: cheerio.Cheerio<cheerio.Element> | null = null;
+    let cfInvestRow: cheerio.Cheerio<cheerio.Element> | null = null;
+    let cfFinanceRow: cheerio.Cheerio<cheerio.Element> | null = null;
+
+    cfRows.each((_, el) => {
+      const firstCell = $(el).find("td").first().text().trim().toLowerCase();
+      if (firstCell.includes("operating") || firstCell.includes("cash from")) {
+        cfOperRow = $(el);
+      }
+      if (firstCell.includes("investing")) {
+        cfInvestRow = $(el);
+      }
+      if (firstCell.includes("financing")) {
+        cfFinanceRow = $(el);
+      }
+    });
+
+    if (cfOperRow || cfInvestRow || cfFinanceRow) {
+      const cashFlow: StockDetail["cashFlow"] = [];
+      for (let i = 1; i < cfHeaders.length; i++) {
+        cashFlow.push({
+          label: cfHeaders[i],
+          operatingCF: cfOperRow ? cfOperRow.find("td").eq(i).text().trim() : "-",
+          investingCF: cfInvestRow ? cfInvestRow.find("td").eq(i).text().trim() : "-",
+          financingCF: cfFinanceRow ? cfFinanceRow.find("td").eq(i).text().trim() : "-",
+        });
+      }
+      if (cashFlow.length > 0) detail.cashFlow = cashFlow;
+    }
+  }
+
+  // ─── Shareholding pattern ───────────────────────────────────────────
+  const shSection = $("#shareholding");
+  if (shSection.length) {
+    const shTable = shSection.find("table.data-table");
+    if (shTable.length) {
+      const shHeaders: string[] = [];
+      shTable.find("thead th").each((_, el) => {
+        shHeaders.push($(el).text().trim());
+      });
+
+      // Build a single shareholding entry with periods as columns
+      const values: { label: string; value: string }[] = [];
+      const seenLabels = new Set<string>();
+      shTable.find("tbody tr").each((_, rowEl) => {
+        const cells = $(rowEl).find("td");
+        if (cells.length < 2) return;
+        const label = $(cells[0]).text().trim().replace(/\s*[\+\\+]\s*$/, "").trim();
+        if (!label || label.length < 2 || seenLabels.has(label)) return;
+        seenLabels.add(label);
+
+        // Get the latest period value (last non-empty cell)
+        let latestValue = "";
+        for (let i = cells.length - 1; i >= 1; i--) {
+          const val = $(cells[i]).text().trim();
+          if (val) { latestValue = val; break; }
+        }
+        if (latestValue) {
+          values.push({ label, value: latestValue });
+        }
+      });
+
+      if (values.length > 0) {
+        // Use the latest period from headers as category
+        const latestPeriod = shHeaders[shHeaders.length - 1] || "Latest";
+        detail.shareholding = [{ category: latestPeriod, values }];
+      }
+    }
+
+    // Fallback: look for list-style format
+    if (!detail.shareholding || detail.shareholding.length === 0) {
+      const shItems: { label: string; value: string }[] = [];
+      shSection.find("li.flex.flex-space-between").each((_, el) => {
+        const label = $(el).find(".name").text().trim();
+        const value = $(el).find(".value .number").first().text().trim();
+        if (label && value) {
+          shItems.push({ label, value });
+        }
+      });
+      if (shItems.length > 0) {
+        detail.shareholding = [{ category: "Shareholding", values: shItems }];
+      }
+    }
+  }
+
+  // ─── Peers ─────────────────────────────────────────────────────────
   $("#peers a[href^='/company/']").each((_, el) => {
     const peerName = $(el).text().trim();
-    // Filter out category-like entries (no spaces, or known categories)
+    // Filter out category-like entries
     if (
       peerName &&
       peerName.length > 2 &&

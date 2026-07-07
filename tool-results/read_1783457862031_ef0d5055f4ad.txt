@@ -1,0 +1,1121 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+     4→     4→import { motion, AnimatePresence } from "framer-motion";
+     5→     5→import {
+     6→     6→  TrendingUp,
+     7→     7→  ArrowUpRight,
+     8→     8→  RefreshCw,
+     9→     9→  Search,
+    10→    10→  X,
+    11→    11→  ExternalLink,
+    12→    12→  BarChart3,
+    13→    13→  Activity,
+    14→    14→  Filter,
+    15→    15→  ChevronDown,
+    16→    16→  ChevronUp,
+    17→    17→  AlertTriangle,
+    18→    18→  Zap,
+    19→    19→  ArrowUpDown,
+    20→    20→  Eye,
+    21→    21→  Shield,
+    22→    22→  Clock,
+    23→    23→  Info,
+    24→    24→  ArrowLeft,
+    25→    25→  LineChart,
+    26→    26→  Sparkles,
+    27→    27→  Star,
+    28→    28→  Loader2,
+    29→    29→} from "lucide-react";
+    30→    30→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    31→    31→import { Badge } from "@/components/ui/badge";
+    32→    32→import { Button } from "@/components/ui/button";
+    33→    33→import { Input } from "@/components/ui/input";
+    34→    34→import { Skeleton } from "@/components/ui/skeleton";
+    35→    35→import { Separator } from "@/components/ui/separator";
+    36→    36→import {
+    37→    37→  Tooltip,
+    38→    38→  TooltipContent,
+    39→    39→  TooltipProvider,
+    40→    40→  TooltipTrigger,
+    41→    41→} from "@/components/ui/tooltip";
+    42→    42→
+    43→    43→// ─── Types ────────────────────────────────────────────────────────────
+    44→    44→interface Stock {
+    45→    45→  sr: number;
+    46→    46→  name: string;
+    47→    47→  ticker: string;
+    48→    48→  close: number;
+    49→    49→  change: number;
+    50→    50→  volGainPct: number;
+    51→    51→  isPositive: boolean;
+    52→    52→}
+    53→    53→
+    54→    54→interface SectorInsight {
+    55→    55→  sector: string;
+    56→    56→  trend: string;
+    57→    57→  description: string;
+    58→    58→  confidence: string;
+    59→    59→}
+    60→    60→
+    61→    61→interface StockDetail {
+    62→    62→  name: string;
+    63→    63→  ticker: string;
+    64→    64→  sector?: string;
+    65→    65→  industry?: string;
+    66→    66→  about?: string;
+    67→    67→  metrics: Record<string, string>;
+    68→    68→  quarters: {
+    69→    69→    label: string;
+    70→    70→    sales: string;
+    71→    71→    netProfit: string;
+    72→    72→    opm: string;
+    73→    73→  }[];
+    74→    74→  peers: string[];
+    75→    75→  cached?: boolean;
+    76→    76→}
+    77→    77→
+    78→    78→interface StockSectorMap {
+    79→    79→  ticker: string;
+    80→    80→  sector?: string;
+    81→    81→  industry?: string;
+    82→    82→  name?: string;
+    83→    83→}
+    84→    84→
+    85→    85→type ViewMode = "list" | "suggestions";
+    86→    86→
+    87→    87→// ─── Trend Colors ─────────────────────────────────────────────────────
+    88→    88→function trendColor(trend: string) {
+    89→    89→  switch (trend) {
+    90→    90→    case "Bullish":
+    91→    91→    case "Rotating In":
+    92→    92→      return { bg: "bg-emerald-500/15", text: "text-emerald-400", border: "border-emerald-500/30" };
+    93→    93→    case "Bearish":
+    94→    94→    case "Rotating Out":
+    95→    95→      return { bg: "bg-red-500/15", text: "text-red-400", border: "border-red-500/30" };
+    96→    96→    default:
+    97→    97→      return { bg: "bg-amber-500/15", text: "text-amber-400", border: "border-amber-500/30" };
+    98→    98→  }
+    99→    99→}
+   100→   100→
+   101→   101→function confidenceDot(confidence: string) {
+   102→   102→  switch (confidence) {
+   103→   103→    case "High":
+   104→   104→      return "bg-emerald-400";
+   105→   105→    case "Medium":
+   106→   106→      return "bg-amber-400";
+   107→   107→    default:
+   108→   108→      return "bg-zinc-500";
+   109→   109→  }
+   110→   110→}
+   111→   111→
+   112→   112→// ─── TradingView URL helper ──────────────────────────────────────────
+   113→   113→function tradingViewUrl(ticker: string): string {
+   114→   114→  return `https://www.tradingview.com/chart/?symbol=NSE:${ticker}`;
+   115→   115→}
+   116→   116→
+   117→   117→// ─── Sector rotation rank (lower = stronger) ─────────────────────────
+   118→   118→function trendRank(trend: string): number {
+   119→   119→  const ranks: Record<string, number> = {
+   120→   120→    "Bullish": 0,
+   121→   121→    "Rotating In": 1,
+   122→   122→    "Neutral": 2,
+   123→   123→    "Bearish": 3,
+   124→   124→    "Rotating Out": 4,
+   125→   125→  };
+   126→   126→  return ranks[trend] ?? 2;
+   127→   127→}
+   128→   128→
+   129→   129→// ─── Match a stock's sector to the nearest sector insight ─────────────
+   130→   130→function matchSectorInsight(
+   131→   131→  stockSector: string | undefined,
+   132→   132→  insights: SectorInsight[]
+   133→   133→): SectorInsight | null {
+   134→   134→  if (!stockSector || insights.length === 0) return null;
+   135→   135→  // Try exact match first, then partial match on first keyword
+   136→   136→  const lower = stockSector.toLowerCase();
+   137→   137→  const exact = insights.find(
+   138→   138→    (s) => s.sector.toLowerCase() === lower
+   139→   139→  );
+   140→   140→  if (exact) return exact;
+   141→   141→  const partial = insights.find((s) => {
+   142→   142→    const keywords = s.sector.toLowerCase().split(/[\s&]+/).filter((w) => w.length > 2);
+   143→   143→    return keywords.some((kw) => lower.includes(kw));
+   144→   144→  });
+   145→   145→  return partial || null;
+   146→   146→}
+   147→   147→
+   148→   148→// ─── Suggestion Group type ────────────────────────────────────────────
+   149→   149→interface SuggestionGroup {
+   150→   150→  trendLabel: string;
+   151→   151→  trendKey: string;
+   152→   152→  insight?: SectorInsight;
+   153→   153→  stocks: (Stock & { matchedSector?: string })[];
+   154→   154→}
+   155→   155→
+   156→   156→// ─── Main Component ──────────────────────────────────────────────────
+   157→   157→export default function Home() {
+   158→   158→  const [stocks, setStocks] = useState<Stock[]>([]);
+   159→   159→  const [filteredStocks, setFilteredStocks] = useState<Stock[]>([]);
+   160→   160→  const [loading, setLoading] = useState(true);
+   161→   161→  const [error, setError] = useState("");
+   162→   162→  const [search, setSearch] = useState("");
+   163→   163→  const [sortBy, setSortBy] = useState<"volGainPct" | "change" | "close" | "name">("volGainPct");
+   164→   164→  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+   165→   165→  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+   166→   166→  const [stockDetail, setStockDetail] = useState<StockDetail | null>(null);
+   167→   167→  const [detailLoading, setDetailLoading] = useState(false);
+   168→   168→  const [detailError, setDetailError] = useState("");
+   169→   169→  const [sectorInsights, setSectorInsights] = useState<SectorInsight[]>([]);
+   170→   170→  const [sectorLoading, setSectorLoading] = useState(true);
+   171→   171→  const [showSectors, setShowSectors] = useState(false);
+   172→   172→  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+   173→   173→  const [stats, setStats] = useState({ total: 0, filtered: 0 });
+   174→   174→
+   175→   175→  // ─── Suggestions state ───────────────────────────────────────────
+   176→   176→  const [viewMode, setViewMode] = useState<ViewMode>("list");
+   177→   177→  const [sectorMap, setSectorMap] = useState<Map<string, StockSectorMap>>(new Map());
+   178→   178→  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+   179→   179→  const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
+   180→   180→  const suggestionsFetchedRef = useRef(false);
+   181→   181→
+   182→   182→  // ─── Fetch Volume Shockers ───────────────────────────────────────
+   183→   183→  const fetchStocks = useCallback(async () => {
+   184→   184→    setLoading(true);
+   185→   185→    setError("");
+   186→   186→    try {
+   187→   187→      const res = await fetch("/api/volume-shockers");
+   188→   188→      const data = await res.json();
+   189→   189→      if (!res.ok) throw new Error(data.error || "Failed to fetch");
+   190→   190→      setStocks(data.stocks);
+   191→   191→      setLastUpdated(data.lastUpdated);
+   192→   192→      setStats({ total: data.totalOnChartink, filtered: data.filteredCount });
+   193→   193→    } catch (err) {
+   194→   194→      setError(err instanceof Error ? err.message : "Failed to load stocks");
+   195→   195→    } finally {
+   196→   196→      setLoading(false);
+   197→   197→    }
+   198→   198→  }, []);
+   199→   199→
+   200→   200→  // ─── Fetch Sector Insights ───────────────────────────────────────
+   201→   201→  const fetchSectors = useCallback(async () => {
+   202→   202→    setSectorLoading(true);
+   203→   203→    try {
+   204→   204→      const res = await fetch("/api/sector-insights");
+   205→   205→      const data = await res.json();
+   206→   206→      setSectorInsights(data.insights);
+   207→   207→    } catch {
+   208→   208→      // silently fail
+   209→   209→    } finally {
+   210→   210→      setSectorLoading(false);
+   211→   211→    }
+   212→   212→  }, []);
+   213→   213→
+   214→   214→  // ─── Fetch Sectors for all stocks (batch) ────────────────────────
+   215→   215→  const fetchSuggestions = useCallback(async () => {
+   216→   216→    if (suggestionsFetchedRef.current) return;
+   217→   217→    suggestionsFetchedRef.current = true;
+   218→   218→    setSuggestionsLoading(true);
+   219→   219→    try {
+   220→   220→      const tickers = stocks.map((s) => s.ticker).join(",");
+   221→   221→      const res = await fetch(`/api/stock-sectors?tickers=${tickers}`);
+   222→   222→      const data = await res.json();
+   223→   223→      if (data.stocks) {
+   224→   224→        const map = new Map<string, StockSectorMap>();
+   225→   225→        for (const s of data.stocks) {
+   226→   226→          map.set(s.ticker, s);
+   227→   227→        }
+   228→   228→        setSectorMap(map);
+   229→   229→        setSuggestionsLoaded(true);
+   230→   230→      }
+   231→   231→    } catch {
+   232→   232→      // silently fail
+   233→   233→    } finally {
+   234→   234→      setSuggestionsLoading(false);
+   235→   235→    }
+   236→   236→  }, [stocks]);
+   237→   237→
+   238→   238→  useEffect(() => {
+   239→   239→    fetchStocks();
+   240→   240→    fetchSectors();
+   241→   241→  }, [fetchStocks, fetchSectors]);
+   242→   242→
+   243→   243→  // ─── Filter & Sort ───────────────────────────────────────────────
+   244→   244→  useEffect(() => {
+   245→   245→    let result = [...stocks];
+   246→   246→    if (search.trim()) {
+   247→   247→      const q = search.toLowerCase();
+   248→   248→      result = result.filter(
+   249→   249→        (s) =>
+   250→   250→          s.name.toLowerCase().includes(q) ||
+   251→   251→          s.ticker.toLowerCase().includes(q)
+   252→   252→      );
+   253→   253→    }
+   254→   254→    result.sort((a, b) => {
+   255→   255→      let cmp = 0;
+   256→   256→      if (sortBy === "name") {
+   257→   257→        cmp = a.name.localeCompare(b.name);
+   258→   258→      } else {
+   259→   259→        cmp = (a[sortBy] as number) - (b[sortBy] as number);
+   260→   260→      }
+   261→   261→      return sortDir === "desc" ? -cmp : cmp;
+   262→   262→    });
+   263→   263→    setFilteredStocks(result);
+   264→   264→  }, [stocks, search, sortBy, sortDir]);
+   265→   265→
+   266→   266→  // ─── Fetch Stock Detail ──────────────────────────────────────────
+   267→   267→  useEffect(() => {
+   268→   268→    if (!selectedStock) {
+   269→   269→      setStockDetail(null);
+   270→   270→      return;
+   271→   271→    }
+   272→   272→    setDetailLoading(true);
+   273→   273→    setDetailError("");
+   274→   274→    fetch(`/api/stock-detail?ticker=${selectedStock.ticker}`)
+   275→   275→      .then((r) => r.json())
+   276→   276→      .then((data) => {
+   277→   277→        if (data.error) throw new Error(data.error);
+   278→   278→        setStockDetail(data);
+   279→   279→        // Also update sectorMap if we have sector info
+   280→   280→        if (data.sector) {
+   281→   281→          setSectorMap((prev) => {
+   282→   282→            const next = new Map(prev);
+   283→   283→            next.set(selectedStock.ticker, {
+   284→   284→              ticker: selectedStock.ticker,
+   285→   285→              sector: data.sector,
+   286→   286→              industry: data.industry,
+   287→   287→              name: data.name,
+   288→   288→            });
+   289→   289→            return next;
+   290→   290→          });
+   291→   291→        }
+   292→   292→      })
+   293→   293→      .catch((err) => {
+   294→   294→        setDetailError(err instanceof Error ? err.message : "Failed to load");
+   295→   295→      })
+   296→   296→      .finally(() => setDetailLoading(false));
+   297→   297→  }, [selectedStock]);
+   298→   298→
+   299→   299→  // ─── Toggle Sort ─────────────────────────────────────────────────
+   300→   300→  const toggleSort = (field: typeof sortBy) => {
+   301→   301→    if (sortBy === field) {
+   302→   302→      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+   303→   303→    } else {
+   304→   304→      setSortBy(field);
+   305→   305→      setSortDir("desc");
+   306→   306→    }
+   307→   307→  };
+   308→   308→
+   309→   309→  const SortIcon = ({ field }: { field: typeof sortBy }) => {
+   310→   310→    if (sortBy !== field) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
+   311→   311→    return sortDir === "desc" ? (
+   312→   312→      <ChevronDown className="w-3 h-3" />
+   313→   313→    ) : (
+   314→   314→      <ChevronUp className="w-3 h-3" />
+   315→   315→    );
+   316→   316→  };
+   317→   317→
+   318→   318→  // ─── Sector suggestion for selected stock ────────────────────────
+   319→   319→  const selectedSectorSuggestion = useMemo(() => {
+   320→   320→    if (!selectedStock || !stockDetail) return null;
+   321→   321→    return matchSectorInsight(stockDetail.sector, sectorInsights);
+   322→   322→  }, [selectedStock, stockDetail, sectorInsights]);
+   323→   323→
+   324→   324→  // ─── Sorted sectors for sector panel ─────────────────────────────
+   325→   325→  const sortedSectors = useMemo(() => {
+   326→   326→    return [...sectorInsights].sort(
+   327→   327→      (a, b) => trendRank(a.trend) - trendRank(b.trend)
+   328→   328→    );
+   329→   329→  }, [sectorInsights]);
+   330→   330→
+   331→   331→  // ─── Suggestions: group filtered stocks by sector rotation ───────
+   332→   332→  const suggestionGroups = useMemo<SuggestionGroup[]>(() => {
+   333→   333→    if (sectorInsights.length === 0 || sectorMap.size === 0) return [];
+   334→   334→
+   335→   335→    const groups: SuggestionGroup[] = [
+   336→   336→      { trendLabel: "Bullish Sectors", trendKey: "Bullish", stocks: [] },
+   337→   337→      { trendLabel: "Rotating In", trendKey: "Rotating In", stocks: [] },
+   338→   338→      { trendLabel: "Neutral Sectors", trendKey: "Neutral", stocks: [] },
+   339→   339→      { trendLabel: "Bearish / Rotating Out", trendKey: "other", stocks: [] },
+   340→   340→    ];
+   341→   341→
+   342→   342→    // Map each filtered stock to its sector trend
+   343→   343→    for (const stock of filteredStocks) {
+   344→   344→      const info = sectorMap.get(stock.ticker);
+   345→   345→      const insight = matchSectorInsight(info?.sector, sectorInsights);
+   346→   346→
+   347→   347→      let groupIdx: number;
+   348→   348→      if (!insight) {
+   349→   349→        groupIdx = 2; // Neutral (unknown sector)
+   350→   350→      } else if (insight.trend === "Bullish") {
+   351→   351→        groupIdx = 0;
+   352→   352→      } else if (insight.trend === "Rotating In") {
+   353→   353→        groupIdx = 1;
+   354→   354→      } else if (insight.trend === "Neutral") {
+   355→   355→        groupIdx = 2;
+   356→   356→      } else {
+   357→   357→        groupIdx = 3; // Bearish or Rotating Out
+   358→   358→      }
+   359→   359→
+   360→   360→      groups[groupIdx].stocks.push({
+   361→   361→        ...stock,
+   362→   362→        matchedSector: info?.sector,
+   363→   363→      });
+   364→   364→    }
+   365→   365→
+   366→   366→    // Sort stocks within each group by volGainPct descending
+   367→   367→    for (const group of groups) {
+   368→   368→      group.stocks.sort((a, b) => b.volGainPct - a.volGainPct);
+   369→   369→    }
+   370→   370→
+   371→   371→    // Attach the first matching insight to each group for display
+   372→   372→    for (const group of groups) {
+   373→   373→      if (group.stocks.length > 0) {
+   374→   374→        const firstSector = group.stocks[0].matchedSector;
+   375→   375→        group.insight = matchSectorInsight(firstSector, sectorInsights) || undefined;
+   376→   376→      }
+   377→   377→    }
+   378→   378→
+   379→   379→    // Only return groups that have stocks
+   380→   380→    return groups.filter((g) => g.stocks.length > 0);
+   381→   381→  }, [filteredStocks, sectorMap, sectorInsights]);
+   382→   382→
+   383→   383→  // ─── Handle switching to suggestions view ────────────────────────
+   384→   384→  const handleViewSwitch = (mode: ViewMode) => {
+   385→   385→    setViewMode(mode);
+   386→   386→    if (mode === "suggestions" && !suggestionsLoaded && !suggestionsLoading) {
+   387→   387→      fetchSuggestions();
+   388→   388→    }
+   389→   389→  };
+   390→   390→
+   391→   391→  return (
+   392→   392→    <TooltipProvider>
+   393→   393→      <div className="min-h-screen flex flex-col bg-background">
+   394→   394→        {/* ─── HEADER ─────────────────────────────────────────────── */}
+   395→   395→        <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+   396→   396→          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+   397→   397→            <div className="flex items-center gap-3 shrink-0">
+   398→   398→              <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+   399→   399→                <BarChart3 className="w-5 h-5 text-primary" />
+   400→   400→              </div>
+   401→   401→              <div>
+   402→   402→                <h1 className="text-lg font-bold tracking-tight">StockPulse</h1>
+   403→   403→                <p className="text-xs text-muted-foreground hidden sm:block">
+   404→   404→                  Volume Shockers &middot; Indian Market
+   405→   405→                </p>
+   406→   406→              </div>
+   407→   407→            </div>
+   408→   408→
+   409→   409→            <div className="flex items-center gap-2 sm:gap-3">
+   410→   410→              {lastUpdated && (
+   411→   411→                <span className="text-xs text-muted-foreground hidden md:flex items-center gap-1">
+   412→   412→                  <Clock className="w-3 h-3" />
+   413→   413→                  {new Date(lastUpdated).toLocaleTimeString("en-IN", {
+   414→   414→                    hour: "2-digit",
+   415→   415→                    minute: "2-digit",
+   416→   416→                  })}
+   417→   417→                </span>
+   418→   418→              )}
+   419→   419→              <Button
+   420→   420→                variant="outline"
+   421→   421→                size="sm"
+   422→   422→                onClick={() => { setShowSectors(!showSectors); if (!showSectors) fetchSectors(); }}
+   423→   423→              >
+   424→   424→                <Activity className="w-4 h-4 mr-1" />
+   425→   425→                <span className="hidden sm:inline">Sectors</span>
+   426→   426→              </Button>
+   427→   427→              <Button
+   428→   428→                variant="outline"
+   429→   429→                size="sm"
+   430→   430→                onClick={fetchStocks}
+   431→   431→                disabled={loading}
+   432→   432→              >
+   433→   433→                <RefreshCw className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`} />
+   434→   434→                <span className="hidden sm:inline">Refresh</span>
+   435→   435→              </Button>
+   436→   436→            </div>
+   437→   437→          </div>
+   438→   438→        </header>
+   439→   439→
+   440→   440→        <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
+   441→   441→          {/* ─── SECTOR INSIGHTS PANEL ────────────────────────────── */}
+   442→   442→          <AnimatePresence>
+   443→   443→            {showSectors && sectorInsights.length > 0 && (
+   444→   444→              <motion.section
+   445→   445→                initial={{ height: 0, opacity: 0 }}
+   446→   446→                animate={{ height: "auto", opacity: 1 }}
+   447→   447→                exit={{ height: 0, opacity: 0 }}
+   448→   448→                transition={{ duration: 0.3 }}
+   449→   449→                className="overflow-hidden mb-6"
+   450→   450→              >
+   451→   451→                <Card className="border-border">
+   452→   452→                  <CardHeader className="pb-3">
+   453→   453→                    <div className="flex items-center justify-between">
+   454→   454→                      <CardTitle className="text-base font-semibold flex items-center gap-2">
+   455→   455→                        <Activity className="w-4 h-4 text-primary" />
+   456→   456→                        Sector Rotation Analysis
+   457→   457→                        {sectorLoading && (
+   458→   458→                          <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground" />
+   459→   459→                        )}
+   460→   460→                      </CardTitle>
+   461→   461→                      <Button variant="ghost" size="sm" onClick={() => setShowSectors(false)}>
+   462→   462→                        <X className="w-4 h-4" />
+   463→   463→                      </Button>
+   464→   464→                    </div>
+   465→   465→                    <p className="text-xs text-muted-foreground mt-1">
+   466→   466→                      AI-powered sector rotation insights for the Indian stock market. Use this to assess
+   467→   467→                      whether the sector of a volume shocker stock is in favour.
+   468→   468→                    </p>
+   469→   469→                  </CardHeader>
+   470→   470→                  <CardContent>
+   471→   471→                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+   472→   472→                      {sortedSectors.map((s) => {
+   473→   473→                        const tc = trendColor(s.trend);
+   474→   474→                        return (
+   475→   475→                          <div key={s.sector} className={`rounded-lg border p-3 ${tc.bg} ${tc.border}`}>
+   476→   476→                            <div className="flex items-center justify-between mb-1">
+   477→   477→                              <span className="text-xs font-medium text-foreground truncate mr-1">
+   478→   478→                                {s.sector}
+   479→   479→                              </span>
+   480→   480→                              <span className={`text-[10px] font-semibold ${tc.text} shrink-0`}>
+   481→   481→                                {s.trend}
+   482→   482→                              </span>
+   483→   483→                            </div>
+   484→   484→                            <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
+   485→   485→                              {s.description}
+   486→   486→                            </p>
+   487→   487→                            <div className="flex items-center gap-1 mt-1.5">
+   488→   488→                              <span className={`w-1.5 h-1.5 rounded-full ${confidenceDot(s.confidence)}`} />
+   489→   489→                              <span className="text-[10px] text-muted-foreground">{s.confidence}</span>
+   490→   490→                            </div>
+   491→   491→                          </div>
+   492→   492→                        );
+   493→   493→                      })}
+   494→   494→                    </div>
+   495→   495→                  </CardContent>
+   496→   496→                </Card>
+   497→   497→              </motion.section>
+   498→   498→            )}
+   499→   499→          </AnimatePresence>
+   500→   500→
+   501→   501→          {/* ─── STATS BAR ────────────────────────────────────────── */}
+   502→   502→          {!error && stocks.length > 0 && (
+   503→   503→            <div className="flex flex-wrap gap-3 mb-5">
+   504→   504→              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+   505→   505→                <Zap className="w-3.5 h-3.5 text-emerald-400" />
+   506→   506→                <span className="text-sm font-medium text-emerald-400">
+   507→   507→                  {stats.filtered} Stocks
+   508→   508→                </span>
+   509→   509→              </div>
+   510→   510→              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary border border-border">
+   511→   511→                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+   512→   512→                <span className="text-sm text-muted-foreground">
+   513→   513→                  Positive &amp; Vol &gt; 180%
+   514→   514→                </span>
+   515→   515→              </div>
+   516→   516→              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary border border-border">
+   517→   517→                <BarChart3 className="w-3.5 h-3.5 text-muted-foreground" />
+   518→   518→                <span className="text-sm text-muted-foreground">
+   519→   519→                  {stats.total} Total on Chartink
+   520→   520→                </span>
+   521→   521→              </div>
+   522→   522→            </div>
+   523→   523→          )}
+   524→   524→
+   525→   525→          {/* ─── VIEW TABS ────────────────────────────────────────── */}
+   526→   526→          {!loading && stocks.length > 0 && (
+   527→   527→            <div className="flex items-center gap-1 mb-5 p-1 rounded-lg bg-secondary w-fit">
+   528→   528→              <button
+   529→   529→                onClick={() => handleViewSwitch("list")}
+   530→   530→                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+   531→   531→                  viewMode === "list"
+   532→   532→                    ? "bg-background text-foreground shadow-sm"
+   533→   533→                    : "text-muted-foreground hover:text-foreground"
+   534→   534→                }`}
+   535→   535→              >
+   536→   536→                <span className="flex items-center gap-1.5">
+   537→   537→                  <BarChart3 className="w-3.5 h-3.5" />
+   538→   538→                  All Stocks
+   539→   539→                </span>
+   540→   540→              </button>
+   541→   541→              <button
+   542→   542→                onClick={() => handleViewSwitch("suggestions")}
+   543→   543→                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+   544→   544→                  viewMode === "suggestions"
+   545→   545→                    ? "bg-background text-foreground shadow-sm"
+   546→   546→                    : "text-muted-foreground hover:text-foreground"
+   547→   547→                }`}
+   548→   548→              >
+   549→   549→                <span className="flex items-center gap-1.5">
+   550→   550→                  <Sparkles className="w-3.5 h-3.5" />
+   551→   551→                  Suggestions
+   552→   552→                </span>
+   553→   553→              </button>
+   554→   554→            </div>
+   555→   555→          )}
+   556→   556→
+   557→   557→          {/* ─── SEARCH ───────────────────────────────────────────── */}
+   558→   558→          <div className="relative mb-4">
+   559→   559→            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   560→   560→            <Input
+   561→   561→              placeholder="Search stocks by name or ticker..."
+   562→   562→              className="pl-9 bg-secondary border-border"
+   563→   563→              value={search}
+   564→   564→              onChange={(e) => setSearch(e.target.value)}
+   565→   565→            />
+   566→   566→            {search && (
+   567→   567→              <button
+   568→   568→                onClick={() => setSearch("")}
+   569→   569→                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+   570→   570→              >
+   571→   571→                <X className="w-4 h-4" />
+   572→   572→              </button>
+   573→   573→            )}
+   574→   574→          </div>
+   575→   575→
+   576→   576→          {/* ─── LOADING ──────────────────────────────────────────── */}
+   577→   577→          {loading && (
+   578→   578→            <div className="space-y-3">
+   579→   579→              {[...Array(8)].map((_, i) => (
+   580→   580→                <div key={i} className="flex items-center gap-4 p-4 rounded-lg bg-secondary">
+   581→   581→                  <Skeleton className="h-4 w-6" />
+   582→   582→                  <Skeleton className="h-4 flex-1" />
+   583→   583→                  <Skeleton className="h-4 w-20" />
+   584→   584→                  <Skeleton className="h-4 w-16" />
+   585→   585→                  <Skeleton className="h-4 w-20" />
+   586→   586→                </div>
+   587→   587→              ))}
+   588→   588→            </div>
+   589→   589→          )}
+   590→   590→
+   591→   591→          {/* ─── ERROR ────────────────────────────────────────────── */}
+   592→   592→          {error && !loading && (
+   593→   593→            <Card className="border-destructive/30 bg-destructive/5">
+   594→   594→              <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+   595→   595→                <AlertTriangle className="w-8 h-8 text-destructive" />
+   596→   596→                <p className="text-sm text-destructive font-medium">{error}</p>
+   597→   597→                <Button variant="outline" size="sm" onClick={fetchStocks}>
+   598→   598→                  <RefreshCw className="w-4 h-4 mr-1" />
+   599→   599→                  Try Again
+   600→   600→                </Button>
+   601→   601→              </CardContent>
+   602→   602→            </Card>
+   603→   603→          )}
+   604→   604→
+   605→   605→          {/* ═══════════════════════════════════════════════════════════
+   606→   606→              LIST VIEW (original)
+   607→   607→             ═══════════════════════════════════════════════════════════ */}
+   608→   608→          {!loading && !error && viewMode === "list" && (
+   609→   609→            <>
+   610→   610→              {/* Desktop Table */}
+   611→   611→              <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+   612→   612→                <table className="w-full text-sm">
+   613→   613→                  <thead>
+   614→   614→                    <tr className="bg-secondary/80">
+   615→   615→                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-12">#</th>
+   616→   616→                      <th className="text-left px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("name")}>
+   617→   617→                        <span className="flex items-center gap-1">Stock <SortIcon field="name" /></span>
+   618→   618→                      </th>
+   619→   619→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("close")}>
+   620→   620→                        <span className="flex items-center justify-end gap-1">Close <SortIcon field="close" /></span>
+   621→   621→                      </th>
+   622→   622→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("change")}>
+   623→   623→                        <span className="flex items-center justify-end gap-1">Change <SortIcon field="change" /></span>
+   624→   624→                      </th>
+   625→   625→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("volGainPct")}>
+   626→   626→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="volGainPct" /></span>
+   627→   627→                      </th>
+   628→   628→                      <th className="text-center px-4 py-3 font-medium text-muted-foreground w-20">Action</th>
+   629→   629→                    </tr>
+   630→   630→                  </thead>
+   631→   631→                  <tbody>
+   632→   632→                    {filteredStocks.map((stock, idx) => (
+   633→   633→                      <motion.tr
+   634→   634→                        key={stock.ticker}
+   635→   635→                        initial={{ opacity: 0, y: 8 }}
+   636→   636→                        animate={{ opacity: 1, y: 0 }}
+   637→   637→                        transition={{ delay: idx * 0.02, duration: 0.2 }}
+   638→   638→                        className="border-t border-border hover:bg-secondary/50 cursor-pointer transition-colors group"
+   639→   639→                        onClick={() => setSelectedStock(stock)}
+   640→   640→                      >
+   641→   641→                        <td className="px-4 py-3 text-muted-foreground text-xs">{stock.sr}</td>
+   642→   642→                        <td className="px-4 py-3">
+   643→   643→                          <div className="font-medium text-foreground group-hover:text-primary transition-colors">{stock.name}</div>
+   644→   644→                          <div className="text-xs text-muted-foreground">{stock.ticker}</div>
+   645→   645→                        </td>
+   646→   646→                        <td className="px-4 py-3 text-right font-mono">{stock.close.toFixed(2)}</td>
+   647→   647→                        <td className="px-4 py-3 text-right">
+   648→   648→                          <span className="inline-flex items-center gap-0.5 text-emerald-400 font-medium">
+   649→   649→                            <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+   650→   650→                          </span>
+   651→   651→                        </td>
+   652→   652→                        <td className="px-4 py-3 text-right">
+   653→   653→                          <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono">
+   654→   654→                            {stock.volGainPct.toFixed(0)}%
+   655→   655→                          </Badge>
+   656→   656→                        </td>
+   657→   657→                        <td className="px-4 py-3 text-center">
+   658→   658→                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedStock(stock); }}>
+   659→   659→                            <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+   660→   660→                          </Button>
+   661→   661→                        </td>
+   662→   662→                      </motion.tr>
+   663→   663→                    ))}
+   664→   664→                  </tbody>
+   665→   665→                </table>
+   666→   666→                {filteredStocks.length === 0 && (
+   667→   667→                  <div className="p-12 text-center text-muted-foreground">
+   668→   668→                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match your search."}
+   669→   669→                  </div>
+   670→   670→                )}
+   671→   671→              </div>
+   672→   672→
+   673→   673→              {/* Mobile Cards */}
+   674→   674→              <div className="md:hidden space-y-2">
+   675→   675→                {filteredStocks.map((stock, idx) => (
+   676→   676→                  <motion.div key={stock.ticker} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03, duration: 0.2 }}>
+   677→   677→                    <Card className="border-border hover:border-primary/30 transition-colors cursor-pointer" onClick={() => setSelectedStock(stock)}>
+   678→   678→                      <CardContent className="p-4">
+   679→   679→                        <div className="flex items-start justify-between gap-2">
+   680→   680→                          <div className="min-w-0">
+   681→   681→                            <p className="font-medium text-foreground truncate">{stock.name}</p>
+   682→   682→                            <p className="text-xs text-muted-foreground">{stock.ticker}</p>
+   683→   683→                          </div>
+   684→   684→                          <div className="text-right shrink-0">
+   685→   685→                            <p className="font-mono font-medium">{stock.close.toFixed(2)}</p>
+   686→   686→                            <span className="inline-flex items-center gap-0.5 text-emerald-400 text-xs font-medium">
+   687→   687→                              <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+   688→   688→                            </span>
+   689→   689→                          </div>
+   690→   690→                        </div>
+   691→   691→                        <div className="flex items-center justify-between mt-2">
+   692→   692→                          <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-xs">
+   693→   693→                            Vol: {stock.volGainPct.toFixed(0)}%
+   694→   694→                          </Badge>
+   695→   695→                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+   696→   696→                            <Eye className="w-3 h-3" /> View Details
+   697→   697→                          </span>
+   698→   698→                        </div>
+   699→   699→                      </CardContent>
+   700→   700→                    </Card>
+   701→   701→                  </motion.div>
+   702→   702→                ))}
+   703→   703→                {filteredStocks.length === 0 && (
+   704→   704→                  <div className="p-12 text-center text-muted-foreground">
+   705→   705→                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match your search."}
+   706→   706→                  </div>
+   707→   707→                )}
+   708→   708→              </div>
+   709→   709→            </>
+   710→   710→          )}
+   711→   711→
+   712→   712→          {/* ═══════════════════════════════════════════════════════════
+   713→   713→              SUGGESTIONS VIEW (sector-rotation grouped)
+   714→   714→             ═══════════════════════════════════════════════════════════ */}
+   715→   715→          {!loading && !error && viewMode === "suggestions" && (
+   716→   716→            <div className="space-y-6">
+   717→   717→              {/* Loading state */}
+   718→   718→              {suggestionsLoading && (
+   719→   719→                <div className="flex flex-col items-center py-16 gap-4">
+   720→   720→                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+   721→   721→                  <div className="text-center">
+   722→   722→                    <p className="text-sm font-medium">Loading sector data for all stocks...</p>
+   723→   723→                    <p className="text-xs text-muted-foreground mt-1">
+   724→   724→                      Fetching sector info from Screener.in for {stocks.length} stocks
+   725→   725→                    </p>
+   726→   726→                  </div>
+   727→   727→                </div>
+   728→   728→              )}
+   729→   729→
+   730→   730→              {/* Empty state */}
+   731→   731→              {!suggestionsLoading && sectorInsights.length === 0 && (
+   732→   732→                <Card className="border-border">
+   733→   733→                  <CardContent className="p-8 text-center">
+   734→   734→                    <Activity className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+   735→   735→                    <p className="text-sm font-medium mb-1">Sector insights not available</p>
+   736→   736→                    <p className="text-xs text-muted-foreground">
+   737→   737→                      Click the <strong>Sectors</strong> button above to load sector rotation data first, then switch back here.
+   738→   738→                    </p>
+   739→   739→                  </CardContent>
+   740→   740→                </Card>
+   741→   741→              )}
+   742→   742→
+   743→   743→              {/* Suggestion groups */}
+   744→   744→              {!suggestionsLoading && suggestionGroups.length > 0 && (
+   745→   745→                <>
+   746→   746→                  <div className="flex items-center gap-2 mb-2">
+   747→   747→                    <Sparkles className="w-4 h-4 text-primary" />
+   748→   748→                    <p className="text-sm text-muted-foreground">
+   749→   749→                      Stocks rearranged by sector rotation strength. Bullish sectors appear first.
+   750→   750→                    </p>
+   751→   751→                  </div>
+   752→   752→
+   753→   753→                  {suggestionGroups.map((group) => {
+   754→   754→                    const tc = group.insight ? trendColor(group.insight.trend) : trendColor("Neutral");
+   755→   755→                    const isTop = group.trendKey === "Bullish" || group.trendKey === "Rotating In";
+   756→   756→                    const isBottom = group.trendKey === "other";
+   757→   757→
+   758→   758→                    return (
+   759→   759→                      <motion.div
+   760→   760→                        key={group.trendKey}
+   761→   761→                        initial={{ opacity: 0, y: 12 }}
+   762→   762→                        animate={{ opacity: 1, y: 0 }}
+   763→   763→                        transition={{ duration: 0.3 }}
+   764→   764→                      >
+   765→   765→                        <Card className={`border ${isTop ? "border-emerald-500/20" : isBottom ? "border-red-500/20" : "border-border"}`}>
+   766→   766→                          <CardHeader className="pb-2">
+   767→   767→                            <div className="flex items-center justify-between">
+   768→   768→                              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+   769→   769→                                {isTop && <Star className="w-4 h-4 text-emerald-400" />}
+   770→   770→                                {isBottom && <AlertTriangle className="w-4 h-4 text-red-400" />}
+   771→   771→                                {group.trendLabel}
+   772→   772→                                <Badge variant="secondary" className={`text-[10px] ${tc.bg} ${tc.text}`}>
+   773→   773→                                  {group.stocks.length} stock{group.stocks.length !== 1 ? "s" : ""}
+   774→   774→                                </Badge>
+   775→   775→                              </CardTitle>
+   776→   776→                              {group.insight && (
+   777→   777→                                <Badge variant="secondary" className={`text-[10px] ${tc.bg} ${tc.text} ${tc.border} border`}>
+   778→   778→                                  {group.insight.trend}
+   779→   779→                                </Badge>
+   780→   780→                              )}
+   781→   781→                            </div>
+   782→   782→                            {group.insight && (
+   783→   783→                              <p className="text-xs text-muted-foreground mt-1">
+   784→   784→                                {group.insight.description}
+   785→   785→                              </p>
+   786→   786→                            )}
+   787→   787→                          </CardHeader>
+   788→   788→                          <CardContent className="pt-0">
+   789→   789→                            <div className="space-y-1.5">
+   790→   790→                              {group.stocks.map((stock, idx) => (
+   791→   791→                                <div
+   792→   792→                                  key={stock.ticker}
+   793→   793→                                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 cursor-pointer transition-colors group"
+   794→   794→                                  onClick={() => setSelectedStock(stock)}
+   795→   795→                                >
+   796→   796→                                  <span className="text-xs text-muted-foreground w-5 text-center shrink-0">
+   797→   797→                                    {idx + 1}
+   798→   798→                                  </span>
+   799→   799→                                  <div className="flex-1 min-w-0">
+   800→   800→                                    <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+   801→   801→                                      {stock.name}
+   802→   802→                                    </p>
+   803→   803→                                    <div className="flex items-center gap-2">
+   804→   804→                                      <span className="text-xs text-muted-foreground">{stock.ticker}</span>
+   805→   805→                                      {stock.matchedSector && (
+   806→   806→                                        <>
+   807→   807→                                          <span className="text-muted-foreground/40">&middot;</span>
+   808→   808→                                          <span className="text-[10px] text-muted-foreground">{stock.matchedSector}</span>
+   809→   809→                                        </>
+   810→   810→                                      )}
+   811→   811→                                    </div>
+   812→   812→                                  </div>
+   813→   813→                                  <div className="text-right shrink-0">
+   814→   814→                                    <p className="text-sm font-mono font-medium">{stock.close.toFixed(2)}</p>
+   815→   815→                                    <div className="flex items-center gap-2">
+   816→   816→                                      <span className="text-xs text-emerald-400 font-medium">+{stock.change.toFixed(2)}%</span>
+   817→   817→                                      <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono px-1.5">
+   818→   818→                                        {stock.volGainPct.toFixed(0)}%
+   819→   819→                                      </Badge>
+   820→   820→                                    </div>
+   821→   821→                                  </div>
+   822→   822→                                  <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0" />
+   823→   823→                                </div>
+   824→   824→                              ))}
+   825→   825→                            </div>
+   826→   826→                          </CardContent>
+   827→   827→                        </Card>
+   828→   828→                      </motion.div>
+   829→   829→                    );
+   830→   830→                  })}
+   831→   831→
+   832→   832→                  {filteredStocks.length === 0 && (
+   833→   833→                    <div className="p-12 text-center text-muted-foreground">
+   834→   834→                      {stocks.length === 0
+   835→   835→                        ? "No volume shockers found today."
+   836→   836→                        : "No stocks match your search."}
+   837→   837→                    </div>
+   838→   838→                  )}
+   839→   839→                </>
+   840→   840→              )}
+   841→   841→            </div>
+   842→   842→          )}
+   843→   843→
+   844→   844→          {/* ─── DATA SOURCE FOOTER ───────────────────────────────── */}
+   845→   845→          {!loading && stocks.length > 0 && (
+   846→   846→            <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+   847→   847→              <span className="flex items-center gap-1">
+   848→   848→                <Info className="w-3 h-3" />
+   849→   849→                Data sourced from{" "}
+   850→   850→                <a href="https://chartink.com/eodscanner/Volume-Shockers.html" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+   851→   851→                  Chartink.com
+   852→   852→                </a>{" "}
+   853→   853→                &middot; Refreshes daily at 7:00 PM IST
+   854→   854→              </span>
+   855→   855→              <span className="hidden sm:inline">&middot;</span>
+   856→   856→              <span className="flex items-center gap-1">
+   857→   857→                <Shield className="w-3 h-3" />
+   858→   858→                Stock details from{" "}
+   859→   859→                <a href="https://www.screener.in/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+   860→   860→                  Screener.in
+   861→   861→                </a>
+   862→   862→              </span>
+   863→   863→            </div>
+   864→   864→          )}
+   865→   865→        </main>
+   866→   866→
+   867→   867→        {/* ─── STOCK DETAIL PANEL ────────────────────────────────── */}
+   868→   868→        <AnimatePresence>
+   869→   869→          {selectedStock && (
+   870→   870→            <motion.div
+   871→   871→              initial={{ x: "100%" }}
+   872→   872→              animate={{ x: 0 }}
+   873→   873→              exit={{ x: "100%" }}
+   874→   874→              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+   875→   875→              className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-background border-l border-border shadow-2xl overflow-y-auto"
+   876→   876→            >
+   877→   877→              {/* Panel Header */}
+   878→   878→              <div className="sticky top-0 z-10 bg-background/90 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
+   879→   879→                <Button variant="ghost" size="sm" onClick={() => setSelectedStock(null)}>
+   880→   880→                  <ArrowLeft className="w-4 h-4 mr-1" />
+   881→   881→                  Back
+   882→   882→                </Button>
+   883→   883→                <div className="flex items-center gap-2">
+   884→   884→                  {/* TradingView Chart Button */}
+   885→   885→                  <Tooltip>
+   886→   886→                    <TooltipTrigger asChild>
+   887→   887→                      <a
+   888→   888→                        href={tradingViewUrl(selectedStock.ticker)}
+   889→   889→                        target="_blank"
+   890→   890→                        rel="noopener noreferrer"
+   891→   891→                      >
+   892→   892→                        <Button variant="outline" size="sm">
+   893→   893→                          <LineChart className="w-4 h-4 mr-1" />
+   894→   894→                          <span className="hidden sm:inline">Chart</span>
+   895→   895→                        </Button>
+   896→   896→                      </a>
+   897→   897→                    </TooltipTrigger>
+   898→   898→                    <TooltipContent>Open chart on TradingView</TooltipContent>
+   899→   899→                  </Tooltip>
+   900→   900→                  <a href={`https://www.screener.in/company/${selectedStock.ticker}/`} target="_blank" rel="noopener noreferrer">
+   901→   901→                    <Button variant="outline" size="sm">
+   902→   902→                      <ExternalLink className="w-4 h-4 mr-1" />
+   903→   903→                      <span className="hidden sm:inline">Screener.in</span>
+   904→   904→                    </Button>
+   905→   905→                  </a>
+   906→   906→                </div>
+   907→   907→              </div>
+   908→   908→
+   909→   909→              {detailLoading && (
+   910→   910→                <div className="p-4 space-y-4">
+   911→   911→                  <Skeleton className="h-6 w-3/4" />
+   912→   912→                  <Skeleton className="h-4 w-1/2" />
+   913→   913→                  {[...Array(6)].map((_, i) => (
+   914→   914→                    <Skeleton key={i} className="h-12 w-full" />
+   915→   915→                  ))}
+   916→   916→                </div>
+   917→   917→              )}
+   918→   918→
+   919→   919→              {detailError && !detailLoading && (
+   920→   920→                <div className="p-6 text-center">
+   921→   921→                  <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
+   922→   922→                  <p className="text-sm text-destructive mb-3">{detailError}</p>
+   923→   923→                  <a href={`https://www.screener.in/company/${selectedStock.ticker}/`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+   924→   924→                    View directly on Screener.in &rarr;
+   925→   925→                  </a>
+   926→   926→                </div>
+   927→   927→              )}
+   928→   928→
+   929→   929→              {stockDetail && !detailLoading && !detailError && (
+   930→   930→                <div className="p-4 space-y-5">
+   931→   931→                  {/* Stock Header */}
+   932→   932→                  <div>
+   933→   933→                    <h2 className="text-xl font-bold">{stockDetail.name}</h2>
+   934→   934→                    <p className="text-sm text-muted-foreground">
+   935→   935→                      {selectedStock.ticker}
+   936→   936→                      {stockDetail.sector && <span className="ml-2">&middot; {stockDetail.sector}</span>}
+   937→   937→                      {stockDetail.industry && <span className="ml-2 text-xs">({stockDetail.industry})</span>}
+   938→   938→                    </p>
+   939→   939→                    <div className="flex items-center gap-3 mt-2">
+   940→   940→                      <span className="text-2xl font-bold font-mono">{selectedStock.close.toFixed(2)}</span>
+   941→   941→                      <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+   942→   942→                        <TrendingUp className="w-3 h-3 mr-1" />
+   943→   943→                        +{selectedStock.change.toFixed(2)}%
+   944→   944→                      </Badge>
+   945→   945→                      <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">
+   946→   946→                        <Zap className="w-3 h-3 mr-1" />
+   947→   947→                        Vol: {selectedStock.volGainPct.toFixed(0)}%
+   948→   948→                      </Badge>
+   949→   949→                    </div>
+   950→   950→                  </div>
+   951→   951→
+   952→   952→                  {/* Sector Suggestion */}
+   953→   953→                  {selectedSectorSuggestion && (
+   954→   954→                    <Card className={`border ${trendColor(selectedSectorSuggestion.trend).border}`}>
+   955→   955→                      <CardContent className="p-3">
+   956→   956→                        <div className="flex items-center gap-2 mb-1">
+   957→   957→                          <Activity className="w-3.5 h-3.5 text-primary" />
+   958→   958→                          <span className="text-xs font-semibold text-foreground">
+   959→   959→                            Sector Outlook: {selectedSectorSuggestion.sector}
+   960→   960→                          </span>
+   961→   961→                          <Badge variant="secondary" className={`text-[10px] ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).text}`}>
+   962→   962→                            {selectedSectorSuggestion.trend}
+   963→   963→                          </Badge>
+   964→   964→                        </div>
+   965→   965→                        <p className="text-xs text-muted-foreground">{selectedSectorSuggestion.description}</p>
+   966→   966→                        <div className="flex items-center gap-1 mt-1.5">
+   967→   967→                          <span className={`w-1.5 h-1.5 rounded-full ${confidenceDot(selectedSectorSuggestion.confidence)}`} />
+   968→   968→                          <span className="text-[10px] text-muted-foreground">Confidence: {selectedSectorSuggestion.confidence}</span>
+   969→   969→                        </div>
+   970→   970→                      </CardContent>
+   971→   971→                    </Card>
+   972→   972→                  )}
+   973→   973→
+   974→   974→                  {/* About */}
+   975→   975→                  {stockDetail.about && (
+   976→   976→                    <div>
+   977→   977→                      <h3 className="text-sm font-semibold mb-1.5 flex items-center gap-1.5">
+   978→   978→                        <Info className="w-3.5 h-3.5 text-primary" /> About
+   979→   979→                      </h3>
+   980→   980→                      <p className="text-xs text-muted-foreground leading-relaxed">{stockDetail.about}</p>
+   981→   981→                    </div>
+   982→   982→                  )}
+   983→   983→
+   984→   984→                  <Separator />
+   985→   985→
+   986→   986→                  {/* Key Metrics */}
+   987→   987→                  {Object.keys(stockDetail.metrics).length > 0 && (
+   988→   988→                    <div>
+   989→   989→                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+   990→   990→                        <BarChart3 className="w-3.5 h-3.5 text-primary" /> Key Ratios
+   991→   991→                      </h3>
+   992→   992→                      <div className="grid grid-cols-2 gap-2">
+   993→   993→                        {Object.entries(stockDetail.metrics).map(([key, val]) => (
+   994→   994→                          <div key={key} className="rounded-lg bg-secondary p-2.5">
+   995→   995→                            <p className="text-[10px] text-muted-foreground truncate">{key}</p>
+   996→   996→                            <p className="text-sm font-semibold font-mono mt-0.5">{val}</p>
+   997→   997→                          </div>
+   998→   998→                        ))}
+   999→   999→                      </div>
+  1000→  1000→                    </div>
+  1001→  1001→                  )}
+  1002→  1002→
+  1003→  1003→                  {/* Quarterly Results */}
+  1004→  1004→                  {stockDetail.quarters.length > 0 && (
+  1005→  1005→                    <div>
+  1006→  1006→                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+  1007→  1007→                        <TrendingUp className="w-3.5 h-3.5 text-primary" /> Recent Quarterly Results
+  1008→  1008→                      </h3>
+  1009→  1009→                      <div className="rounded-lg border border-border overflow-x-auto">
+  1010→  1010→                        <table className="w-full text-xs">
+  1011→  1011→                          <thead>
+  1012→  1012→                            <tr className="bg-secondary">
+  1013→  1013→                              <th className="text-left px-3 py-2 font-medium text-muted-foreground">Metric</th>
+  1014→  1014→                              {stockDetail.quarters.map((q) => (
+  1015→  1015→                                <th key={q.label} className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
+  1016→  1016→                                  {q.label}
+  1017→  1017→                                </th>
+  1018→  1018→                              ))}
+  1019→  1019→                            </tr>
+  1020→  1020→                          </thead>
+  1021→  1021→                          <tbody>
+  1022→  1022→                            <tr className="border-t border-border">
+  1023→  1023→                              <td className="px-3 py-2 text-muted-foreground">Sales</td>
+  1024→  1024→                              {stockDetail.quarters.map((q) => (
+  1025→  1025→                                <td key={q.label} className="text-right px-3 py-2 font-mono">{q.sales}</td>
+  1026→  1026→                              ))}
+  1027→  1027→                            </tr>
+  1028→  1028→                            <tr className="border-t border-border">
+  1029→  1029→                              <td className="px-3 py-2 text-muted-foreground">Net Profit</td>
+  1030→  1030→                              {stockDetail.quarters.map((q) => (
+  1031→  1031→                                <td key={q.label} className="text-right px-3 py-2 font-mono">{q.netProfit}</td>
+  1032→  1032→                              ))}
+  1033→  1033→                            </tr>
+  1034→  1034→                            {stockDetail.quarters[0]?.opm && stockDetail.quarters[0].opm !== "-" && (
+  1035→  1035→                              <tr className="border-t border-border">
+  1036→  1036→                                <td className="px-3 py-2 text-muted-foreground">OPM</td>
+  1037→  1037→                                {stockDetail.quarters.map((q) => (
+  1038→  1038→                                  <td key={q.label} className="text-right px-3 py-2 font-mono">{q.opm}</td>
+  1039→  1039→                                ))}
+  1040→  1040→                              </tr>
+  1041→  1041→                            )}
+  1042→  1042→                          </tbody>
+  1043→  1043→                        </table>
+  1044→  1044→                      </div>
+  1045→  1045→                    </div>
+  1046→  1046→                  )}
+  1047→  1047→
+  1048→  1048→                  {/* Peers */}
+  1049→  1049→                  {stockDetail.peers.length > 0 && (
+  1050→  1050→                    <div>
+  1051→  1051→                      <h3 className="text-sm font-semibold mb-2">Peer Companies</h3>
+  1052→  1052→                      <div className="flex flex-wrap gap-1.5">
+  1053→  1053→                        {stockDetail.peers.map((peer) => (
+  1054→  1054→                          <Badge key={peer} variant="secondary" className="text-xs">{peer}</Badge>
+  1055→  1055→                        ))}
+  1056→  1056→                      </div>
+  1057→  1057→                    </div>
+  1058→  1058→                  )}
+  1059→  1059→
+  1060→  1060→                  {/* Action Buttons */}
+  1061→  1061→                  <Separator />
+  1062→  1062→                  <div className="grid grid-cols-2 gap-2">
+  1063→  1063→                    <a
+  1064→  1064→                      href={tradingViewUrl(selectedStock.ticker)}
+  1065→  1065→                      target="_blank"
+  1066→  1066→                      rel="noopener noreferrer"
+  1067→  1067→                      className="block"
+  1068→  1068→                    >
+  1069→  1069→                      <Button className="w-full" variant="outline">
+  1070→  1070→                        <LineChart className="w-4 h-4 mr-2" />
+  1071→  1071→                        TradingView Chart
+  1072→  1072→                      </Button>
+  1073→  1073→                    </a>
+  1074→  1074→                    <a
+  1075→  1075→                      href={`https://www.screener.in/company/${selectedStock.ticker}/`}
+  1076→  1076→                      target="_blank"
+  1077→  1077→                      rel="noopener noreferrer"
+  1078→  1078→                      className="block"
+  1079→  1079→                    >
+  1080→  1080→                      <Button className="w-full" variant="outline">
+  1081→  1081→                        <ExternalLink className="w-4 h-4 mr-2" />
+  1082→  1082→                        Screener.in
+  1083→  1083→                      </Button>
+  1084→  1084→                    </a>
+  1085→  1085→                  </div>
+  1086→  1086→                </div>
+  1087→  1087→              )}
+  1088→  1088→            </motion.div>
+  1089→  1089→          )}
+  1090→  1090→        </AnimatePresence>
+  1091→  1091→
+  1092→  1092→        {/* ─── BACKDROP ───────────────────────────────────────────── */}
+  1093→  1093→        <AnimatePresence>
+  1094→  1094→          {selectedStock && (
+  1095→  1095→            <motion.div
+  1096→  1096→              initial={{ opacity: 0 }}
+  1097→  1097→              animate={{ opacity: 1 }}
+  1098→  1098→              exit={{ opacity: 0 }}
+  1099→  1099→              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:block hidden"
+  1100→  1100→              onClick={() => setSelectedStock(null)}
+  1101→  1101→            />
+  1102→  1102→          )}
+  1103→  1103→        </AnimatePresence>
+  1104→  1104→
+  1105→  1105→        {/* ─── FOOTER ─────────────────────────────────────────────── */}
+  1106→  1106→        <footer className="mt-auto border-t border-border py-4 px-4 sm:px-6">
+  1107→  1107→          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
+  1108→  1108→            <p>
+  1109→  1109→              StockPulse &middot; Data from Chartink &amp; Screener.in &middot;
+  1110→  1110→              For informational purposes only. Not financial advice.
+  1111→  1111→            </p>
+  1112→  1112→            <p className="flex items-center gap-1">
+  1113→  1113→              <Shield className="w-3 h-3" />
+  1114→  1114→              Always do your own research before investing.
+  1115→  1115→            </p>
+  1116→  1116→          </div>
+  1117→  1117→        </footer>
+  1118→  1118→      </div>
+  1119→  1119→    </TooltipProvider>
+  1120→  1120→  );
+  1121→  1121→}

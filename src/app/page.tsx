@@ -26,6 +26,11 @@ import {
   Sparkles,
   Star,
   Loader2,
+  Globe,
+  CheckCircle,
+  XCircle,
+  Users,
+  DollarSign,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +78,34 @@ interface StockDetail {
   }[];
   peers: string[];
   cached?: boolean;
+  pros?: string[];
+  cons?: string[];
+  balanceSheet?: {
+    label: string;
+    reserves: string;
+    borrowing: string;
+    otherLiab: string;
+    totalLiab: string;
+    fixedAssets: string;
+    cwip: string;
+    totalAssets: string;
+  }[];
+  shareholding?: {
+    category: string;
+    values: { label: string; value: string }[];
+  }[];
+  annualResults?: {
+    label: string;
+    sales: string;
+    netProfit: string;
+    opm: string;
+  }[];
+  cashFlow?: {
+    label: string;
+    operatingCF: string;
+    investingCF: string;
+    financingCF: string;
+  }[];
 }
 
 interface StockSectorMap {
@@ -82,7 +115,12 @@ interface StockSectorMap {
   name?: string;
 }
 
-type ViewMode = "list" | "suggestions";
+interface SearchResult {
+  name: string;
+  ticker: string;
+}
+
+type ViewMode = "list" | "suggestions" | "search";
 
 // ─── Trend Colors ─────────────────────────────────────────────────────
 function trendColor(trend: string) {
@@ -178,6 +216,14 @@ export default function Home() {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
   const suggestionsFetchedRef = useRef(false);
+
+  // ─── Universal Stock Search state ───────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [isSearchedStock, setIsSearchedStock] = useState(false);
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // ─── Fetch Volume Shockers ───────────────────────────────────────
   const fetchStocks = useCallback(async () => {
@@ -295,6 +341,65 @@ export default function Home() {
       })
       .finally(() => setDetailLoading(false));
   }, [selectedStock]);
+
+  // Reset isSearchedStock when closing detail panel
+  useEffect(() => {
+    if (!selectedStock) setIsSearchedStock(false);
+  }, [selectedStock]);
+
+  // ─── Universal Stock Search ─────────────────────────────────────
+  const performSearch = useCallback(async (query: string) => {
+    if (query.trim().length < 2) {
+      setSearchResults([]);
+      setSearchError("");
+      return;
+    }
+    setSearchLoading(true);
+    setSearchError("");
+    try {
+      const res = await fetch(`/api/stock-search?q=${encodeURIComponent(query.trim())}`);
+      const data = await res.json();
+      if (data.error) {
+        setSearchError(data.error);
+        setSearchResults([]);
+      } else {
+        setSearchResults(data.results || []);
+        if (!data.results || data.results.length === 0) {
+          setSearchError(`No results found for "${query.trim()}"`);
+        }
+      }
+    } catch {
+      setSearchError("Search failed. Please try again.");
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  const handleSearchInput = useCallback(
+    (value: string) => {
+      setSearchQuery(value);
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = setTimeout(() => {
+        performSearch(value);
+      }, 400);
+    },
+    [performSearch]
+  );
+
+  const handleSearchSelect = useCallback((result: SearchResult) => {
+    // Create a minimal Stock object for the detail panel
+    setSelectedStock({
+      sr: 0,
+      name: result.name,
+      ticker: result.ticker,
+      close: 0,
+      change: 0,
+      volGainPct: 0,
+      isPositive: true,
+    });
+    setIsSearchedStock(true);
+  }, []);
 
   // ─── Toggle Sort ─────────────────────────────────────────────────
   const toggleSort = (field: typeof sortBy) => {
@@ -523,7 +628,7 @@ export default function Home() {
           )}
 
           {/* ─── VIEW TABS ────────────────────────────────────────── */}
-          {!loading && stocks.length > 0 && (
+          {(stocks.length > 0 || viewMode === "search") && (
             <div className="flex items-center gap-1 mb-5 p-1 rounded-lg bg-secondary w-fit">
               <button
                 onClick={() => handleViewSwitch("list")}
@@ -551,10 +656,24 @@ export default function Home() {
                   Suggestions
                 </span>
               </button>
+              <button
+                onClick={() => handleViewSwitch("search")}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  viewMode === "search"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  Search
+                </span>
+              </button>
             </div>
           )}
 
           {/* ─── SEARCH ───────────────────────────────────────────── */}
+          {viewMode !== "search" && (
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -572,9 +691,10 @@ export default function Home() {
               </button>
             )}
           </div>
+          )}
 
           {/* ─── LOADING ──────────────────────────────────────────── */}
-          {loading && (
+          {loading && viewMode !== "search" && (
             <div className="space-y-3">
               {[...Array(8)].map((_, i) => (
                 <div key={i} className="flex items-center gap-4 p-4 rounded-lg bg-secondary">
@@ -841,6 +961,182 @@ export default function Home() {
             </div>
           )}
 
+          {/* ═══════════════════════════════════════════════════════════
+              SEARCH VIEW (universal stock search from Screener.in)
+             ═══════════════════════════════════════════════════════════ */}
+          {viewMode === "search" && (
+            <div>
+              {/* Search Input */}
+              <Card className="border-border mb-4">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Globe className="w-4 h-4 text-primary" />
+                    <h3 className="text-sm font-semibold">Search Any Stock on Screener.in</h3>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Type a company name or stock ticker (e.g., Reliance, TCS, HDFCBANK) to look up
+                    complete financial data from Screener.in. Covers all NSE &amp; BSE listed companies.
+                  </p>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by company name or ticker..."
+                      className="pl-9 pr-20 bg-secondary border-border text-base"
+                      value={searchQuery}
+                      onChange={(e) => handleSearchInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && searchQuery.trim().length >= 2) {
+                          performSearch(searchQuery);
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      {searchLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                      {searchQuery && (
+                        <button
+                          onClick={() => { setSearchQuery(""); setSearchResults([]); setSearchError(""); }}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Search Loading */}
+              {searchLoading && (
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-secondary">
+                      <Skeleton className="h-10 w-10 rounded-lg" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-3/5" />
+                        <Skeleton className="h-3 w-1/3" />
+                      </div>
+                      <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Search Error */}
+              {searchError && !searchLoading && (
+                <Card className="border-border">
+                  <CardContent className="p-8 flex flex-col items-center text-center gap-2">
+                    <Search className="w-8 h-8 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">{searchError}</p>
+                    <p className="text-xs text-muted-foreground/60">
+                      Try different keywords, the full company name, or the NSE/BSE ticker code.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Search Results */}
+              {!searchLoading && searchResults.length > 0 && (
+                <Card className="border-border">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <Search className="w-3.5 h-3.5" />
+                      {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} found
+                      {searchQuery && <span className="text-foreground font-semibold">for "{searchQuery}"</span>}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-1">
+                      {searchResults.map((result, idx) => (
+                        <motion.div
+                          key={result.ticker}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.15, delay: idx * 0.03 }}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/80 cursor-pointer transition-colors group"
+                          onClick={() => handleSearchSelect(result)}
+                        >
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-primary">
+                              {result.ticker.slice(0, 2)}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                              {result.name}
+                            </p>
+                            <span className="text-xs text-muted-foreground font-mono">{result.ticker}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <a
+                                  href={`https://www.screener.in/company/${result.ticker}/`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                                  </Button>
+                                </a>
+                              </TooltipTrigger>
+                              <TooltipContent>Open on Screener.in</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <a
+                                  href={tradingViewUrl(result.ticker)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <LineChart className="w-3.5 h-3.5 text-muted-foreground" />
+                                  </Button>
+                                </a>
+                              </TooltipTrigger>
+                              <TooltipContent>Open on TradingView</TooltipContent>
+                            </Tooltip>
+                            <ArrowUpRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Empty State */}
+              {!searchLoading && !searchError && searchQuery.length < 2 && (
+                <Card className="border-border">
+                  <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                      <Globe className="w-7 h-7 text-primary" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-foreground">Search Any Indian Stock</h3>
+                    <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+                      Look up complete financial data for any company listed on NSE or BSE.
+                      Search by company name (e.g., &quot;Reliance Industries&quot;) or ticker
+                      (e.g., &quot;TCS&quot;, &quot;HDFCBANK&quot;).
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {["RELIANCE", "TCS", "HDFCBANK", "INFY", "ITC", "SBIN"].map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => handleSearchInput(t)}
+                          className="px-3 py-1 rounded-full bg-secondary text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
           {/* ─── DATA SOURCE FOOTER ───────────────────────────────── */}
           {!loading && stocks.length > 0 && (
             <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
@@ -936,17 +1232,27 @@ export default function Home() {
                       {stockDetail.sector && <span className="ml-2">&middot; {stockDetail.sector}</span>}
                       {stockDetail.industry && <span className="ml-2 text-xs">({stockDetail.industry})</span>}
                     </p>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-2xl font-bold font-mono">{selectedStock.close.toFixed(2)}</span>
-                      <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
-                        <TrendingUp className="w-3 h-3 mr-1" />
-                        +{selectedStock.change.toFixed(2)}%
-                      </Badge>
-                      <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">
-                        <Zap className="w-3 h-3 mr-1" />
-                        Vol: {selectedStock.volGainPct.toFixed(0)}%
-                      </Badge>
-                    </div>
+                    {!isSearchedStock && (
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="text-2xl font-bold font-mono">{selectedStock.close.toFixed(2)}</span>
+                        <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                          <TrendingUp className="w-3 h-3 mr-1" />
+                          +{selectedStock.change.toFixed(2)}%
+                        </Badge>
+                        <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30">
+                          <Zap className="w-3 h-3 mr-1" />
+                          Vol: {selectedStock.volGainPct.toFixed(0)}%
+                        </Badge>
+                      </div>
+                    )}
+                    {isSearchedStock && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/30">
+                          <Globe className="w-3 h-3 mr-1" />
+                          Screener.in Data
+                        </Badge>
+                      </div>
+                    )}
                   </div>
 
                   {/* Sector Suggestion */}
@@ -1053,6 +1359,182 @@ export default function Home() {
                         {stockDetail.peers.map((peer) => (
                           <Badge key={peer} variant="secondary" className="text-xs">{peer}</Badge>
                         ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pros & Cons */}
+                  {(stockDetail.pros && stockDetail.pros.length > 0) && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-400" /> Pros
+                      </h3>
+                      <ul className="space-y-1.5">
+                        {stockDetail.pros.map((pro, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                            <CheckCircle className="w-3 h-3 text-emerald-400 mt-0.5 shrink-0" />
+                            <span>{pro}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(stockDetail.cons && stockDetail.cons.length > 0) && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                        <XCircle className="w-3.5 h-3.5 text-red-400" /> Cons
+                      </h3>
+                      <ul className="space-y-1.5">
+                        {stockDetail.cons.map((con, i) => (
+                          <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                            <XCircle className="w-3 h-3 text-red-400 mt-0.5 shrink-0" />
+                            <span>{con}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Balance Sheet Summary */}
+                  {stockDetail.balanceSheet && stockDetail.balanceSheet.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                        <DollarSign className="w-3.5 h-3.5 text-primary" /> Balance Sheet (in Cr)
+                      </h3>
+                      <div className="rounded-lg border border-border overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-secondary">
+                              <th className="text-left px-2 py-2 font-medium text-muted-foreground">Item</th>
+                              {stockDetail.balanceSheet.map((bs) => (
+                                <th key={bs.label} className="text-right px-2 py-2 font-medium text-muted-foreground whitespace-nowrap">
+                                  {bs.label}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[
+                              { key: "reserves", label: "Reserves" },
+                              { key: "borrowing", label: "Borrowings" },
+                              { key: "totalLiab", label: "Total Liab." },
+                              { key: "fixedAssets", label: "Fixed Assets" },
+                              { key: "totalAssets", label: "Total Assets" },
+                            ].map((row) => (
+                              <tr key={row.key} className="border-t border-border">
+                                <td className="px-2 py-1.5 text-muted-foreground">{row.label}</td>
+                                {stockDetail.balanceSheet!.map((bs) => (
+                                  <td key={bs.label} className="text-right px-2 py-1.5 font-mono">
+                                    {bs[row.key as keyof typeof bs]}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cash Flow */}
+                  {stockDetail.cashFlow && stockDetail.cashFlow.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                        <DollarSign className="w-3.5 h-3.5 text-primary" /> Cash Flow (in Cr)
+                      </h3>
+                      <div className="rounded-lg border border-border overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-secondary">
+                              <th className="text-left px-2 py-2 font-medium text-muted-foreground">Type</th>
+                              {stockDetail.cashFlow.map((cf) => (
+                                <th key={cf.label} className="text-right px-2 py-2 font-medium text-muted-foreground whitespace-nowrap">
+                                  {cf.label}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-t border-border">
+                              <td className="px-2 py-1.5 text-muted-foreground">Operating</td>
+                              {stockDetail.cashFlow.map((cf) => (
+                                <td key={cf.label} className="text-right px-2 py-1.5 font-mono">{cf.operatingCF}</td>
+                              ))}
+                            </tr>
+                            <tr className="border-t border-border">
+                              <td className="px-2 py-1.5 text-muted-foreground">Investing</td>
+                              {stockDetail.cashFlow.map((cf) => (
+                                <td key={cf.label} className="text-right px-2 py-1.5 font-mono">{cf.investingCF}</td>
+                              ))}
+                            </tr>
+                            <tr className="border-t border-border">
+                              <td className="px-2 py-1.5 text-muted-foreground">Financing</td>
+                              {stockDetail.cashFlow.map((cf) => (
+                                <td key={cf.label} className="text-right px-2 py-1.5 font-mono">{cf.financingCF}</td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Shareholding Pattern */}
+                  {stockDetail.shareholding && stockDetail.shareholding.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-primary" /> Shareholding Pattern
+                      </h3>
+                      {stockDetail.shareholding.map((sh) => (
+                        <div key={sh.category} className="mb-3 last:mb-0">
+                          <p className="text-[10px] text-muted-foreground mb-1 font-medium">{sh.category}</p>
+                          <div className="space-y-1">
+                            {sh.values.map((v) => (
+                              <div key={v.label} className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground truncate mr-2">{v.label}</span>
+                                <span className="font-mono font-medium shrink-0">{v.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Annual Results */}
+                  {stockDetail.annualResults && stockDetail.annualResults.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                        <BarChart3 className="w-3.5 h-3.5 text-primary" /> Annual Results
+                      </h3>
+                      <div className="rounded-lg border border-border overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-secondary">
+                              <th className="text-left px-3 py-2 font-medium text-muted-foreground">Metric</th>
+                              {stockDetail.annualResults.map((ar) => (
+                                <th key={ar.label} className="text-right px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">
+                                  {ar.label}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-t border-border">
+                              <td className="px-3 py-2 text-muted-foreground">Sales</td>
+                              {stockDetail.annualResults.map((ar) => (
+                                <td key={ar.label} className="text-right px-3 py-2 font-mono">{ar.sales}</td>
+                              ))}
+                            </tr>
+                            <tr className="border-t border-border">
+                              <td className="px-3 py-2 text-muted-foreground">Net Profit</td>
+                              {stockDetail.annualResults.map((ar) => (
+                                <td key={ar.label} className="text-right px-3 py-2 font-mono">{ar.netProfit}</td>
+                              ))}
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   )}
