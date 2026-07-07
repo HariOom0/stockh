@@ -49,3 +49,22 @@ Stage Summary:
 - Enhanced scraper extracts: 9 metrics, 13 quarters, 58 peers, pros, cons, 12 periods of balance sheet, 12 periods of cash flow, shareholding pattern
 - Search tab accessible immediately without waiting for volume shockers to load
 - Comprehensive stock data now available for any Indian stock
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix peer companies showing index names instead of actual stocks
+
+Work Log:
+- Investigated screener.in HTML structure for RELIANCE, TATAPOWER, TCS
+- Discovered ALL `/company/` links in `#peers` section are benchmark/index links (Nifty 50, BSE Sensex, etc.) with class "tag" inside `#benchmarks` paragraph
+- Found that actual peer companies are loaded via JavaScript (placeholder: "Loading peers table ...") - not available in static HTML
+- Fixed scraper.ts to: (1) exclude `.tag` class links (benchmarks), (2) filter by index keywords as safety net, (3) fetch real peer companies from the sector classification page as fallback
+- Added `fetchSectorPeers()` function that scrapes the screener.in sector page (extracted from `a[title="Sector"]` href) for actual companies
+- Tested with RELIANCE (got ONGC, BPCL, HPCL, GAIL, etc.), TCS (got Infosys, Wipro, HCL Tech, etc.), TATAPOWER (got Adani Power, NTPC, etc.)
+
+Stage Summary:
+- Peers now show real sector companies instead of index names
+- Sector page is fetched as fallback when static HTML has no peer links
+- Build verified clean
+- Other features (Search tab, Suggestions tab, TradingView button) confirmed already working from previous session

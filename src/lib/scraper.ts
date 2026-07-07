@@ -408,9 +408,41 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
   }
 
   // ─── Peers ─────────────────────────────────────────────────────────
+  // The #peers section on screener.in contains benchmark/index links (Nifty 50, BSE Sensex, etc.)
+  // inside #benchmarks with class "tag". The actual peer companies are loaded via JavaScript
+  // and are NOT in the static HTML. So we:
+  // 1. Skip ALL benchmark links (they have class "tag" and are inside #benchmarks)
+  // 2. Extract the sector URL to fetch real companies from the sector classification page
+  let sectorUrl = "";
+  const sectorLink = $("#peers a[title='Sector']");
+  if (sectorLink.length) {
+    const href = sectorLink.attr("href") || "";
+    if (href.startsWith("/market/")) {
+      sectorUrl = href;
+    }
+  }
+
+  // Known index/benchmark keywords to filter out just in case
+  const indexKeywords = [
+    "nifty", "bse", "sensex", "dollex", "cnx", "nft", "lix",
+    "index", "benchmark", "equal weight", "low volatility",
+    "value 20", "liquid 15", "esg", "largecap", "midcap",
+    "commodities", "infrastructure", "energy", "mobility",
+  ];
+
   $("#peers a[href^='/company/']").each((_, el) => {
-    const peerName = $(el).text().trim();
-    // Filter out category-like entries
+    const $el = $(el);
+    const peerName = $el.text().trim();
+    const classes = $el.attr("class") || "";
+
+    // Skip benchmark/index links (they have "tag" class)
+    if (classes.includes("tag")) return;
+
+    // Skip if name matches any index keyword
+    const lower = peerName.toLowerCase();
+    if (indexKeywords.some((kw) => lower.includes(kw))) return;
+
+    // Skip category-like entries
     if (
       peerName &&
       peerName.length > 2 &&
@@ -423,5 +455,68 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     }
   });
 
+  // If no peers found from static HTML (expected), fetch from sector page
+  if (detail.peers.length === 0 && sectorUrl) {
+    try {
+      detail.peers = await fetchSectorPeers(sectorUrl, ticker);
+    } catch {
+      // Silently fail — peers are optional
+    }
+  }
+
   return detail;
+}
+
+/**
+ * Fetch peer companies from a screener.in sector/industry classification page.
+ * The peer table on the main company page is JS-loaded and unavailable in static HTML,
+ * so we scrape the sector classification page instead.
+ */
+async function fetchSectorPeers(
+  sectorPath: string,
+  currentTicker: string
+): Promise<string[]> {
+  const url = `https://www.screener.in${sectorPath}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": USER_AGENT },
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!res.ok) return [];
+
+  const html = await res.text();
+  const $ = cheerio.load(html);
+
+  const peers: string[] = [];
+  const seen = new Set<string>();
+
+  // Look for company links in the data table
+  $("table.data-table a[href^='/company/']").each((_, el) => {
+    const $el = $(el);
+    const name = $el.text().trim();
+    const href = $el.attr("href") || "";
+    const tickerMatch = href.match(/\/company\/([A-Z0-9]+)\//);
+
+    if (name && name.length > 2 && tickerMatch) {
+      const peerTicker = tickerMatch[1];
+      // Exclude numeric-only codes (these are BSE codes, not useful)
+      if (/^\d+$/.test(peerTicker)) return;
+      // Exclude the current company
+      if (peerTicker === currentTicker.toUpperCase()) return;
+      // Exclude known index tickers
+      if (
+        ["NIFTY", "CNX100", "CNX500", "CNX200INDE", "CNXCOMMODI"].includes(
+          peerTicker
+        )
+      )
+        return;
+      // Deduplicate by name
+      if (!seen.has(name)) {
+        seen.add(name);
+        peers.push(name);
+      }
+    }
+  });
+
+  return peers.slice(0, 15); // Limit to 15 peers
 }
