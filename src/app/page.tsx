@@ -280,6 +280,7 @@ export default function Home() {
   const [sectorInsights, setSectorInsights] = useState<SectorInsight[]>([]);
   const [sectorLoading, setSectorLoading] = useState(true);
   const [showSectors, setShowSectors] = useState(false);
+  const [selectedSectorInsight, setSelectedSectorInsight] = useState<SectorInsight | null>(null);
 
   // ─── Index Performance state ─────────────────────────────────────
   interface IndexData {
@@ -878,7 +879,7 @@ export default function Home() {
                       {sortedSectors.map((s) => {
                         const tc = trendColor(s.trend);
                         return (
-                          <div key={s.sector} className={`rounded-lg border p-3 ${tc.bg} ${tc.border}`}>
+                          <div key={s.sector} className={`rounded-lg border p-3 ${tc.bg} ${tc.border} cursor-pointer hover:scale-[1.02] transition-all duration-150`} onClick={() => setSelectedSectorInsight(s)}>
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs font-medium text-foreground truncate mr-1">
                                 {s.sector}
@@ -2052,6 +2053,115 @@ export default function Home() {
           )}
         </AnimatePresence>
 
+        {/* ─── SECTOR DETAIL MODAL ─────────────────────────────── */}
+        <AnimatePresence>
+          {selectedSectorInsight && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-40 bg-black/60"
+                onClick={() => setSelectedSectorInsight(null)}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                transition={{ type: "tween", duration: 0.2 }}
+                className="fixed inset-4 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-lg z-50 bg-background border border-border rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+              >
+                {/* Modal Header */}
+                <div className="shrink-0 border-b border-border px-5 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-2.5 h-2.5 rounded-full ${confidenceDot(selectedSectorInsight.confidence)}`} />
+                    <h2 className="text-base font-semibold text-foreground truncate">{selectedSectorInsight.sector}</h2>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge className={`border-0 font-semibold ${trendColor(selectedSectorInsight.trend).text} ${trendColor(selectedSectorInsight.trend).bg}`}>
+                      {selectedSectorInsight.trend}
+                    </Badge>
+                    <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => setSelectedSectorInsight(null)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Modal Body */}
+                <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+                  {/* Analysis */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">Analysis</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{selectedSectorInsight.description}</p>
+                  </div>
+
+                  {/* Confidence */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">Confidence Level</h3>
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${confidenceDot(selectedSectorInsight.confidence)}`} />
+                      <span className="text-sm text-muted-foreground">{selectedSectorInsight.confidence}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground/60 mt-1.5">
+                      {selectedSectorInsight.confidence === "High" && "Based on strong macro indicators, consistent data trends, and multiple confirming signals."}
+                      {selectedSectorInsight.confidence === "Medium" && "Based on mixed signals with some supporting data. Monitor for confirmation or reversal."}
+                      {selectedSectorInsight.confidence === "Low" && "Limited data or high uncertainty. Treat as directional guidance only."}
+                    </p>
+                  </div>
+
+                  {/* Trend Interpretation */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">What This Means</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {selectedSectorInsight.trend === "Bullish" && "This sector has strong momentum and favorable conditions. Stocks in this sector may continue to perform well. Look for volume shockers in this sector as potential opportunities."}
+                      {selectedSectorInsight.trend === "Bearish" && "This sector faces headwinds and negative conditions. Exercise caution with stocks in this sector. Volume spikes here may indicate distribution rather than accumulation."}
+                      {selectedSectorInsight.trend === "Neutral" && "This sector is in a consolidation phase with no strong directional bias. Wait for clear signals before taking positions. Volume breakouts could signal the next move."}
+                      {selectedSectorInsight.trend === "Rotating In" && "Institutional money is starting to flow into this sector. Early-stage rotation often precedes sustained rallies. Watch for increasing volume and price breakout patterns."}
+                      {selectedSectorInsight.trend === "Rotating Out" && "Institutional money is exiting this sector. This often leads to prolonged underperformance. Reduce exposure to stocks in this sector."}
+                    </p>
+                  </div>
+
+                  {/* Stocks from this sector */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">Volume Shockers in This Sector</h3>
+                    {filteredStocks.filter(st => {
+                      const info = sectorMap.get(st.ticker);
+                      return info?.sector === selectedSectorInsight.sector;
+                    }).length > 0 ? (
+                      <div className="space-y-1.5">
+                        {filteredStocks.filter(st => {
+                          const info = sectorMap.get(st.ticker);
+                          return info?.sector === selectedSectorInsight.sector;
+                        }).map(st => (
+                          <button
+                            key={st.ticker}
+                            onClick={() => { setSelectedSectorInsight(null); setSelectedStock(st); }}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-border hover:bg-secondary/50 transition-colors text-left"
+                          >
+                            <div className="min-w-0">
+                              <span className="text-sm font-medium text-foreground truncate block">{st.name}</span>
+                              <span className="text-xs text-muted-foreground">{st.ticker}</span>
+                            </div>
+                            <div className="text-right shrink-0 ml-3">
+                              <div className="text-sm font-mono text-foreground">₹{st.close.toLocaleString("en-IN")}</div>
+                              <span className={`text-xs font-mono ${st.isPositive ? "text-emerald-400" : "text-red-400"}`}>
+                                {st.isPositive ? "+" : ""}{st.change.toFixed(2)}%
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground/60">
+                        {sectorMap.size > 0 ? "No volume shockers found in this sector today." : "Load sector data first to see matching stocks."}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
       </div>
     </TooltipProvider>
