@@ -567,7 +567,7 @@ export default function Home() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen flex flex-col bg-background">
+      <div className={`min-h-screen flex flex-col bg-background ${selectedStock ? 'overflow-hidden' : ''}`}>
         {/* ─── HEADER ─────────────────────────────────────────────── */}
         <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
@@ -682,18 +682,6 @@ export default function Home() {
                 <Zap className="w-3.5 h-3.5 text-emerald-400" />
                 <span className="text-sm font-medium text-emerald-400">
                   {stats.filtered} Stocks
-                </span>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary border border-border">
-                <Filter className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Positive &amp; Vol &gt; 180%
-                </span>
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary border border-border">
-                <BarChart3 className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  {stats.total} Total on Chartink
                 </span>
               </div>
             </div>
