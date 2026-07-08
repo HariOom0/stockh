@@ -664,22 +664,23 @@ export default function Home() {
       <div className="min-h-screen flex flex-col bg-background">
         {/* ─── HEADER ─────────────────────────────────────────────── */}
         <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
-                <BarChart3 className="w-5 h-5 text-primary" />
+          {/* Row 1: Logo + Actions */}
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-lg font-bold tracking-tight">StockH</h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">
+                <h1 className="text-base sm:text-lg font-bold tracking-tight">StockH</h1>
+                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
                   Volume Shockers &middot; Indian Market
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               {lastUpdated && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <span className="text-[10px] sm:text-xs text-muted-foreground items-center gap-1 hidden sm:flex">
                   <Clock className="w-3 h-3" />
                   {new Date(lastUpdated).toLocaleTimeString("en-IN", {
                     hour: "2-digit",
@@ -687,38 +688,38 @@ export default function Home() {
                   })}
                 </span>
               )}
-              <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="px-2 sm:px-3"
-                  onClick={() => { setShowSectors(!showSectors); setShowIndices(false); if (!showSectors) fetchSectors(); }}
-                >
-                  <Activity className="w-4 h-4 sm:mr-1" />
-                  <span className="hidden sm:inline">Sectors</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="px-2 sm:px-3"
-                  onClick={() => { setShowIndices(!showIndices); setShowSectors(false); if (!showIndices) fetchIndices(); }}
-                >
-                <TrendingDown className="w-4 h-4 sm:mr-1" />
-                <span className="hidden sm:inline">Indices</span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="w-8 h-8 sm:w-9 sm:h-9"
+                onClick={() => { setShowSectors(!showSectors); setShowIndices(false); if (!showSectors) fetchSectors(); }}
+              >
+                <Activity className="w-4 h-4" />
+                <span className="sr-only">Sectors</span>
               </Button>
               <Button
                 variant="outline"
                 size="icon"
-                className="w-9 h-9 shrink-0"
+                className="w-8 h-8 sm:w-9 sm:h-9"
+                onClick={() => { setShowIndices(!showIndices); setShowSectors(false); if (!showIndices) fetchIndices(); }}
+              >
+                <TrendingDown className="w-4 h-4" />
+                <span className="sr-only">Indices</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="w-8 h-8 sm:w-9 sm:h-9"
                 onClick={fetchStocks}
                 disabled={loading}
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                <span className="sr-only">Refresh</span>
               </Button>
               <Button
                 variant="outline"
                 size="icon"
-                className="w-9 h-9 shrink-0"
+                className="w-8 h-8 sm:w-9 sm:h-9"
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               >
                 <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -727,10 +728,11 @@ export default function Home() {
               </Button>
             </div>
           </div>
-          {/* ─── VIEW TABS (sticky sub-header) ──────────────── */}
+          {/* ─── VIEW TABS (separate row) ──────────────── */}
           {(stocks.length > 0 || viewMode === "search" || viewMode === "history") && (
-            <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-2">
-              <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary w-fit overflow-x-auto scrollbar-none -mx-1 px-1">
+            <div className="border-t border-border">
+              <div className="max-w-7xl mx-auto w-full px-3 sm:px-6 py-2">
+                <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary w-fit overflow-x-auto scrollbar-none">
                 <button
                   onClick={() => handleViewSwitch("list")}
                   className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
@@ -785,8 +787,8 @@ export default function Home() {
                 </button>
               </div>
             </div>
+            </div>
           )}
-        </div>
         </header>
 
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
