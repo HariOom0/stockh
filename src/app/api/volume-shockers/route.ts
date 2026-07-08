@@ -13,8 +13,8 @@ const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 /**
  * Get the actual trading date for the EOD data.
  * Chartink EOD data is from the previous trading day if current IST time
- * is before 4:00 PM (market closes at 3:30 PM + buffer).
- * After 4 PM IST, data is from today's trading session.
+ * is before 7:00 PM (data updates after market close + processing delay).
+ * After 7 PM IST, data is from today's trading session.
  */
 function getTradingDate(): string {
   const now = new Date();
@@ -23,8 +23,8 @@ function getTradingDate(): string {
   const ist = new Date(utc + istOffset);
   const hour = ist.getHours();
 
-  // Before 4 PM IST → data is from previous day
-  if (hour < 16) {
+  // Before 7 PM IST → data is from previous day
+  if (hour < 19) {
     ist.setDate(ist.getDate() - 1);
   }
 
