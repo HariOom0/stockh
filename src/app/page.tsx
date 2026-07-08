@@ -32,6 +32,7 @@ import {
   Users,
   DollarSign,
   History,
+  TrendingDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +71,7 @@ interface StockDetail {
   sector?: string;
   industry?: string;
   about?: string;
+  indices?: string[];
   metrics: Record<string, string>;
   quarters: {
     label: string;
@@ -270,6 +272,33 @@ export default function Home() {
   const [sectorInsights, setSectorInsights] = useState<SectorInsight[]>([]);
   const [sectorLoading, setSectorLoading] = useState(true);
   const [showSectors, setShowSectors] = useState(false);
+
+  // ─── Index Performance state ─────────────────────────────────────
+  interface IndexData {
+    name: string;
+    symbol: string;
+    lastPrice: number;
+    changePct: number;
+    changeAbs: number;
+    recommendation: string;
+  }
+  const [showIndices, setShowIndices] = useState(false);
+  const [indexData, setIndexData] = useState<IndexData[]>([]);
+  const [indexLoading, setIndexLoading] = useState(false);
+
+  const fetchIndices = async () => {
+    setIndexLoading(true);
+    try {
+      const res = await fetch("/api/index-performance");
+      const data = await res.json();
+      if (data.indices) setIndexData(data.indices);
+    } catch (err) {
+      console.error("Failed to fetch indices:", err);
+    } finally {
+      setIndexLoading(false);
+    }
+  };
+
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [stats, setStats] = useState({ total: 0, filtered: 0 });
 
@@ -663,6 +692,14 @@ export default function Home() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => { setShowIndices(!showIndices); if (!showIndices) fetchIndices(); }}
+              >
+                <TrendingDown className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Indices</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={fetchStocks}
                 disabled={loading}
               >
@@ -728,6 +765,85 @@ export default function Home() {
                         );
                       })}
                     </div>
+                  </CardContent>
+                </Card>
+              </motion.section>
+            )}
+          </AnimatePresence>
+
+          {/* ─── INDEX PERFORMANCE PANEL ────────────────────────────── */}
+          <AnimatePresence>
+            {showIndices && (
+              <motion.section
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden mb-6"
+              >
+                <Card className="border-border">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base font-semibold flex items-center gap-2">
+                        <TrendingDown className="w-4 h-4 text-blue-400" />
+                        Index Performance
+                        {indexLoading && (
+                          <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground" />
+                        )}
+                      </CardTitle>
+                      <Button variant="ghost" size="sm" onClick={() => setShowIndices(false)}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Live Indian market index data from TradingView. 15-minute cache.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {indexLoading && indexData.length === 0 ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {indexData.map((idx) => {
+                          const isUp = idx.changePct >= 0;
+                          return (
+                            <div
+                              key={idx.symbol}
+                              className="rounded-lg border border-border p-3 hover:bg-secondary/30 transition-colors"
+                            >
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-xs font-medium text-foreground truncate mr-2">
+                                  {idx.name}
+                                </span>
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-[10px] shrink-0 border-0 font-mono ${
+                                    isUp
+                                      ? "bg-emerald-500/15 text-emerald-400"
+                                      : "bg-red-500/15 text-red-400"
+                                  }`}
+                                >
+                                  {isUp ? "+" : ""}{idx.changePct.toFixed(2)}%
+                                </Badge>
+                              </div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-sm font-bold font-mono text-foreground">
+                                  {idx.lastPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                                </span>
+                                <span className={`text-[11px] font-mono ${isUp ? "text-emerald-400" : "text-red-400"}`}>
+                                  {isUp ? "+" : ""}{idx.changeAbs.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground/60 mt-1">
+                                {idx.recommendation}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </motion.section>
@@ -1573,6 +1689,20 @@ export default function Home() {
                               Screener.in
                             </Badge>
                           )}
+                        </div>
+                      )}
+
+                      {/* Index memberships */}
+                      {stockDetail.indices && stockDetail.indices.length > 0 && (
+                        <div className="mt-2.5">
+                          <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Part of</span>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {stockDetail.indices.map((idx) => (
+                              <Badge key={idx} variant="secondary" className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-[10px] font-medium">
+                                {idx}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>

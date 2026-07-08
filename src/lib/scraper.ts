@@ -73,6 +73,7 @@ export interface StockDetail {
   sector?: string;
   industry?: string;
   about?: string;
+  indices?: string[];
   metrics: Record<string, string>;
   quarters: {
     label: string;
@@ -408,6 +409,16 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
   }
 
   // ─── Peers ─────────────────────────────────────────────────────────
+  // Extract index/benchmark names from #benchmarks .tag links
+  const indices: string[] = [];
+  $("#peers #benchmarks a.tag").each((_, el) => {
+    const name = $(el).text().trim();
+    if (name && !$(el).hasClass("hidden")) {
+      indices.push(name);
+    }
+  });
+  if (indices.length > 0) detail.indices = indices;
+
   // The #peers section on screener.in contains benchmark/index links (Nifty 50, BSE Sensex, etc.)
   // inside #benchmarks with class "tag". The actual peer companies are loaded via JavaScript
   // and are NOT in the static HTML. So we:
