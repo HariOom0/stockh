@@ -879,7 +879,7 @@ export default function Home() {
                       {sortedSectors.map((s) => {
                         const tc = trendColor(s.trend);
                         return (
-                          <div key={s.sector} className={`rounded-lg border p-3 ${tc.bg} ${tc.border} cursor-pointer hover:scale-[1.02] transition-all duration-150`} onClick={() => setSelectedSectorInsight(s)}>
+                          <div key={s.sector} className={`rounded-lg border p-3 ${tc.bg} ${tc.border} cursor-pointer hover:brightness-110 transition-colors`} onClick={() => setSelectedSectorInsight(s)}>
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs font-medium text-foreground truncate mr-1">
                                 {s.sector}
