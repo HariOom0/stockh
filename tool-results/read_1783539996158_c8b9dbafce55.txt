@@ -1,0 +1,502 @@
+  1120→
+  1121→              {/* Suggestion groups */}
+  1122→              {!suggestionsLoading && suggestionGroups.length > 0 && (
+  1123→                <>
+  1124→                  <div className="flex items-center gap-2 mb-2">
+  1125→                    <Sparkles className="w-4 h-4 text-primary" />
+  1126→                    <p className="text-sm text-muted-foreground">
+  1127→                      Stocks rearranged by sector rotation strength. Bullish sectors appear first.
+  1128→                    </p>
+  1129→                  </div>
+  1130→
+  1131→                  {suggestionGroups.map((group) => {
+  1132→                    const tc = group.insight ? trendColor(group.insight.trend) : trendColor("Neutral");
+  1133→                    const isTop = group.trendKey === "Bullish" || group.trendKey === "Rotating In";
+  1134→                    const isBottom = group.trendKey === "other";
+  1135→
+  1136→                    return (
+  1137→                      <motion.div
+  1138→                        key={group.trendKey}
+  1139→                        initial={{ opacity: 0, y: 12 }}
+  1140→                        animate={{ opacity: 1, y: 0 }}
+  1141→                        transition={{ duration: 0.3 }}
+  1142→                      >
+  1143→                        <Card className={`border ${isTop ? "border-emerald-500/20" : isBottom ? "border-red-500/20" : "border-border"}`}>
+  1144→                          <CardHeader className="pb-2">
+  1145→                            <div className="flex items-center justify-between">
+  1146→                              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+  1147→                                {isTop && <Star className="w-4 h-4 text-emerald-400" />}
+  1148→                                {isBottom && <AlertTriangle className="w-4 h-4 text-red-400" />}
+  1149→                                {group.trendLabel}
+  1150→                                <Badge variant="secondary" className={`text-[10px] ${tc.bg} ${tc.text}`}>
+  1151→                                  {group.stocks.length} stock{group.stocks.length !== 1 ? "s" : ""}
+  1152→                                </Badge>
+  1153→                              </CardTitle>
+  1154→                              {group.insight && (
+  1155→                                <Badge variant="secondary" className={`text-[10px] ${tc.bg} ${tc.text} ${tc.border} border`}>
+  1156→                                  {group.insight.trend}
+  1157→                                </Badge>
+  1158→                              )}
+  1159→                            </div>
+  1160→                            {group.insight && (
+  1161→                              <p className="text-xs text-muted-foreground mt-1">
+  1162→                                {group.insight.description}
+  1163→                              </p>
+  1164→                            )}
+  1165→                          </CardHeader>
+  1166→                          <CardContent className="pt-0">
+  1167→                            <div className="space-y-1.5">
+  1168→                              {group.stocks.map((stock, idx) => (
+  1169→                                <div
+  1170→                                  key={stock.ticker}
+  1171→                                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 cursor-pointer transition-colors group"
+  1172→                                  onClick={() => setSelectedStock(stock)}
+  1173→                                >
+  1174→                                  <span className="text-xs text-muted-foreground w-5 text-center shrink-0">
+  1175→                                    {idx + 1}
+  1176→                                  </span>
+  1177→                                  <div className="flex-1 min-w-0">
+  1178→                                    <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+  1179→                                      {stock.name}
+  1180→                                    </p>
+  1181→                                    <div className="flex items-center gap-2">
+  1182→                                      <span className="text-xs text-muted-foreground">{stock.ticker}</span>
+  1183→                                      {stock.matchedSector && (
+  1184→                                        <>
+  1185→                                          <span className="text-muted-foreground/40">&middot;</span>
+  1186→                                          <span className="text-[10px] text-muted-foreground">{stock.matchedSector}</span>
+  1187→                                        </>
+  1188→                                      )}
+  1189→                                    </div>
+  1190→                                  </div>
+  1191→                                  <div className="text-right shrink-0">
+  1192→                                    <p className="text-sm font-mono font-medium">{stock.close.toFixed(2)}</p>
+  1193→                                    <div className="flex items-center gap-2">
+  1194→                                      <span className="text-xs text-emerald-400 font-medium">+{stock.change.toFixed(2)}%</span>
+  1195→                                      <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono px-1.5">
+  1196→                                        {stock.volGainPct.toFixed(0)}%
+  1197→                                      </Badge>
+  1198→                                    </div>
+  1199→                                  </div>
+  1200→                                  <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0" />
+  1201→                                </div>
+  1202→                              ))}
+  1203→                            </div>
+  1204→                          </CardContent>
+  1205→                        </Card>
+  1206→                      </motion.div>
+  1207→                    );
+  1208→                  })}
+  1209→
+  1210→                  {filteredStocks.length === 0 && (
+  1211→                    <div className="p-12 text-center text-muted-foreground">
+  1212→                      {stocks.length === 0
+  1213→                        ? "No volume shockers found today."
+  1214→                        : "No stocks match your search."}
+  1215→                    </div>
+  1216→                  )}
+  1217→                </>
+  1218→              )}
+  1219→            </div>
+  1220→          )}
+  1221→
+  1222→          {/* ═══════════════════════════════════════════════════════════
+  1223→              SEARCH VIEW (universal stock search from Screener.in)
+  1224→             ═══════════════════════════════════════════════════════════ */}
+  1225→          {viewMode === "search" && (
+  1226→            <div>
+  1227→              {/* Search Input */}
+  1228→              <Card className="border-border mb-4">
+  1229→                <CardContent className="p-4">
+  1230→                  <div className="flex items-center gap-2 mb-2">
+  1231→                    <Globe className="w-4 h-4 text-primary" />
+  1232→                    <h3 className="text-sm font-semibold">Search Any Stock on Screener.in</h3>
+  1233→                  </div>
+  1234→                  <p className="text-xs text-muted-foreground mb-3">
+  1235→                    Type a company name or stock ticker (e.g., Reliance, TCS, HDFCBANK) to look up
+  1236→                    complete financial data from Screener.in. Covers all NSE &amp; BSE listed companies.
+  1237→                  </p>
+  1238→                  <div className="relative">
+  1239→                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+  1240→                    <Input
+  1241→                      placeholder="Search by company name or ticker..."
+  1242→                      className="pl-9 pr-20 bg-secondary border-border text-base"
+  1243→                      value={searchQuery}
+  1244→                      onChange={(e) => handleSearchInput(e.target.value)}
+  1245→                      onKeyDown={(e) => {
+  1246→                        if (e.key === "Enter" && searchQuery.trim().length >= 2) {
+  1247→                          performSearch(searchQuery);
+  1248→                        }
+  1249→                      }}
+  1250→                      autoFocus
+  1251→                    />
+  1252→                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+  1253→                      {searchLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+  1254→                      {searchQuery && (
+  1255→                        <button
+  1256→                          onClick={() => { setSearchQuery(""); setSearchResults([]); setSearchError(""); }}
+  1257→                          className="text-muted-foreground hover:text-foreground"
+  1258→                        >
+  1259→                          <X className="w-4 h-4" />
+  1260→                        </button>
+  1261→                      )}
+  1262→                    </div>
+  1263→                  </div>
+  1264→                </CardContent>
+  1265→              </Card>
+  1266→
+  1267→              {/* Search Loading */}
+  1268→              {searchLoading && (
+  1269→                <div className="space-y-2">
+  1270→                  {[...Array(5)].map((_, i) => (
+  1271→                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-secondary">
+  1272→                      <Skeleton className="h-10 w-10 rounded-lg" />
+  1273→                      <div className="flex-1 space-y-2">
+  1274→                        <Skeleton className="h-4 w-3/5" />
+  1275→                        <Skeleton className="h-3 w-1/3" />
+  1276→                      </div>
+  1277→                      <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
+  1278→                    </div>
+  1279→                  ))}
+  1280→                </div>
+  1281→              )}
+  1282→
+  1283→              {/* Search Error */}
+  1284→              {searchError && !searchLoading && (
+  1285→                <Card className="border-border">
+  1286→                  <CardContent className="p-8 flex flex-col items-center text-center gap-2">
+  1287→                    <Search className="w-8 h-8 text-muted-foreground" />
+  1288→                    <p className="text-sm text-muted-foreground">{searchError}</p>
+  1289→                    <p className="text-xs text-muted-foreground/60">
+  1290→                      Try different keywords, the full company name, or the NSE/BSE ticker code.
+  1291→                    </p>
+  1292→                  </CardContent>
+  1293→                </Card>
+  1294→              )}
+  1295→
+  1296→              {/* Search Results */}
+  1297→              {!searchLoading && searchResults.length > 0 && (
+  1298→                <Card className="border-border">
+  1299→                  <CardHeader className="pb-2">
+  1300→                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+  1301→                      <Search className="w-3.5 h-3.5" />
+  1302→                      {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} found
+  1303→                      {searchQuery && <span className="text-foreground font-semibold">for "{searchQuery}"</span>}
+  1304→                    </CardTitle>
+  1305→                  </CardHeader>
+  1306→                  <CardContent className="pt-0">
+  1307→                    <div className="space-y-1">
+  1308→                      {searchResults.map((result, idx) => (
+  1309→                        <motion.div
+  1310→                          key={result.ticker}
+  1311→                          initial={{ opacity: 0, y: 8 }}
+  1312→                          animate={{ opacity: 1, y: 0 }}
+  1313→                          transition={{ duration: 0.15, delay: idx * 0.03 }}
+  1314→                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/80 cursor-pointer transition-colors group"
+  1315→                          onClick={() => handleSearchSelect(result)}
+  1316→                        >
+  1317→                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+  1318→                            <span className="text-xs font-bold text-primary">
+  1319→                              {result.ticker.slice(0, 2)}
+  1320→                            </span>
+  1321→                          </div>
+  1322→                          <div className="flex-1 min-w-0">
+  1323→                            <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+  1324→                              {result.name}
+  1325→                            </p>
+  1326→                            <span className="text-xs text-muted-foreground font-mono">{result.ticker}</span>
+  1327→                          </div>
+  1328→                          <div className="flex items-center gap-2 shrink-0">
+  1329→                            <Tooltip>
+  1330→                              <TooltipTrigger asChild>
+  1331→                                <a
+  1332→                                  href={`https://www.screener.in/company/${result.ticker}/`}
+  1333→                                  target="_blank"
+  1334→                                  rel="noopener noreferrer"
+  1335→                                  onClick={(e) => e.stopPropagation()}
+  1336→                                >
+  1337→                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+  1338→                                    <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+  1339→                                  </Button>
+  1340→                                </a>
+  1341→                              </TooltipTrigger>
+  1342→                              <TooltipContent>Open on Screener.in</TooltipContent>
+  1343→                            </Tooltip>
+  1344→                            <Tooltip>
+  1345→                              <TooltipTrigger asChild>
+  1346→                                <a
+  1347→                                  href={tradingViewUrl(result.ticker)}
+  1348→                                  target="_blank"
+  1349→                                  rel="noopener noreferrer"
+  1350→                                  onClick={(e) => e.stopPropagation()}
+  1351→                                >
+  1352→                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+  1353→                                    <LineChart className="w-3.5 h-3.5 text-muted-foreground" />
+  1354→                                  </Button>
+  1355→                                </a>
+  1356→                              </TooltipTrigger>
+  1357→                              <TooltipContent>Open on TradingView</TooltipContent>
+  1358→                            </Tooltip>
+  1359→                            <ArrowUpRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+  1360→                          </div>
+  1361→                        </motion.div>
+  1362→                      ))}
+  1363→                    </div>
+  1364→                  </CardContent>
+  1365→                </Card>
+  1366→              )}
+  1367→
+  1368→              {/* Empty State */}
+  1369→              {!searchLoading && !searchError && searchQuery.length < 2 && (
+  1370→                <Card className="border-border">
+  1371→                  <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+  1372→                    <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+  1373→                      <Globe className="w-7 h-7 text-primary" />
+  1374→                    </div>
+  1375→                    <h3 className="text-sm font-semibold text-foreground">Search Any Indian Stock</h3>
+  1376→                    <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+  1377→                      Look up complete financial data for any company listed on NSE or BSE.
+  1378→                      Search by company name (e.g., &quot;Reliance Industries&quot;) or ticker
+  1379→                      (e.g., &quot;TCS&quot;, &quot;HDFCBANK&quot;).
+  1380→                    </p>
+  1381→                    <div className="flex flex-wrap gap-2 mt-2">
+  1382→                      {["RELIANCE", "TCS", "HDFCBANK", "INFY", "ITC", "SBIN"].map((t) => (
+  1383→                        <button
+  1384→                          key={t}
+  1385→                          onClick={() => handleSearchInput(t)}
+  1386→                          className="px-3 py-1 rounded-full bg-secondary text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+  1387→                        >
+  1388→                          {t}
+  1389→                        </button>
+  1390→                      ))}
+  1391→                    </div>
+  1392→                  </CardContent>
+  1393→                </Card>
+  1394→              )}
+  1395→            </div>
+  1396→          )}
+  1397→
+  1398→          {/* ─── HISTORY VIEW ─────────────────────────────────────── */}
+  1399→          {viewMode === "history" && (
+  1400→            <div>
+  1401→              {/* Date list */}
+  1402→              {!selectedHistoryDate && (
+  1403→                <div>
+  1404→                  {historyDates.length === 0 ? (
+  1405→                    <Card className="border-border">
+  1406→                      <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+  1407→                        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+  1408→                          <History className="w-7 h-7 text-primary" />
+  1409→                        </div>
+  1410→                        <h3 className="text-sm font-semibold text-foreground">Daily History</h3>
+  1411→                        <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+  1412→                          Every day&apos;s volume shocker stocks are automatically saved here.
+  1413→                          Browse past days to see which stocks had volume spikes.
+  1414→                        </p>
+  1415→                        <p className="text-xs text-muted-foreground/60 mt-1">
+  1416→                          Today&apos;s data will appear after the first refresh.
+  1417→                        </p>
+  1418→                      </CardContent>
+  1419→                    </Card>
+  1420→                  ) : (
+  1421→                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+  1422→                      {historyDates.map((h) => (
+  1423→                        <button
+  1424→                          key={h.date}
+  1425→                          onClick={() => fetchHistoryStocks(h.date)}
+  1426→                          className="rounded-lg border border-border p-3 text-left hover:bg-secondary/50 hover:border-primary/20 transition-colors group"
+  1427→                        >
+  1428→                          <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+  1429→                            {formatDate(h.date)}
+  1430→                          </p>
+  1431→                          <p className="text-xs text-muted-foreground mt-1">
+  1432→                            {h.stockCount} stock{h.stockCount !== 1 ? "s" : ""}
+  1433→                          </p>
+  1434→                        </button>
+  1435→                      ))}
+  1436→                    </div>
+  1437→                  )}
+  1438→                </div>
+  1439→              )}
+  1440→
+  1441→              {/* Stocks for selected date */}
+  1442→              {selectedHistoryDate && (
+  1443→                <div>
+  1444→                  <div className="flex items-center gap-3 mb-4">
+  1445→                    <Button variant="ghost" size="sm" onClick={() => { setSelectedHistoryDate(null); setHistoryStocks([]); }}>
+  1446→                      <ArrowLeft className="w-4 h-4 mr-1" />
+  1447→                      Back
+  1448→                    </Button>
+  1449→                    <div>
+  1450→                      <h2 className="text-sm font-semibold text-foreground">{formatDate(selectedHistoryDate)}</h2>
+  1451→                      <p className="text-xs text-muted-foreground">{historyStocks.length} volume shockers</p>
+  1452→                    </div>
+  1453→                  </div>
+  1454→
+  1455→                  {historyLoading ? (
+  1456→                    <div className="flex flex-col items-center py-16 gap-4">
+  1457→                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+  1458→                      <p className="text-sm text-muted-foreground">Loading historical data...</p>
+  1459→                    </div>
+  1460→                  ) : historyStocks.length > 0 ? (
+  1461→                    <>
+  1462→                      {/* Desktop Table */}
+  1463→                      <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+  1464→                        <table className="w-full text-sm">
+  1465→                          <thead>
+  1466→                            <tr className="bg-secondary/80">
+  1467→                              <th className="text-left px-4 py-3 font-medium text-muted-foreground w-12">#</th>
+  1468→                              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Stock</th>
+  1469→                              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Close</th>
+  1470→                              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Change</th>
+  1471→                              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Vol Gain</th>
+  1472→                              <th className="text-center px-4 py-3 font-medium text-muted-foreground w-20">Action</th>
+  1473→                            </tr>
+  1474→                          </thead>
+  1475→                          <tbody>
+  1476→                            {historyStocks.map((stock, idx) => (
+  1477→                              <tr
+  1478→                                key={stock.ticker}
+  1479→                                className="border-t border-border hover:bg-secondary/50 cursor-pointer transition-colors group"
+  1480→                                onClick={() => setSelectedStock(stock)}
+  1481→                              >
+  1482→                                <td className="px-4 py-3 text-muted-foreground text-xs">{idx + 1}</td>
+  1483→                                <td className="px-4 py-3">
+  1484→                                  <div className="font-medium text-foreground group-hover:text-primary transition-colors">{stock.name}</div>
+  1485→                                  <div className="text-xs text-muted-foreground">{stock.ticker}</div>
+  1486→                                </td>
+  1487→                                <td className="px-4 py-3 text-right font-mono">{stock.close.toFixed(2)}</td>
+  1488→                                <td className="px-4 py-3 text-right">
+  1489→                                  <span className="inline-flex items-center gap-0.5 text-emerald-400 font-medium">
+  1490→                                    <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+  1491→                                  </span>
+  1492→                                </td>
+  1493→                                <td className="px-4 py-3 text-right">
+  1494→                                  <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono">
+  1495→                                    {stock.volGainPct.toFixed(0)}%
+  1496→                                  </Badge>
+  1497→                                </td>
+  1498→                                <td className="px-4 py-3 text-center">
+  1499→                                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedStock(stock); }}>
+  1500→                                    <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+  1501→                                  </Button>
+  1502→                                </td>
+  1503→                              </tr>
+  1504→                            ))}
+  1505→                          </tbody>
+  1506→                        </table>
+  1507→                      </div>
+  1508→
+  1509→                      {/* Mobile Cards */}
+  1510→                      <div className="md:hidden space-y-2">
+  1511→                        {historyStocks.map((stock) => (
+  1512→                          <Card key={stock.ticker} className="border-border hover:border-primary/30 transition-colors cursor-pointer" onClick={() => setSelectedStock(stock)}>
+  1513→                            <CardContent className="p-4">
+  1514→                              <div className="flex items-start justify-between gap-2">
+  1515→                                <div className="min-w-0">
+  1516→                                  <p className="font-medium text-foreground truncate">{stock.name}</p>
+  1517→                                  <p className="text-xs text-muted-foreground">{stock.ticker}</p>
+  1518→                                </div>
+  1519→                                <div className="text-right shrink-0">
+  1520→                                  <p className="font-mono font-medium">{stock.close.toFixed(2)}</p>
+  1521→                                  <span className="inline-flex items-center gap-0.5 text-emerald-400 text-xs font-medium">
+  1522→                                    <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+  1523→                                  </span>
+  1524→                                </div>
+  1525→                              </div>
+  1526→                              <div className="mt-2 flex items-center gap-2">
+  1527→                                <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono">
+  1528→                                  Vol {stock.volGainPct.toFixed(0)}%
+  1529→                                </Badge>
+  1530→                              </div>
+  1531→                            </CardContent>
+  1532→                          </Card>
+  1533→                        ))}
+  1534→                      </div>
+  1535→                    </>
+  1536→                  ) : (
+  1537→                    <Card className="border-border">
+  1538→                      <CardContent className="p-12 text-center text-muted-foreground text-sm">
+  1539→                        No stocks found for this date.
+  1540→                      </CardContent>
+  1541→                    </Card>
+  1542→                  )}
+  1543→                </div>
+  1544→              )}
+  1545→            </div>
+  1546→          )}
+  1547→
+  1548→        </main>
+  1549→
+  1550→        {/* ─── STOCK DETAIL PANEL ────────────────────────────────── */}
+  1551→        <AnimatePresence>
+  1552→          {selectedStock && (
+  1553→            <motion.div
+  1554→              initial={{ x: "100%" }}
+  1555→              animate={{ x: 0 }}
+  1556→              exit={{ x: "100%" }}
+  1557→              transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
+  1558→              className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-background border-l border-border shadow-2xl flex flex-col"
+  1559→            >
+  1560→              {/* Panel Header */}
+  1561→              <div className="shrink-0 bg-background/90 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
+  1562→                <Button variant="ghost" size="sm" onClick={() => setSelectedStock(null)}>
+  1563→                  <ArrowLeft className="w-4 h-4 mr-1" />
+  1564→                  Back
+  1565→                </Button>
+  1566→                <div className="flex items-center gap-2">
+  1567→                  {/* TradingView Chart Button */}
+  1568→                  <Tooltip>
+  1569→                    <TooltipTrigger asChild>
+  1570→                      <a
+  1571→                        href={tradingViewUrl(selectedStock.ticker)}
+  1572→                        target="_blank"
+  1573→                        rel="noopener noreferrer"
+  1574→                      >
+  1575→                        <Button variant="outline" size="sm">
+  1576→                          <LineChart className="w-4 h-4 mr-1" />
+  1577→                          <span className="hidden sm:inline">Chart</span>
+  1578→                        </Button>
+  1579→                      </a>
+  1580→                    </TooltipTrigger>
+  1581→                    <TooltipContent>Open chart on TradingView</TooltipContent>
+  1582→                  </Tooltip>
+  1583→                  <a href={`https://www.screener.in/company/${selectedStock.ticker}/`} target="_blank" rel="noopener noreferrer">
+  1584→                    <Button variant="outline" size="sm">
+  1585→                      <ExternalLink className="w-4 h-4 mr-1" />
+  1586→                      <span className="hidden sm:inline">Screener.in</span>
+  1587→                    </Button>
+  1588→                  </a>
+  1589→                </div>
+  1590→              </div>
+  1591→
+  1592→              {detailLoading && (
+  1593→                <div className="p-4 space-y-4">
+  1594→                  <Skeleton className="h-6 w-3/4" />
+  1595→                  <Skeleton className="h-4 w-1/2" />
+  1596→                  {[...Array(6)].map((_, i) => (
+  1597→                    <Skeleton key={i} className="h-12 w-full" />
+  1598→                  ))}
+  1599→                </div>
+  1600→              )}
+  1601→
+  1602→              {detailError && !detailLoading && (
+  1603→                <div className="p-6 text-center">
+  1604→                  <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
+  1605→                  <p className="text-sm text-destructive mb-3">{detailError}</p>
+  1606→                  <a href={`https://www.screener.in/company/${selectedStock.ticker}/`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+  1607→                    View directly on Screener.in &rarr;
+  1608→                  </a>
+  1609→                </div>
+  1610→              )}
+  1611→
+  1612→              {stockDetail && !detailLoading && !detailError && (
+  1613→                <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+  1614→                  {/* ═══ SCROLLABLE CONTENT ═══ */}
+  1615→                  <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 scrollbar-none">
+  1616→
+  1617→                    {/* ──── SCREENER-STYLE HEADER ──── */}
+  1618→                    <div className="pb-4 border-b border-border -mx-4 px-4 -mt-4 pt-0">
+  1619→                      <div className="flex items-start justify-between gap-3">
+
+[showing lines 1120-1619 of 2115; use offset=1620 with limit to continue reading]

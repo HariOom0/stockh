@@ -1,0 +1,502 @@
+   730→            </div>
+   731→          </div>
+   732→          {/* ─── VIEW TABS (sticky sub-header) ──────────────── */}
+   733→          {(stocks.length > 0 || viewMode === "search" || viewMode === "history") && (
+   734→            <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-2">
+   735→              <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary w-fit">
+   736→                <button
+   737→                  onClick={() => handleViewSwitch("list")}
+   738→                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+   739→                    viewMode === "list"
+   740→                      ? "bg-background text-foreground shadow-sm"
+   741→                      : "text-muted-foreground hover:text-foreground"
+   742→                  }`}
+   743→                >
+   744→                  <span className="flex items-center gap-1.5">
+   745→                    <BarChart3 className="w-3.5 h-3.5" />
+   746→                    All Stocks
+   747→                  </span>
+   748→                </button>
+   749→                <button
+   750→                  onClick={() => handleViewSwitch("suggestions")}
+   751→                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+   752→                    viewMode === "suggestions"
+   753→                      ? "bg-background text-foreground shadow-sm"
+   754→                      : "text-muted-foreground hover:text-foreground"
+   755→                  }`}
+   756→                >
+   757→                  <span className="flex items-center gap-1.5">
+   758→                    <Sparkles className="w-3.5 h-3.5" />
+   759→                    Suggestions
+   760→                  </span>
+   761→                </button>
+   762→                <button
+   763→                  onClick={() => handleViewSwitch("search")}
+   764→                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+   765→                    viewMode === "search"
+   766→                      ? "bg-background text-foreground shadow-sm"
+   767→                      : "text-muted-foreground hover:text-foreground"
+   768→                  }`}
+   769→                >
+   770→                  <span className="flex items-center gap-1.5">
+   771→                    <Globe className="w-3.5 h-3.5" />
+   772→                    Search
+   773→                  </span>
+   774→                </button>
+   775→                <button
+   776→                  onClick={() => handleViewSwitch("history")}
+   777→                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+   778→                    viewMode === "history"
+   779→                      ? "bg-background text-foreground shadow-sm"
+   780→                      : "text-muted-foreground hover:text-foreground"
+   781→                  }`}
+   782→                >
+   783→                  <span className="flex items-center gap-1.5">
+   784→                    <History className="w-3.5 h-3.5" />
+   785→                    History
+   786→                  </span>
+   787→                </button>
+   788→              </div>
+   789→            </div>
+   790→          )}
+   791→        </header>
+   792→
+   793→        <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
+   794→          {/* ─── SECTOR INSIGHTS PANEL ────────────────────────────── */}
+   795→          <AnimatePresence>
+   796→            {showSectors && sectorInsights.length > 0 && (
+   797→              <motion.section
+   798→                initial={{ height: 0, opacity: 0 }}
+   799→                animate={{ height: "auto", opacity: 1 }}
+   800→                exit={{ height: 0, opacity: 0 }}
+   801→                transition={{ duration: 0.3 }}
+   802→                className="overflow-hidden mb-6"
+   803→              >
+   804→                <Card className="border-border">
+   805→                  <CardHeader className="pb-3">
+   806→                    <div className="flex items-center justify-between">
+   807→                      <CardTitle className="text-base font-semibold flex items-center gap-2">
+   808→                        <Activity className="w-4 h-4 text-primary" />
+   809→                        Sector Rotation Analysis
+   810→                        {sectorLoading && (
+   811→                          <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground" />
+   812→                        )}
+   813→                      </CardTitle>
+   814→                      <Button variant="ghost" size="sm" onClick={() => setShowSectors(false)}>
+   815→                        <X className="w-4 h-4" />
+   816→                      </Button>
+   817→                    </div>
+   818→                    <p className="text-xs text-muted-foreground mt-1">
+   819→                      AI-powered sector rotation insights for the Indian stock market. Use this to assess
+   820→                      whether the sector of a volume shocker stock is in favour.
+   821→                    </p>
+   822→                  </CardHeader>
+   823→                  <CardContent>
+   824→                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+   825→                      {sortedSectors.map((s) => {
+   826→                        const tc = trendColor(s.trend);
+   827→                        return (
+   828→                          <div key={s.sector} className={`rounded-lg border p-3 ${tc.bg} ${tc.border} cursor-pointer hover:scale-[1.03] transition-transform`} onClick={() => setSelectedSectorInsight(s)}>
+   829→                            <div className="flex items-center justify-between mb-1">
+   830→                              <span className="text-xs font-medium text-foreground truncate mr-1">
+   831→                                {s.sector}
+   832→                              </span>
+   833→                              <span className={`text-[10px] font-semibold ${tc.text} shrink-0`}>
+   834→                                {s.trend}
+   835→                              </span>
+   836→                            </div>
+   837→                            <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
+   838→                              {s.description}
+   839→                            </p>
+   840→                            <div className="flex items-center gap-1 mt-1.5">
+   841→                              <span className={`w-1.5 h-1.5 rounded-full ${confidenceDot(s.confidence)}`} />
+   842→                              <span className="text-[10px] text-muted-foreground">{s.confidence}</span>
+   843→                            </div>
+   844→                          </div>
+   845→                        );
+   846→                      })}
+   847→                    </div>
+   848→                  </CardContent>
+   849→                </Card>
+   850→              </motion.section>
+   851→            )}
+   852→          </AnimatePresence>
+   853→
+   854→          {/* ─── INDEX PERFORMANCE PANEL ────────────────────────────── */}
+   855→          <AnimatePresence>
+   856→            {showIndices && (
+   857→              <motion.section
+   858→                initial={{ height: 0, opacity: 0 }}
+   859→                animate={{ height: "auto", opacity: 1 }}
+   860→                exit={{ height: 0, opacity: 0 }}
+   861→                transition={{ duration: 0.3 }}
+   862→                className="overflow-hidden mb-6"
+   863→              >
+   864→                <Card className="border-border">
+   865→                  <CardHeader className="pb-3">
+   866→                    <div className="flex items-center justify-between">
+   867→                      <CardTitle className="text-base font-semibold flex items-center gap-2">
+   868→                        <TrendingDown className="w-4 h-4 text-blue-400" />
+   869→                        Index Performance
+   870→                        {indexLoading && (
+   871→                          <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground" />
+   872→                        )}
+   873→                      </CardTitle>
+   874→                      <Button variant="ghost" size="sm" onClick={() => setShowIndices(false)}>
+   875→                        <X className="w-4 h-4" />
+   876→                      </Button>
+   877→                    </div>
+   878→                    <p className="text-xs text-muted-foreground mt-1">
+   879→                      Live Indian market index data from TradingView. 15-minute cache.
+   880→                    </p>
+   881→                  </CardHeader>
+   882→                  <CardContent>
+   883→                    {indexLoading && indexData.length === 0 ? (
+   884→                      <div className="flex items-center justify-center py-8">
+   885→                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+   886→                      </div>
+   887→                    ) : (
+   888→                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+   889→                        {indexData.map((idx) => {
+   890→                          const isUp = idx.changePct >= 0;
+   891→                          return (
+   892→                            <div
+   893→                              key={idx.symbol}
+   894→                              className="rounded-lg border border-border p-3 hover:bg-secondary/30 transition-colors"
+   895→                            >
+   896→                              <div className="flex items-center justify-between mb-1.5">
+   897→                                <span className="text-xs font-medium text-foreground truncate mr-2">
+   898→                                  {idx.name}
+   899→                                </span>
+   900→                                <Badge
+   901→                                  variant="secondary"
+   902→                                  className={`text-[10px] shrink-0 border-0 font-mono ${
+   903→                                    isUp
+   904→                                      ? "bg-emerald-500/15 text-emerald-400"
+   905→                                      : "bg-red-500/15 text-red-400"
+   906→                                  }`}
+   907→                                >
+   908→                                  {isUp ? "+" : ""}{idx.changePct.toFixed(2)}%
+   909→                                </Badge>
+   910→                              </div>
+   911→                              <div className="flex items-baseline gap-2">
+   912→                                <span className="text-sm font-bold font-mono text-foreground">
+   913→                                  {idx.lastPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+   914→                                </span>
+   915→                                <span className={`text-[11px] font-mono ${isUp ? "text-emerald-400" : "text-red-400"}`}>
+   916→                                  {isUp ? "+" : ""}{idx.changeAbs.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+   917→                                </span>
+   918→                              </div>
+   919→                              <p className="text-[10px] text-muted-foreground/60 mt-1">
+   920→                                {idx.recommendation}
+   921→                              </p>
+   922→                            </div>
+   923→                          );
+   924→                        })}
+   925→                      </div>
+   926→                    )}
+   927→                  </CardContent>
+   928→                </Card>
+   929→              </motion.section>
+   930→            )}
+   931→          </AnimatePresence>
+   932→
+   933→          {/* ─── SEARCH ───────────────────────────────────────────── */}
+   934→          {viewMode !== "search" && (
+   935→          <div className="relative mb-4">
+   936→            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   937→            <Input
+   938→              placeholder="Search stocks by name or ticker..."
+   939→              className="pl-9 bg-secondary border-border"
+   940→              value={search}
+   941→              onChange={(e) => setSearch(e.target.value)}
+   942→            />
+   943→            {search && (
+   944→              <button
+   945→                onClick={() => setSearch("")}
+   946→                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+   947→              >
+   948→                <X className="w-4 h-4" />
+   949→              </button>
+   950→            )}
+   951→          </div>
+   952→          )}
+   953→
+   954→          {/* ─── LOADING ──────────────────────────────────────────── */}
+   955→          {loading && viewMode !== "search" && (
+   956→            <div className="space-y-3">
+   957→              {[...Array(8)].map((_, i) => (
+   958→                <div key={i} className="flex items-center gap-4 p-4 rounded-lg bg-secondary">
+   959→                  <Skeleton className="h-4 w-6" />
+   960→                  <Skeleton className="h-4 flex-1" />
+   961→                  <Skeleton className="h-4 w-20" />
+   962→                  <Skeleton className="h-4 w-16" />
+   963→                  <Skeleton className="h-4 w-20" />
+   964→                </div>
+   965→              ))}
+   966→            </div>
+   967→          )}
+   968→
+   969→          {/* ─── ERROR ────────────────────────────────────────────── */}
+   970→          {error && !loading && (
+   971→            <Card className="border-destructive/30 bg-destructive/5">
+   972→              <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+   973→                <AlertTriangle className="w-8 h-8 text-destructive" />
+   974→                <p className="text-sm text-destructive font-medium">{error}</p>
+   975→                <Button variant="outline" size="sm" onClick={fetchStocks}>
+   976→                  <RefreshCw className="w-4 h-4 mr-1" />
+   977→                  Try Again
+   978→                </Button>
+   979→              </CardContent>
+   980→            </Card>
+   981→          )}
+   982→
+   983→          {/* ═══════════════════════════════════════════════════════════
+   984→              LIST VIEW (original)
+   985→             ═══════════════════════════════════════════════════════════ */}
+   986→          {!loading && !error && viewMode === "list" && (
+   987→            <>
+   988→              {/* Desktop Table */}
+   989→              <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+   990→                <table className="w-full text-sm">
+   991→                  <thead>
+   992→                    <tr className="bg-secondary/80">
+   993→                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-12">#</th>
+   994→                      <th className="text-left px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("name")}>
+   995→                        <span className="flex items-center gap-1">Stock <SortIcon field="name" /></span>
+   996→                      </th>
+   997→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("close")}>
+   998→                        <span className="flex items-center justify-end gap-1">Close <SortIcon field="close" /></span>
+   999→                      </th>
+  1000→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("change")}>
+  1001→                        <span className="flex items-center justify-end gap-1">Change <SortIcon field="change" /></span>
+  1002→                      </th>
+  1003→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("volGainPct")}>
+  1004→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="volGainPct" /></span>
+  1005→                      </th>
+  1006→                      <th className="text-center px-4 py-3 font-medium text-muted-foreground w-20">Action</th>
+  1007→                    </tr>
+  1008→                  </thead>
+  1009→                  <tbody>
+  1010→                    {filteredStocks.map((stock, idx) => (
+  1011→                      <motion.tr
+  1012→                        key={stock.ticker}
+  1013→                        initial={{ opacity: 0, y: 8 }}
+  1014→                        animate={{ opacity: 1, y: 0 }}
+  1015→                        transition={{ delay: idx * 0.02, duration: 0.2 }}
+  1016→                        className="border-t border-border hover:bg-secondary/50 cursor-pointer transition-colors group"
+  1017→                        onClick={() => setSelectedStock(stock)}
+  1018→                      >
+  1019→                        <td className="px-4 py-3 text-muted-foreground text-xs">{idx + 1}</td>
+  1020→                        <td className="px-4 py-3">
+  1021→                          <div className="font-medium text-foreground group-hover:text-primary transition-colors">{stock.name}</div>
+  1022→                          <div className="text-xs text-muted-foreground">{stock.ticker}</div>
+  1023→                        </td>
+  1024→                        <td className="px-4 py-3 text-right font-mono">{stock.close.toFixed(2)}</td>
+  1025→                        <td className="px-4 py-3 text-right">
+  1026→                          <span className="inline-flex items-center gap-0.5 text-emerald-400 font-medium">
+  1027→                            <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+  1028→                          </span>
+  1029→                        </td>
+  1030→                        <td className="px-4 py-3 text-right">
+  1031→                          <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono">
+  1032→                            {stock.volGainPct.toFixed(0)}%
+  1033→                          </Badge>
+  1034→                        </td>
+  1035→                        <td className="px-4 py-3 text-center">
+  1036→                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedStock(stock); }}>
+  1037→                            <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+  1038→                          </Button>
+  1039→                        </td>
+  1040→                      </motion.tr>
+  1041→                    ))}
+  1042→                  </tbody>
+  1043→                </table>
+  1044→                {filteredStocks.length === 0 && (
+  1045→                  <div className="p-12 text-center text-muted-foreground">
+  1046→                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match your search."}
+  1047→                  </div>
+  1048→                )}
+  1049→              </div>
+  1050→
+  1051→              {/* Mobile Cards */}
+  1052→              <div className="md:hidden space-y-2">
+  1053→                {filteredStocks.map((stock, idx) => (
+  1054→                  <motion.div key={stock.ticker} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03, duration: 0.2 }}>
+  1055→                    <Card className="border-border hover:border-primary/30 transition-colors cursor-pointer" onClick={() => setSelectedStock(stock)}>
+  1056→                      <CardContent className="p-4">
+  1057→                        <div className="flex items-start justify-between gap-2">
+  1058→                          <div className="min-w-0">
+  1059→                            <p className="font-medium text-foreground truncate">{stock.name}</p>
+  1060→                            <p className="text-xs text-muted-foreground">{stock.ticker}</p>
+  1061→                          </div>
+  1062→                          <div className="text-right shrink-0">
+  1063→                            <p className="font-mono font-medium">{stock.close.toFixed(2)}</p>
+  1064→                            <span className="inline-flex items-center gap-0.5 text-emerald-400 text-xs font-medium">
+  1065→                              <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+  1066→                            </span>
+  1067→                          </div>
+  1068→                        </div>
+  1069→                        <div className="flex items-center justify-between mt-2">
+  1070→                          <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-xs">
+  1071→                            Vol: {stock.volGainPct.toFixed(0)}%
+  1072→                          </Badge>
+  1073→                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+  1074→                            <Eye className="w-3 h-3" /> View Details
+  1075→                          </span>
+  1076→                        </div>
+  1077→                      </CardContent>
+  1078→                    </Card>
+  1079→                  </motion.div>
+  1080→                ))}
+  1081→                {filteredStocks.length === 0 && (
+  1082→                  <div className="p-12 text-center text-muted-foreground">
+  1083→                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match your search."}
+  1084→                  </div>
+  1085→                )}
+  1086→              </div>
+  1087→            </>
+  1088→          )}
+  1089→
+  1090→          {/* ═══════════════════════════════════════════════════════════
+  1091→              SUGGESTIONS VIEW (sector-rotation grouped)
+  1092→             ═══════════════════════════════════════════════════════════ */}
+  1093→          {!loading && !error && viewMode === "suggestions" && (
+  1094→            <div className="space-y-6">
+  1095→              {/* Loading state */}
+  1096→              {suggestionsLoading && (
+  1097→                <div className="flex flex-col items-center py-16 gap-4">
+  1098→                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+  1099→                  <div className="text-center">
+  1100→                    <p className="text-sm font-medium">Loading sector data for all stocks...</p>
+  1101→                    <p className="text-xs text-muted-foreground mt-1">
+  1102→                      Fetching sector info from Screener.in for {stocks.length} stocks
+  1103→                    </p>
+  1104→                  </div>
+  1105→                </div>
+  1106→              )}
+  1107→
+  1108→              {/* Empty state */}
+  1109→              {!suggestionsLoading && sectorInsights.length === 0 && (
+  1110→                <Card className="border-border">
+  1111→                  <CardContent className="p-8 text-center">
+  1112→                    <Activity className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+  1113→                    <p className="text-sm font-medium mb-1">Sector insights not available</p>
+  1114→                    <p className="text-xs text-muted-foreground">
+  1115→                      Click the <strong>Sectors</strong> button above to load sector rotation data first, then switch back here.
+  1116→                    </p>
+  1117→                  </CardContent>
+  1118→                </Card>
+  1119→              )}
+  1120→
+  1121→              {/* Suggestion groups */}
+  1122→              {!suggestionsLoading && suggestionGroups.length > 0 && (
+  1123→                <>
+  1124→                  <div className="flex items-center gap-2 mb-2">
+  1125→                    <Sparkles className="w-4 h-4 text-primary" />
+  1126→                    <p className="text-sm text-muted-foreground">
+  1127→                      Stocks rearranged by sector rotation strength. Bullish sectors appear first.
+  1128→                    </p>
+  1129→                  </div>
+  1130→
+  1131→                  {suggestionGroups.map((group) => {
+  1132→                    const tc = group.insight ? trendColor(group.insight.trend) : trendColor("Neutral");
+  1133→                    const isTop = group.trendKey === "Bullish" || group.trendKey === "Rotating In";
+  1134→                    const isBottom = group.trendKey === "other";
+  1135→
+  1136→                    return (
+  1137→                      <motion.div
+  1138→                        key={group.trendKey}
+  1139→                        initial={{ opacity: 0, y: 12 }}
+  1140→                        animate={{ opacity: 1, y: 0 }}
+  1141→                        transition={{ duration: 0.3 }}
+  1142→                      >
+  1143→                        <Card className={`border ${isTop ? "border-emerald-500/20" : isBottom ? "border-red-500/20" : "border-border"}`}>
+  1144→                          <CardHeader className="pb-2">
+  1145→                            <div className="flex items-center justify-between">
+  1146→                              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+  1147→                                {isTop && <Star className="w-4 h-4 text-emerald-400" />}
+  1148→                                {isBottom && <AlertTriangle className="w-4 h-4 text-red-400" />}
+  1149→                                {group.trendLabel}
+  1150→                                <Badge variant="secondary" className={`text-[10px] ${tc.bg} ${tc.text}`}>
+  1151→                                  {group.stocks.length} stock{group.stocks.length !== 1 ? "s" : ""}
+  1152→                                </Badge>
+  1153→                              </CardTitle>
+  1154→                              {group.insight && (
+  1155→                                <Badge variant="secondary" className={`text-[10px] ${tc.bg} ${tc.text} ${tc.border} border`}>
+  1156→                                  {group.insight.trend}
+  1157→                                </Badge>
+  1158→                              )}
+  1159→                            </div>
+  1160→                            {group.insight && (
+  1161→                              <p className="text-xs text-muted-foreground mt-1">
+  1162→                                {group.insight.description}
+  1163→                              </p>
+  1164→                            )}
+  1165→                          </CardHeader>
+  1166→                          <CardContent className="pt-0">
+  1167→                            <div className="space-y-1.5">
+  1168→                              {group.stocks.map((stock, idx) => (
+  1169→                                <div
+  1170→                                  key={stock.ticker}
+  1171→                                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 cursor-pointer transition-colors group"
+  1172→                                  onClick={() => setSelectedStock(stock)}
+  1173→                                >
+  1174→                                  <span className="text-xs text-muted-foreground w-5 text-center shrink-0">
+  1175→                                    {idx + 1}
+  1176→                                  </span>
+  1177→                                  <div className="flex-1 min-w-0">
+  1178→                                    <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+  1179→                                      {stock.name}
+  1180→                                    </p>
+  1181→                                    <div className="flex items-center gap-2">
+  1182→                                      <span className="text-xs text-muted-foreground">{stock.ticker}</span>
+  1183→                                      {stock.matchedSector && (
+  1184→                                        <>
+  1185→                                          <span className="text-muted-foreground/40">&middot;</span>
+  1186→                                          <span className="text-[10px] text-muted-foreground">{stock.matchedSector}</span>
+  1187→                                        </>
+  1188→                                      )}
+  1189→                                    </div>
+  1190→                                  </div>
+  1191→                                  <div className="text-right shrink-0">
+  1192→                                    <p className="text-sm font-mono font-medium">{stock.close.toFixed(2)}</p>
+  1193→                                    <div className="flex items-center gap-2">
+  1194→                                      <span className="text-xs text-emerald-400 font-medium">+{stock.change.toFixed(2)}%</span>
+  1195→                                      <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono px-1.5">
+  1196→                                        {stock.volGainPct.toFixed(0)}%
+  1197→                                      </Badge>
+  1198→                                    </div>
+  1199→                                  </div>
+  1200→                                  <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0" />
+  1201→                                </div>
+  1202→                              ))}
+  1203→                            </div>
+  1204→                          </CardContent>
+  1205→                        </Card>
+  1206→                      </motion.div>
+  1207→                    );
+  1208→                  })}
+  1209→
+  1210→                  {filteredStocks.length === 0 && (
+  1211→                    <div className="p-12 text-center text-muted-foreground">
+  1212→                      {stocks.length === 0
+  1213→                        ? "No volume shockers found today."
+  1214→                        : "No stocks match your search."}
+  1215→                    </div>
+  1216→                  )}
+  1217→                </>
+  1218→              )}
+  1219→            </div>
+  1220→          )}
+  1221→
+  1222→          {/* ═══════════════════════════════════════════════════════════
+  1223→              SEARCH VIEW (universal stock search from Screener.in)
+  1224→             ═══════════════════════════════════════════════════════════ */}
+  1225→          {viewMode === "search" && (
+  1226→            <div>
+  1227→              {/* Search Input */}
+  1228→              <Card className="border-border mb-4">
+  1229→                <CardContent className="p-4">
+
+[showing lines 730-1229 of 2115; use offset=1230 with limit to continue reading]

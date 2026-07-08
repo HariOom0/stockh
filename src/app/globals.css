@@ -129,3 +129,48 @@
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* ─── Mobile-friendly improvements ─── */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Prevent overscroll bounce on iOS */
+body {
+  overscroll-behavior-y: contain;
+}
+
+/* Safe area padding for notched phones */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Better touch targets on mobile */
+@media (max-width: 640px) {
+  button, a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Smaller, tighter tables on mobile */
+  table {
+    font-size: 0.8125rem;
+  }
+
+  /* Prevent horizontal overflow from financial tables */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Smooth scrolling for the whole page */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Fix iOS Safari 100vh bug */
+@supports (height: 100dvh) {
+  .min-h-screen {
+    min-height: 100dvh;
+  }
+}

@@ -679,7 +679,7 @@ export default function Home() {
 
             <div className="flex items-center gap-2 sm:gap-3">
               {lastUpdated && (
-                <span className="text-xs text-muted-foreground hidden md:flex items-center gap-1">
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   {new Date(lastUpdated).toLocaleTimeString("en-IN", {
                     hour: "2-digit",
@@ -687,55 +687,53 @@ export default function Home() {
                   })}
                 </span>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { setShowSectors(!showSectors); setShowIndices(false); if (!showSectors) fetchSectors(); }}
-              >
-                <Activity className="w-4 h-4 mr-1" />
-                <span className="hidden sm:inline">Sectors</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { setShowIndices(!showIndices); setShowSectors(false); if (!showIndices) fetchIndices(); }}
-              >
-                <TrendingDown className="w-4 h-4 mr-1" />
+              <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="px-2 sm:px-3"
+                  onClick={() => { setShowSectors(!showSectors); setShowIndices(false); if (!showSectors) fetchSectors(); }}
+                >
+                  <Activity className="w-4 h-4 sm:mr-1" />
+                  <span className="hidden sm:inline">Sectors</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="px-2 sm:px-3"
+                  onClick={() => { setShowIndices(!showIndices); setShowSectors(false); if (!showIndices) fetchIndices(); }}
+                >
+                <TrendingDown className="w-4 h-4 sm:mr-1" />
                 <span className="hidden sm:inline">Indices</span>
               </Button>
               <Button
                 variant="outline"
-                size="sm"
+                size="icon"
+                className="w-9 h-9 shrink-0"
                 onClick={fetchStocks}
                 disabled={loading}
               >
-                <RefreshCw className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`} />
-                <span className="hidden sm:inline">Refresh</span>
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               </Button>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="w-9 h-9"
-                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  >
-                    <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                    <span className="sr-only">Toggle theme</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{theme === "dark" ? "Light mode" : "Dark mode"}</TooltipContent>
-              </Tooltip>
+              <Button
+                variant="outline"
+                size="icon"
+                className="w-9 h-9 shrink-0"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              >
+                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                <span className="sr-only">Toggle theme</span>
+              </Button>
             </div>
           </div>
           {/* ─── VIEW TABS (sticky sub-header) ──────────────── */}
           {(stocks.length > 0 || viewMode === "search" || viewMode === "history") && (
             <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-2">
-              <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary w-fit">
+              <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary w-fit overflow-x-auto scrollbar-none -mx-1 px-1">
                 <button
                   onClick={() => handleViewSwitch("list")}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
                     viewMode === "list"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -748,7 +746,7 @@ export default function Home() {
                 </button>
                 <button
                   onClick={() => handleViewSwitch("suggestions")}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
                     viewMode === "suggestions"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -761,7 +759,7 @@ export default function Home() {
                 </button>
                 <button
                   onClick={() => handleViewSwitch("search")}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
                     viewMode === "search"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -774,7 +772,7 @@ export default function Home() {
                 </button>
                 <button
                   onClick={() => handleViewSwitch("history")}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
                     viewMode === "history"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -788,6 +786,7 @@ export default function Home() {
               </div>
             </div>
           )}
+        </div>
         </header>
 
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
@@ -825,7 +824,7 @@ export default function Home() {
                       {sortedSectors.map((s) => {
                         const tc = trendColor(s.trend);
                         return (
-                          <div key={s.sector} className={`rounded-lg border p-3 ${tc.bg} ${tc.border} cursor-pointer hover:scale-[1.03] transition-transform`} onClick={() => setSelectedSectorInsight(s)}>
+                          <div key={s.sector} className={`rounded-lg border p-2.5 sm:p-3 ${tc.bg} ${tc.border} cursor-pointer hover:scale-[1.03] active:scale-[0.98] transition-transform`} onClick={() => setSelectedSectorInsight(s)}>
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-xs font-medium text-foreground truncate mr-1">
                                 {s.sector}
@@ -1168,7 +1167,7 @@ export default function Home() {
                               {group.stocks.map((stock, idx) => (
                                 <div
                                   key={stock.ticker}
-                                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 cursor-pointer transition-colors group"
+                                  className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg hover:bg-secondary/50 active:bg-secondary/70 cursor-pointer transition-colors group"
                                   onClick={() => setSelectedStock(stock)}
                                 >
                                   <span className="text-xs text-muted-foreground w-5 text-center shrink-0">
@@ -1197,7 +1196,7 @@ export default function Home() {
                                       </Badge>
                                     </div>
                                   </div>
-                                  <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0" />
+                                  <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0 hidden sm:block" />
                                 </div>
                               ))}
                             </div>
@@ -1423,12 +1422,12 @@ export default function Home() {
                         <button
                           key={h.date}
                           onClick={() => fetchHistoryStocks(h.date)}
-                          className="rounded-lg border border-border p-3 text-left hover:bg-secondary/50 hover:border-primary/20 transition-colors group"
+                          className="rounded-lg border border-border p-2.5 sm:p-3 text-left hover:bg-secondary/50 active:bg-secondary/70 hover:border-primary/20 transition-colors group"
                         >
                           <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
                             {formatDate(h.date)}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-0.5">
                             {h.stockCount} stock{h.stockCount !== 1 ? "s" : ""}
                           </p>
                         </button>
@@ -1555,7 +1554,7 @@ export default function Home() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
-              className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-background border-l border-border shadow-2xl flex flex-col"
+              className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-background border-l border-border shadow-2xl flex flex-col safe-area-bottom"
             >
               {/* Panel Header */}
               <div className="shrink-0 bg-background/90 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
@@ -1993,7 +1992,7 @@ export default function Home() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/60 md:block hidden"
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
               onClick={() => setSelectedStock(null)}
             />
           )}
