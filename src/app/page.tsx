@@ -253,6 +253,16 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<"volGainPct" | "change" | "close" | "name">("volGainPct");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+
+  // Lock body scroll when detail panel is open
+  useEffect(() => {
+    if (selectedStock) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [selectedStock]);
   const [stockDetail, setStockDetail] = useState<StockDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
@@ -567,7 +577,7 @@ export default function Home() {
 
   return (
     <TooltipProvider>
-      <div className={`min-h-screen flex flex-col bg-background ${selectedStock ? 'overflow-hidden' : ''}`}>
+      <div className="min-h-screen flex flex-col bg-background">
         {/* ─── HEADER ─────────────────────────────────────────────── */}
         <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
@@ -1231,7 +1241,7 @@ export default function Home() {
               className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-background border-l border-border shadow-2xl flex flex-col"
             >
               {/* Panel Header */}
-              <div className="sticky top-0 z-10 bg-background/90 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
+              <div className="shrink-0 bg-background/90 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
                 <Button variant="ghost" size="sm" onClick={() => setSelectedStock(null)}>
                   <ArrowLeft className="w-4 h-4 mr-1" />
                   Back
@@ -1283,7 +1293,7 @@ export default function Home() {
               )}
 
               {stockDetail && !detailLoading && !detailError && (
-                <div className="flex flex-col h-full overflow-hidden">
+                <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                   {/* ═══ SCREENER-STYLE HEADER ═══ */}
                   <div className="px-4 pt-4 pb-3 border-b border-border">
                     <div className="flex items-start justify-between gap-3">
@@ -1374,7 +1384,7 @@ export default function Home() {
                   </div>
 
                   {/* ═══ SCROLLABLE CONTENT ═══ */}
-                  <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+                  <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 scrollbar-none">
 
                     {/* ──── TOP RATIOS (screener-style flex list) ──── */}
                     {Object.keys(stockDetail.metrics).length > 0 && (
