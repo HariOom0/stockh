@@ -1563,7 +1563,7 @@ export default function Home() {
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
               className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-background border-l border-border shadow-2xl flex flex-col"
             >
               {/* Panel Header */}
@@ -2002,7 +2002,7 @@ export default function Home() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:block hidden"
+              className="fixed inset-0 z-40 bg-black/60 md:block hidden"
               onClick={() => setSelectedStock(null)}
             />
           )}
