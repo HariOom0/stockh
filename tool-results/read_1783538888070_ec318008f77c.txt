@@ -1,0 +1,2002 @@
+     1→"use client";
+     2→
+     3→import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+     4→import { useTheme } from "next-themes";
+     5→import { motion, AnimatePresence } from "framer-motion";
+     6→import {
+     7→  TrendingUp,
+     8→  ArrowUpRight,
+     9→  RefreshCw,
+    10→  Search,
+    11→  X,
+    12→  ExternalLink,
+    13→  BarChart3,
+    14→  Activity,
+    15→  Filter,
+    16→  ChevronDown,
+    17→  ChevronUp,
+    18→  AlertTriangle,
+    19→  Zap,
+    20→  ArrowUpDown,
+    21→  Eye,
+    22→  Clock,
+    23→  Info,
+    24→  ArrowLeft,
+    25→  LineChart,
+    26→  Sparkles,
+    27→  Star,
+    28→  Loader2,
+    29→  Globe,
+    30→  CheckCircle,
+    31→  XCircle,
+    32→  Users,
+    33→  DollarSign,
+    34→  History,
+    35→  TrendingDown,
+    36→  Sun,
+    37→  Moon,
+    38→} from "lucide-react";
+    39→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+    40→import { Badge } from "@/components/ui/badge";
+    41→import { Button } from "@/components/ui/button";
+    42→import { Input } from "@/components/ui/input";
+    43→import { Skeleton } from "@/components/ui/skeleton";
+    44→import { Separator } from "@/components/ui/separator";
+    45→import {
+    46→  Tooltip,
+    47→  TooltipContent,
+    48→  TooltipProvider,
+    49→  TooltipTrigger,
+    50→} from "@/components/ui/tooltip";
+    51→
+    52→// ─── Types ────────────────────────────────────────────────────────────
+    53→interface Stock {
+    54→  sr: number;
+    55→  name: string;
+    56→  ticker: string;
+    57→  close: number;
+    58→  change: number;
+    59→  volGainPct: number;
+    60→  isPositive: boolean;
+    61→}
+    62→
+    63→interface SectorInsight {
+    64→  sector: string;
+    65→  trend: string;
+    66→  description: string;
+    67→  confidence: string;
+    68→}
+    69→
+    70→interface StockDetail {
+    71→  name: string;
+    72→  ticker: string;
+    73→  bseCode?: string;
+    74→  nseCode?: string;
+    75→  sector?: string;
+    76→  industry?: string;
+    77→  about?: string;
+    78→  indices?: string[];
+    79→  metrics: Record<string, string>;
+    80→  quarters: {
+    81→    label: string;
+    82→    sales: string;
+    83→    netProfit: string;
+    84→    opm: string;
+    85→  }[];
+    86→  peers: { name: string; ticker: string }[];
+    87→  cached?: boolean;
+    88→  pros?: string[];
+    89→  cons?: string[];
+    90→  balanceSheet?: {
+    91→    label: string;
+    92→    reserves: string;
+    93→    borrowing: string;
+    94→    otherLiab: string;
+    95→    totalLiab: string;
+    96→    fixedAssets: string;
+    97→    cwip: string;
+    98→    totalAssets: string;
+    99→  }[];
+   100→  shareholding?: {
+   101→    category: string;
+   102→    values: { label: string; value: string }[];
+   103→  }[];
+   104→  annualResults?: {
+   105→    label: string;
+   106→    sales: string;
+   107→    netProfit: string;
+   108→    opm: string;
+   109→  }[];
+   110→  cashFlow?: {
+   111→    label: string;
+   112→    operatingCF: string;
+   113→    investingCF: string;
+   114→    financingCF: string;
+   115→  }[];
+   116→}
+   117→
+   118→interface StockSectorMap {
+   119→  ticker: string;
+   120→  sector?: string;
+   121→  industry?: string;
+   122→  name?: string;
+   123→}
+   124→
+   125→interface SearchResult {
+   126→  name: string;
+   127→  ticker: string;
+   128→}
+   129→
+   130→type ViewMode = "list" | "suggestions" | "search" | "history";
+   131→
+   132→// ─── Trend Colors ─────────────────────────────────────────────────────
+   133→function trendColor(trend: string) {
+   134→  switch (trend) {
+   135→    case "Bullish":
+   136→    case "Rotating In":
+   137→      return { bg: "bg-emerald-500/15", text: "text-emerald-400", border: "border-emerald-500/30" };
+   138→    case "Bearish":
+   139→    case "Rotating Out":
+   140→      return { bg: "bg-red-500/15", text: "text-red-400", border: "border-red-500/30" };
+   141→    default:
+   142→      return { bg: "bg-amber-500/15", text: "text-amber-400", border: "border-amber-500/30" };
+   143→  }
+   144→}
+   145→
+   146→function confidenceDot(confidence: string) {
+   147→  switch (confidence) {
+   148→    case "High":
+   149→      return "bg-emerald-400";
+   150→    case "Medium":
+   151→      return "bg-amber-400";
+   152→    default:
+   153→      return "bg-zinc-500";
+   154→  }
+   155→}
+   156→
+   157→// ─── TradingView URL helper ──────────────────────────────────────────
+   158→function tradingViewUrl(ticker: string): string {
+   159→  return `https://www.tradingview.com/chart/?symbol=NSE:${ticker}`;
+   160→}
+   161→
+   162→// ─── Sector rotation rank (lower = stronger) ─────────────────────────
+   163→function trendRank(trend: string): number {
+   164→  const ranks: Record<string, number> = {
+   165→    "Bullish": 0,
+   166→    "Rotating In": 1,
+   167→    "Neutral": 2,
+   168→    "Bearish": 3,
+   169→    "Rotating Out": 4,
+   170→  };
+   171→  return ranks[trend] ?? 2;
+   172→}
+   173→
+   174→// ─── Match a stock's sector to the nearest sector insight ─────────────
+   175→function matchSectorInsight(
+   176→  stockSector: string | undefined,
+   177→  insights: SectorInsight[]
+   178→): SectorInsight | null {
+   179→  if (!stockSector || insights.length === 0) return null;
+   180→  // Try exact match first, then partial match on first keyword
+   181→  const lower = stockSector.toLowerCase();
+   182→  const exact = insights.find(
+   183→    (s) => s.sector.toLowerCase() === lower
+   184→  );
+   185→  if (exact) return exact;
+   186→  const partial = insights.find((s) => {
+   187→    const keywords = s.sector.toLowerCase().split(/[\s&]+/).filter((w) => w.length > 2);
+   188→    return keywords.some((kw) => lower.includes(kw));
+   189→  });
+   190→  return partial || null;
+   191→}
+   192→
+   193→// ─── Suggestion Group type ────────────────────────────────────────────
+   194→interface SuggestionGroup {
+   195→  trendLabel: string;
+   196→  trendKey: string;
+   197→  insight?: SectorInsight;
+   198→  stocks: (Stock & { matchedSector?: string })[];
+   199→}
+   200→
+   201→// ─── Screener-style Table Components ─────────────────────────────────
+   202→function ScreenerTable({
+   203→  headers,
+   204→  fiscalYearEnds = [],
+   205→  children,
+   206→}: {
+   207→  headers: string[];
+   208→  fiscalYearEnds?: number[];
+   209→  children: React.ReactNode;
+   210→}) {
+   211→  return (
+   212→    <table className="w-full text-[11px] border-collapse">
+   213→      <thead>
+   214→        <tr className="border-b border-border">
+   215→          {headers.map((h, i) => (
+   216→            <th
+   217→              key={i}
+   218→              className={`px-2 py-1.5 font-medium text-muted-foreground whitespace-nowrap ${
+   219→                i === 0 ? "text-left" : "text-right"
+   220→              } ${fiscalYearEnds.includes(i - 1) ? "bg-primary/8" : ""}`}
+   221→            >
+   222→              {h}
+   223→            </th>
+   224→          ))}
+   225→        </tr>
+   226→      </thead>
+   227→      <tbody>{children}</tbody>
+   228→    </table>
+   229→  );
+   230→}
+   231→
+   232→function ScreenerRow({
+   233→  label,
+   234→  values,
+   235→  highlight = false,
+   236→}: {
+   237→  label: string;
+   238→  values: string[];
+   239→  highlight?: boolean;
+   240→}) {
+   241→  return (
+   242→    <tr className={`border-t border-border/60 ${highlight ? "bg-primary/5" : ""}`}>
+   243→      <td className="px-2 py-1.5 text-muted-foreground font-medium whitespace-nowrap">{label}</td>
+   244→      {values.map((v, i) => (
+   245→        <td key={i} className="px-2 py-1.5 text-right font-mono whitespace-nowrap">
+   246→          {v}
+   247→        </td>
+   248→      ))}
+   249→    </tr>
+   250→  );
+   251→}
+   252→
+   253→// ─── Main Component ──────────────────────────────────────────────────
+   254→const ACCESS_PASSWORD = "stockh2025";
+   255→
+   256→export default function Home() {
+   257→  const [isAuthenticated, setIsAuthenticated] = useState(false);
+   258→  const [passwordInput, setPasswordInput] = useState("");
+   259→  const [passwordError, setPasswordError] = useState("");
+   260→  const [stocks, setStocks] = useState<Stock[]>([]);
+   261→  const [filteredStocks, setFilteredStocks] = useState<Stock[]>([]);
+   262→  const { theme, setTheme } = useTheme();
+   263→  const [loading, setLoading] = useState(true);
+   264→  const [error, setError] = useState("");
+   265→  const [search, setSearch] = useState("");
+   266→  const [sortBy, setSortBy] = useState<"volGainPct" | "change" | "close" | "name">("volGainPct");
+   267→  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+   268→  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+   269→
+   270→  // Lock body scroll when detail panel is open
+   271→  useEffect(() => {
+   272→    if (selectedStock) {
+   273→      document.body.style.overflow = "hidden";
+   274→    } else {
+   275→      document.body.style.overflow = "";
+   276→    }
+   277→    return () => { document.body.style.overflow = ""; };
+   278→  }, [selectedStock]);
+   279→  const [stockDetail, setStockDetail] = useState<StockDetail | null>(null);
+   280→  const [detailLoading, setDetailLoading] = useState(false);
+   281→  const [detailError, setDetailError] = useState("");
+   282→  const [sectorInsights, setSectorInsights] = useState<SectorInsight[]>([]);
+   283→  const [sectorLoading, setSectorLoading] = useState(true);
+   284→  const [showSectors, setShowSectors] = useState(false);
+   285→  const [selectedSectorInsight, setSelectedSectorInsight] = useState<SectorInsight | null>(null);
+   286→
+   287→  // ─── Index Performance state ─────────────────────────────────────
+   288→  interface IndexData {
+   289→    name: string;
+   290→    symbol: string;
+   291→    lastPrice: number;
+   292→    changePct: number;
+   293→    changeAbs: number;
+   294→    recommendation: string;
+   295→  }
+   296→  const [showIndices, setShowIndices] = useState(false);
+   297→  const [indexData, setIndexData] = useState<IndexData[]>([]);
+   298→  const [indexLoading, setIndexLoading] = useState(false);
+   299→
+   300→  const fetchIndices = async () => {
+   301→    setIndexLoading(true);
+   302→    try {
+   303→      const res = await fetch("/api/index-performance");
+   304→      const data = await res.json();
+   305→      if (data.indices) setIndexData(data.indices);
+   306→    } catch (err) {
+   307→      console.error("Failed to fetch indices:", err);
+   308→    } finally {
+   309→      setIndexLoading(false);
+   310→    }
+   311→  };
+   312→
+   313→  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+   314→  const [stats, setStats] = useState({ total: 0, filtered: 0 });
+   315→
+   316→  // ─── Suggestions state ───────────────────────────────────────────
+   317→  const [viewMode, setViewMode] = useState<ViewMode>("list");
+   318→  const [historyDates, setHistoryDates] = useState<{ date: string; stockCount: number }[]>([]);
+   319→  const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null);
+   320→  const [historyStocks, setHistoryStocks] = useState<Stock[]>([]);
+   321→  const [historyLoading, setHistoryLoading] = useState(false);
+   322→  const [sectorMap, setSectorMap] = useState<Map<string, StockSectorMap>>(new Map());
+   323→  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+   324→  const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
+   325→  const suggestionsFetchedRef = useRef(false);
+   326→
+   327→  // ─── Universal Stock Search state ───────────────────────────────
+   328→  const [searchQuery, setSearchQuery] = useState("");
+   329→  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+   330→  const [searchLoading, setSearchLoading] = useState(false);
+   331→  const [searchError, setSearchError] = useState("");
+   332→  const [isSearchedStock, setIsSearchedStock] = useState(false);
+   333→  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+   334→
+   335→  // ─── Fetch Volume Shockers ───────────────────────────────────────
+   336→  const fetchStocks = useCallback(async () => {
+   337→    setLoading(true);
+   338→    setError("");
+   339→    try {
+   340→      const res = await fetch("/api/volume-shockers");
+   341→      const data = await res.json();
+   342→      if (!res.ok) throw new Error(data.error || "Failed to fetch");
+   343→      setStocks(data.stocks);
+   344→      setLastUpdated(data.lastUpdated);
+   345→      setStats({ total: data.totalOnChartink, filtered: data.filteredCount });
+   346→    } catch (err) {
+   347→      setError(err instanceof Error ? err.message : "Failed to load stocks");
+   348→    } finally {
+   349→      setLoading(false);
+   350→    }
+   351→  }, []);
+   352→
+   353→  // ─── Fetch Sector Insights ───────────────────────────────────────
+   354→  const fetchSectors = useCallback(async () => {
+   355→    setSectorLoading(true);
+   356→    try {
+   357→      const res = await fetch("/api/sector-insights");
+   358→      const data = await res.json();
+   359→      setSectorInsights(data.insights);
+   360→    } catch {
+   361→      // silently fail
+   362→    } finally {
+   363→      setSectorLoading(false);
+   364→    }
+   365→  }, []);
+   366→
+   367→  // ─── Fetch Sectors for all stocks (batch) ────────────────────────
+   368→  const fetchSuggestions = useCallback(async () => {
+   369→    if (suggestionsFetchedRef.current) return;
+   370→    suggestionsFetchedRef.current = true;
+   371→    setSuggestionsLoading(true);
+   372→    try {
+   373→      const tickers = stocks.map((s) => s.ticker).join(",");
+   374→      const res = await fetch(`/api/stock-sectors?tickers=${tickers}`);
+   375→      const data = await res.json();
+   376→      if (data.stocks) {
+   377→        const map = new Map<string, StockSectorMap>();
+   378→        for (const s of data.stocks) {
+   379→          map.set(s.ticker, s);
+   380→        }
+   381→        setSectorMap(map);
+   382→        setSuggestionsLoaded(true);
+   383→      }
+   384→    } catch {
+   385→      // silently fail
+   386→    } finally {
+   387→      setSuggestionsLoading(false);
+   388→    }
+   389→  }, [stocks]);
+   390→
+   391→  useEffect(() => {
+   392→    fetchStocks();
+   393→    fetchSectors();
+   394→  }, [fetchStocks, fetchSectors]);
+   395→
+   396→  // ─── Filter & Sort ───────────────────────────────────────────────
+   397→  useEffect(() => {
+   398→    let result = [...stocks];
+   399→    if (search.trim()) {
+   400→      const q = search.toLowerCase();
+   401→      result = result.filter(
+   402→        (s) =>
+   403→          s.name.toLowerCase().includes(q) ||
+   404→          s.ticker.toLowerCase().includes(q)
+   405→      );
+   406→    }
+   407→    result.sort((a, b) => {
+   408→      let cmp = 0;
+   409→      if (sortBy === "name") {
+   410→        cmp = a.name.localeCompare(b.name);
+   411→      } else {
+   412→        cmp = (a[sortBy] as number) - (b[sortBy] as number);
+   413→      }
+   414→      return sortDir === "desc" ? -cmp : cmp;
+   415→    });
+   416→    setFilteredStocks(result);
+   417→  }, [stocks, search, sortBy, sortDir]);
+   418→
+   419→  // ─── Fetch Stock Detail ──────────────────────────────────────────
+   420→  useEffect(() => {
+   421→    if (!selectedStock) {
+   422→      setStockDetail(null);
+   423→      return;
+   424→    }
+   425→    setDetailLoading(true);
+   426→    setDetailError("");
+   427→    fetch(`/api/stock-detail?ticker=${selectedStock.ticker}`)
+   428→      .then((r) => r.json())
+   429→      .then((data) => {
+   430→        if (data.error) throw new Error(data.error);
+   431→        setStockDetail(data);
+   432→        // Also update sectorMap if we have sector info
+   433→        if (data.sector) {
+   434→          setSectorMap((prev) => {
+   435→            const next = new Map(prev);
+   436→            next.set(selectedStock.ticker, {
+   437→              ticker: selectedStock.ticker,
+   438→              sector: data.sector,
+   439→              industry: data.industry,
+   440→              name: data.name,
+   441→            });
+   442→            return next;
+   443→          });
+   444→        }
+   445→      })
+   446→      .catch((err) => {
+   447→        setDetailError(err instanceof Error ? err.message : "Failed to load");
+   448→      })
+   449→      .finally(() => setDetailLoading(false));
+   450→  }, [selectedStock]);
+   451→
+   452→  // Reset isSearchedStock when closing detail panel
+   453→  useEffect(() => {
+   454→    if (!selectedStock) setIsSearchedStock(false);
+   455→  }, [selectedStock]);
+   456→
+   457→  // ─── Universal Stock Search ─────────────────────────────────────
+   458→  const performSearch = useCallback(async (query: string) => {
+   459→    if (query.trim().length < 2) {
+   460→      setSearchResults([]);
+   461→      setSearchError("");
+   462→      return;
+   463→    }
+   464→    setSearchLoading(true);
+   465→    setSearchError("");
+   466→    try {
+   467→      const res = await fetch(`/api/stock-search?q=${encodeURIComponent(query.trim())}`);
+   468→      const data = await res.json();
+   469→      if (data.error) {
+   470→        setSearchError(data.error);
+   471→        setSearchResults([]);
+   472→      } else {
+   473→        setSearchResults(data.results || []);
+   474→        if (!data.results || data.results.length === 0) {
+   475→          setSearchError(`No results found for "${query.trim()}"`);
+   476→        }
+   477→      }
+   478→    } catch {
+   479→      setSearchError("Search failed. Please try again.");
+   480→      setSearchResults([]);
+   481→    } finally {
+   482→      setSearchLoading(false);
+   483→    }
+   484→  }, []);
+   485→
+   486→  const handleSearchInput = useCallback(
+   487→    (value: string) => {
+   488→      setSearchQuery(value);
+   489→      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+   490→      searchDebounceRef.current = setTimeout(() => {
+   491→        performSearch(value);
+   492→      }, 400);
+   493→    },
+   494→    [performSearch]
+   495→  );
+   496→
+   497→  const handleSearchSelect = useCallback((result: SearchResult) => {
+   498→    // Create a minimal Stock object for the detail panel
+   499→    setSelectedStock({
+   500→      sr: 0,
+   501→      name: result.name,
+   502→      ticker: result.ticker,
+   503→      close: 0,
+   504→      change: 0,
+   505→      volGainPct: 0,
+   506→      isPositive: true,
+   507→    });
+   508→    setIsSearchedStock(true);
+   509→  }, []);
+   510→
+   511→  // ─── Handle Peer Click (direct navigation with ticker) ──────────
+   512→  const [peerLoading, setPeerLoading] = useState(false);
+   513→  const handlePeerClick = useCallback((peerName: string, peerTicker: string) => {
+   514→    setPeerLoading(true);
+   515→    setStockDetail(null);
+   516→    // Directly select the peer using its ticker — no search needed
+   517→    setSelectedStock({
+   518→      sr: 0,
+   519→      name: peerName,
+   520→      ticker: peerTicker,
+   521→      close: 0,
+   522→      change: 0,
+   523→      volGainPct: 0,
+   524→      isPositive: true,
+   525→    });
+   526→    setIsSearchedStock(true);
+   527→    // Small delay to show the loading state briefly
+   528→    setTimeout(() => setPeerLoading(false), 300);
+   529→  }, []);
+   530→
+   531→  // ─── Toggle Sort ─────────────────────────────────────────────────
+   532→  const toggleSort = (field: typeof sortBy) => {
+   533→    if (sortBy === field) {
+   534→      setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+   535→    } else {
+   536→      setSortBy(field);
+   537→      setSortDir("desc");
+   538→    }
+   539→  };
+   540→
+   541→  const SortIcon = ({ field }: { field: typeof sortBy }) => {
+   542→    if (sortBy !== field) return <ArrowUpDown className="w-3 h-3 opacity-30" />;
+   543→    return sortDir === "desc" ? (
+   544→      <ChevronDown className="w-3 h-3" />
+   545→    ) : (
+   546→      <ChevronUp className="w-3 h-3" />
+   547→    );
+   548→  };
+   549→
+   550→  // ─── Sector suggestion for selected stock ────────────────────────
+   551→  const selectedSectorSuggestion = useMemo(() => {
+   552→    if (!selectedStock || !stockDetail) return null;
+   553→    return matchSectorInsight(stockDetail.sector, sectorInsights);
+   554→  }, [selectedStock, stockDetail, sectorInsights]);
+   555→
+   556→  // ─── Sorted sectors for sector panel ─────────────────────────────
+   557→  const sortedSectors = useMemo(() => {
+   558→    return [...sectorInsights].sort(
+   559→      (a, b) => trendRank(a.trend) - trendRank(b.trend)
+   560→    );
+   561→  }, [sectorInsights]);
+   562→
+   563→  // ─── Suggestions: group filtered stocks by sector rotation ───────
+   564→  const suggestionGroups = useMemo<SuggestionGroup[]>(() => {
+   565→    if (sectorInsights.length === 0 || sectorMap.size === 0) return [];
+   566→
+   567→    const groups: SuggestionGroup[] = [
+   568→      { trendLabel: "Bullish Sectors", trendKey: "Bullish", stocks: [] },
+   569→      { trendLabel: "Rotating In", trendKey: "Rotating In", stocks: [] },
+   570→      { trendLabel: "Neutral Sectors", trendKey: "Neutral", stocks: [] },
+   571→      { trendLabel: "Bearish / Rotating Out", trendKey: "other", stocks: [] },
+   572→    ];
+   573→
+   574→    // Map each filtered stock to its sector trend
+   575→    for (const stock of filteredStocks) {
+   576→      const info = sectorMap.get(stock.ticker);
+   577→      const insight = matchSectorInsight(info?.sector, sectorInsights);
+   578→
+   579→      let groupIdx: number;
+   580→      if (!insight) {
+   581→        groupIdx = 2; // Neutral (unknown sector)
+   582→      } else if (insight.trend === "Bullish") {
+   583→        groupIdx = 0;
+   584→      } else if (insight.trend === "Rotating In") {
+   585→        groupIdx = 1;
+   586→      } else if (insight.trend === "Neutral") {
+   587→        groupIdx = 2;
+   588→      } else {
+   589→        groupIdx = 3; // Bearish or Rotating Out
+   590→      }
+   591→
+   592→      groups[groupIdx].stocks.push({
+   593→        ...stock,
+   594→        matchedSector: info?.sector,
+   595→      });
+   596→    }
+   597→
+   598→    // Sort stocks within each group by volGainPct descending
+   599→    for (const group of groups) {
+   600→      group.stocks.sort((a, b) => b.volGainPct - a.volGainPct);
+   601→    }
+   602→
+   603→    // Attach the first matching insight to each group for display
+   604→    for (const group of groups) {
+   605→      if (group.stocks.length > 0) {
+   606→        const firstSector = group.stocks[0].matchedSector;
+   607→        group.insight = matchSectorInsight(firstSector, sectorInsights) || undefined;
+   608→      }
+   609→    }
+   610→
+   611→    // Only return groups that have stocks
+   612→    return groups.filter((g) => g.stocks.length > 0);
+   613→  }, [filteredStocks, sectorMap, sectorInsights]);
+   614→
+   615→  // ─── Handle switching to suggestions view ────────────────────────
+   616→  const handleViewSwitch = (mode: ViewMode) => {
+   617→    setViewMode(mode);
+   618→    if (mode === "suggestions" && !suggestionsLoaded && !suggestionsLoading) {
+   619→      fetchSuggestions();
+   620→    }
+   621→    if (mode === "history") {
+   622→      fetchHistoryDates();
+   623→    }
+   624→  };
+   625→
+   626→  // ─── History functions ───────────────────────────────────────────
+   627→  const fetchHistoryDates = async () => {
+   628→    try {
+   629→      const res = await fetch("/api/stock-history");
+   630→      const data = await res.json();
+   631→      if (data.snapshots) setHistoryDates(data.snapshots);
+   632→    } catch (err) {
+   633→      console.error("Failed to fetch history dates:", err);
+   634→    }
+   635→  };
+   636→
+   637→  const fetchHistoryStocks = async (date: string) => {
+   638→    setSelectedHistoryDate(date);
+   639→    setHistoryLoading(true);
+   640→    try {
+   641→      const res = await fetch(`/api/stock-history?date=${date}`);
+   642→      const data = await res.json();
+   643→      if (data.stocks) {
+   644→        const stocks: Stock[] = data.stocks.map((s: Record<string, unknown>, i: number) => ({
+   645→          sr: i + 1,
+   646→          name: s.name as string,
+   647→          ticker: s.ticker as string,
+   648→          close: s.close as number,
+   649→          change: s.change as number,
+   650→          volGainPct: s.volGainPct as number,
+   651→          isPositive: s.isPositive as boolean,
+   652→        }));
+   653→        setHistoryStocks(stocks);
+   654→      }
+   655→    } catch (err) {
+   656→      console.error("Failed to fetch history stocks:", err);
+   657→    } finally {
+   658→      setHistoryLoading(false);
+   659→    }
+   660→  };
+   661→
+   662→  const formatDate = (dateStr: string) => {
+   663→    const d = new Date(dateStr + "T00:00:00");
+   664→    return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+   665→  };
+   666→
+   667→  // Check session storage for existing auth
+   668→  useEffect(() => {
+   669→    const session = sessionStorage.getItem("stockh_auth");
+   670→    if (session === "true") setIsAuthenticated(true);
+   671→  }, []);
+   672→
+   673→  const handleLogin = (e: React.FormEvent) => {
+   674→    e.preventDefault();
+   675→    if (passwordInput === ACCESS_PASSWORD) {
+   676→      setIsAuthenticated(true);
+   677→      sessionStorage.setItem("stockh_auth", "true");
+   678→      setPasswordError("");
+   679→    } else {
+   680→      setPasswordError("Wrong password");
+   681→    }
+   682→  };
+   683→
+   684→  if (!isAuthenticated) {
+   685→    return (
+   686→      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+   687→        <div className="w-full max-w-sm">
+   688→          <div className="flex flex-col items-center mb-8">
+   689→            <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center mb-4">
+   690→              <BarChart3 className="w-7 h-7 text-primary" />
+   691→            </div>
+   692→            <h1 className="text-2xl font-bold tracking-tight">StockH</h1>
+   693→            <p className="text-sm text-muted-foreground mt-1">Private access only</p>
+   694→          </div>
+   695→          <form onSubmit={handleLogin} className="space-y-4">
+   696→            <div>
+   697→              <Input
+   698→                type="password"
+   699→                placeholder="Enter password"
+   700→                value={passwordInput}
+   701→                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
+   702→                className="h-11 text-center text-lg tracking-widest"
+   703→                autoFocus
+   704→              />
+   705→              {passwordError && (
+   706→                <p className="text-xs text-destructive mt-2 text-center">{passwordError}</p>
+   707→              )}
+   708→            </div>
+   709→            <Button type="submit" className="w-full h-11" size="lg">
+   710→              Enter
+   711→            </Button>
+   712→          </form>
+   713→        </div>
+   714→      </div>
+   715→    );
+   716→  }
+   717→
+   718→  return (
+   719→    <TooltipProvider>
+   720→      <div className="min-h-screen flex flex-col bg-background">
+   721→        {/* ─── HEADER ─────────────────────────────────────────────── */}
+   722→        <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+   723→          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+   724→            <div className="flex items-center gap-3 shrink-0">
+   725→              <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+   726→                <BarChart3 className="w-5 h-5 text-primary" />
+   727→              </div>
+   728→              <div>
+   729→                <h1 className="text-lg font-bold tracking-tight">StockH</h1>
+   730→                <p className="text-xs text-muted-foreground hidden sm:block">
+   731→                  Volume Shockers &middot; Indian Market
+   732→                </p>
+   733→              </div>
+   734→            </div>
+   735→
+   736→            <div className="flex items-center gap-2 sm:gap-3">
+   737→              {lastUpdated && (
+   738→                <span className="text-xs text-muted-foreground hidden md:flex items-center gap-1">
+   739→                  <Clock className="w-3 h-3" />
+   740→                  {new Date(lastUpdated).toLocaleTimeString("en-IN", {
+   741→                    hour: "2-digit",
+   742→                    minute: "2-digit",
+   743→                  })}
+   744→                </span>
+   745→              )}
+   746→              <Button
+   747→                variant="outline"
+   748→                size="sm"
+   749→                onClick={() => { setShowSectors(!showSectors); setShowIndices(false); if (!showSectors) fetchSectors(); }}
+   750→              >
+   751→                <Activity className="w-4 h-4 mr-1" />
+   752→                <span className="hidden sm:inline">Sectors</span>
+   753→              </Button>
+   754→              <Button
+   755→                variant="outline"
+   756→                size="sm"
+   757→                onClick={() => { setShowIndices(!showIndices); setShowSectors(false); if (!showIndices) fetchIndices(); }}
+   758→              >
+   759→                <TrendingDown className="w-4 h-4 mr-1" />
+   760→                <span className="hidden sm:inline">Indices</span>
+   761→              </Button>
+   762→              <Button
+   763→                variant="outline"
+   764→                size="sm"
+   765→                onClick={fetchStocks}
+   766→                disabled={loading}
+   767→              >
+   768→                <RefreshCw className={`w-4 h-4 mr-1 ${loading ? "animate-spin" : ""}`} />
+   769→                <span className="hidden sm:inline">Refresh</span>
+   770→              </Button>
+   771→              <Tooltip>
+   772→                <TooltipTrigger asChild>
+   773→                  <Button
+   774→                    variant="outline"
+   775→                    size="icon"
+   776→                    className="w-9 h-9"
+   777→                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+   778→                  >
+   779→                    <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+   780→                    <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+   781→                    <span className="sr-only">Toggle theme</span>
+   782→                  </Button>
+   783→                </TooltipTrigger>
+   784→                <TooltipContent>{theme === "dark" ? "Light mode" : "Dark mode"}</TooltipContent>
+   785→              </Tooltip>
+   786→            </div>
+   787→          </div>
+   788→          {/* ─── VIEW TABS (sticky sub-header) ──────────────── */}
+   789→          {(stocks.length > 0 || viewMode === "search" || viewMode === "history") && (
+   790→            <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-2">
+   791→              <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary w-fit">
+   792→                <button
+   793→                  onClick={() => handleViewSwitch("list")}
+   794→                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+   795→                    viewMode === "list"
+   796→                      ? "bg-background text-foreground shadow-sm"
+   797→                      : "text-muted-foreground hover:text-foreground"
+   798→                  }`}
+   799→                >
+   800→                  <span className="flex items-center gap-1.5">
+   801→                    <BarChart3 className="w-3.5 h-3.5" />
+   802→                    All Stocks
+   803→                  </span>
+   804→                </button>
+   805→                <button
+   806→                  onClick={() => handleViewSwitch("suggestions")}
+   807→                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+   808→                    viewMode === "suggestions"
+   809→                      ? "bg-background text-foreground shadow-sm"
+   810→                      : "text-muted-foreground hover:text-foreground"
+   811→                  }`}
+   812→                >
+   813→                  <span className="flex items-center gap-1.5">
+   814→                    <Sparkles className="w-3.5 h-3.5" />
+   815→                    Suggestions
+   816→                  </span>
+   817→                </button>
+   818→                <button
+   819→                  onClick={() => handleViewSwitch("search")}
+   820→                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+   821→                    viewMode === "search"
+   822→                      ? "bg-background text-foreground shadow-sm"
+   823→                      : "text-muted-foreground hover:text-foreground"
+   824→                  }`}
+   825→                >
+   826→                  <span className="flex items-center gap-1.5">
+   827→                    <Globe className="w-3.5 h-3.5" />
+   828→                    Search
+   829→                  </span>
+   830→                </button>
+   831→                <button
+   832→                  onClick={() => handleViewSwitch("history")}
+   833→                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+   834→                    viewMode === "history"
+   835→                      ? "bg-background text-foreground shadow-sm"
+   836→                      : "text-muted-foreground hover:text-foreground"
+   837→                  }`}
+   838→                >
+   839→                  <span className="flex items-center gap-1.5">
+   840→                    <History className="w-3.5 h-3.5" />
+   841→                    History
+   842→                  </span>
+   843→                </button>
+   844→              </div>
+   845→            </div>
+   846→          )}
+   847→        </header>
+   848→
+   849→        <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
+   850→          {/* ─── SECTOR INSIGHTS PANEL ────────────────────────────── */}
+   851→          <AnimatePresence>
+   852→            {showSectors && sectorInsights.length > 0 && (
+   853→              <motion.section
+   854→                initial={{ height: 0, opacity: 0 }}
+   855→                animate={{ height: "auto", opacity: 1 }}
+   856→                exit={{ height: 0, opacity: 0 }}
+   857→                transition={{ duration: 0.3 }}
+   858→                className="overflow-hidden mb-6"
+   859→              >
+   860→                <Card className="border-border">
+   861→                  <CardHeader className="pb-3">
+   862→                    <div className="flex items-center justify-between">
+   863→                      <CardTitle className="text-base font-semibold flex items-center gap-2">
+   864→                        <Activity className="w-4 h-4 text-primary" />
+   865→                        Sector Rotation Analysis
+   866→                        {sectorLoading && (
+   867→                          <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground" />
+   868→                        )}
+   869→                      </CardTitle>
+   870→                      <Button variant="ghost" size="sm" onClick={() => setShowSectors(false)}>
+   871→                        <X className="w-4 h-4" />
+   872→                      </Button>
+   873→                    </div>
+   874→                    <p className="text-xs text-muted-foreground mt-1">
+   875→                      AI-powered sector rotation insights for the Indian stock market. Use this to assess
+   876→                      whether the sector of a volume shocker stock is in favour.
+   877→                    </p>
+   878→                  </CardHeader>
+   879→                  <CardContent>
+   880→                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+   881→                      {sortedSectors.map((s) => {
+   882→                        const tc = trendColor(s.trend);
+   883→                        return (
+   884→                          <div key={s.sector} className={`rounded-lg border p-3 ${tc.bg} ${tc.border} cursor-pointer hover:scale-[1.03] transition-transform`} onClick={() => setSelectedSectorInsight(s)}>
+   885→                            <div className="flex items-center justify-between mb-1">
+   886→                              <span className="text-xs font-medium text-foreground truncate mr-1">
+   887→                                {s.sector}
+   888→                              </span>
+   889→                              <span className={`text-[10px] font-semibold ${tc.text} shrink-0`}>
+   890→                                {s.trend}
+   891→                              </span>
+   892→                            </div>
+   893→                            <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
+   894→                              {s.description}
+   895→                            </p>
+   896→                            <div className="flex items-center gap-1 mt-1.5">
+   897→                              <span className={`w-1.5 h-1.5 rounded-full ${confidenceDot(s.confidence)}`} />
+   898→                              <span className="text-[10px] text-muted-foreground">{s.confidence}</span>
+   899→                            </div>
+   900→                          </div>
+   901→                        );
+   902→                      })}
+   903→                    </div>
+   904→                  </CardContent>
+   905→                </Card>
+   906→              </motion.section>
+   907→            )}
+   908→          </AnimatePresence>
+   909→
+   910→          {/* ─── INDEX PERFORMANCE PANEL ────────────────────────────── */}
+   911→          <AnimatePresence>
+   912→            {showIndices && (
+   913→              <motion.section
+   914→                initial={{ height: 0, opacity: 0 }}
+   915→                animate={{ height: "auto", opacity: 1 }}
+   916→                exit={{ height: 0, opacity: 0 }}
+   917→                transition={{ duration: 0.3 }}
+   918→                className="overflow-hidden mb-6"
+   919→              >
+   920→                <Card className="border-border">
+   921→                  <CardHeader className="pb-3">
+   922→                    <div className="flex items-center justify-between">
+   923→                      <CardTitle className="text-base font-semibold flex items-center gap-2">
+   924→                        <TrendingDown className="w-4 h-4 text-blue-400" />
+   925→                        Index Performance
+   926→                        {indexLoading && (
+   927→                          <RefreshCw className="w-3 h-3 animate-spin text-muted-foreground" />
+   928→                        )}
+   929→                      </CardTitle>
+   930→                      <Button variant="ghost" size="sm" onClick={() => setShowIndices(false)}>
+   931→                        <X className="w-4 h-4" />
+   932→                      </Button>
+   933→                    </div>
+   934→                    <p className="text-xs text-muted-foreground mt-1">
+   935→                      Live Indian market index data from TradingView. 15-minute cache.
+   936→                    </p>
+   937→                  </CardHeader>
+   938→                  <CardContent>
+   939→                    {indexLoading && indexData.length === 0 ? (
+   940→                      <div className="flex items-center justify-center py-8">
+   941→                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+   942→                      </div>
+   943→                    ) : (
+   944→                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+   945→                        {indexData.map((idx) => {
+   946→                          const isUp = idx.changePct >= 0;
+   947→                          return (
+   948→                            <div
+   949→                              key={idx.symbol}
+   950→                              className="rounded-lg border border-border p-3 hover:bg-secondary/30 transition-colors"
+   951→                            >
+   952→                              <div className="flex items-center justify-between mb-1.5">
+   953→                                <span className="text-xs font-medium text-foreground truncate mr-2">
+   954→                                  {idx.name}
+   955→                                </span>
+   956→                                <Badge
+   957→                                  variant="secondary"
+   958→                                  className={`text-[10px] shrink-0 border-0 font-mono ${
+   959→                                    isUp
+   960→                                      ? "bg-emerald-500/15 text-emerald-400"
+   961→                                      : "bg-red-500/15 text-red-400"
+   962→                                  }`}
+   963→                                >
+   964→                                  {isUp ? "+" : ""}{idx.changePct.toFixed(2)}%
+   965→                                </Badge>
+   966→                              </div>
+   967→                              <div className="flex items-baseline gap-2">
+   968→                                <span className="text-sm font-bold font-mono text-foreground">
+   969→                                  {idx.lastPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+   970→                                </span>
+   971→                                <span className={`text-[11px] font-mono ${isUp ? "text-emerald-400" : "text-red-400"}`}>
+   972→                                  {isUp ? "+" : ""}{idx.changeAbs.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+   973→                                </span>
+   974→                              </div>
+   975→                              <p className="text-[10px] text-muted-foreground/60 mt-1">
+   976→                                {idx.recommendation}
+   977→                              </p>
+   978→                            </div>
+   979→                          );
+   980→                        })}
+   981→                      </div>
+   982→                    )}
+   983→                  </CardContent>
+   984→                </Card>
+   985→              </motion.section>
+   986→            )}
+   987→          </AnimatePresence>
+   988→
+   989→          {/* ─── SEARCH ───────────────────────────────────────────── */}
+   990→          {viewMode !== "search" && (
+   991→          <div className="relative mb-4">
+   992→            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   993→            <Input
+   994→              placeholder="Search stocks by name or ticker..."
+   995→              className="pl-9 bg-secondary border-border"
+   996→              value={search}
+   997→              onChange={(e) => setSearch(e.target.value)}
+   998→            />
+   999→            {search && (
+  1000→              <button
+  1001→                onClick={() => setSearch("")}
+  1002→                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+  1003→              >
+  1004→                <X className="w-4 h-4" />
+  1005→              </button>
+  1006→            )}
+  1007→          </div>
+  1008→          )}
+  1009→
+  1010→          {/* ─── LOADING ──────────────────────────────────────────── */}
+  1011→          {loading && viewMode !== "search" && (
+  1012→            <div className="space-y-3">
+  1013→              {[...Array(8)].map((_, i) => (
+  1014→                <div key={i} className="flex items-center gap-4 p-4 rounded-lg bg-secondary">
+  1015→                  <Skeleton className="h-4 w-6" />
+  1016→                  <Skeleton className="h-4 flex-1" />
+  1017→                  <Skeleton className="h-4 w-20" />
+  1018→                  <Skeleton className="h-4 w-16" />
+  1019→                  <Skeleton className="h-4 w-20" />
+  1020→                </div>
+  1021→              ))}
+  1022→            </div>
+  1023→          )}
+  1024→
+  1025→          {/* ─── ERROR ────────────────────────────────────────────── */}
+  1026→          {error && !loading && (
+  1027→            <Card className="border-destructive/30 bg-destructive/5">
+  1028→              <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+  1029→                <AlertTriangle className="w-8 h-8 text-destructive" />
+  1030→                <p className="text-sm text-destructive font-medium">{error}</p>
+  1031→                <Button variant="outline" size="sm" onClick={fetchStocks}>
+  1032→                  <RefreshCw className="w-4 h-4 mr-1" />
+  1033→                  Try Again
+  1034→                </Button>
+  1035→              </CardContent>
+  1036→            </Card>
+  1037→          )}
+  1038→
+  1039→          {/* ═══════════════════════════════════════════════════════════
+  1040→              LIST VIEW (original)
+  1041→             ═══════════════════════════════════════════════════════════ */}
+  1042→          {!loading && !error && viewMode === "list" && (
+  1043→            <>
+  1044→              {/* Desktop Table */}
+  1045→              <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+  1046→                <table className="w-full text-sm">
+  1047→                  <thead>
+  1048→                    <tr className="bg-secondary/80">
+  1049→                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-12">#</th>
+  1050→                      <th className="text-left px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("name")}>
+  1051→                        <span className="flex items-center gap-1">Stock <SortIcon field="name" /></span>
+  1052→                      </th>
+  1053→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("close")}>
+  1054→                        <span className="flex items-center justify-end gap-1">Close <SortIcon field="close" /></span>
+  1055→                      </th>
+  1056→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("change")}>
+  1057→                        <span className="flex items-center justify-end gap-1">Change <SortIcon field="change" /></span>
+  1058→                      </th>
+  1059→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("volGainPct")}>
+  1060→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="volGainPct" /></span>
+  1061→                      </th>
+  1062→                      <th className="text-center px-4 py-3 font-medium text-muted-foreground w-20">Action</th>
+  1063→                    </tr>
+  1064→                  </thead>
+  1065→                  <tbody>
+  1066→                    {filteredStocks.map((stock, idx) => (
+  1067→                      <motion.tr
+  1068→                        key={stock.ticker}
+  1069→                        initial={{ opacity: 0, y: 8 }}
+  1070→                        animate={{ opacity: 1, y: 0 }}
+  1071→                        transition={{ delay: idx * 0.02, duration: 0.2 }}
+  1072→                        className="border-t border-border hover:bg-secondary/50 cursor-pointer transition-colors group"
+  1073→                        onClick={() => setSelectedStock(stock)}
+  1074→                      >
+  1075→                        <td className="px-4 py-3 text-muted-foreground text-xs">{idx + 1}</td>
+  1076→                        <td className="px-4 py-3">
+  1077→                          <div className="font-medium text-foreground group-hover:text-primary transition-colors">{stock.name}</div>
+  1078→                          <div className="text-xs text-muted-foreground">{stock.ticker}</div>
+  1079→                        </td>
+  1080→                        <td className="px-4 py-3 text-right font-mono">{stock.close.toFixed(2)}</td>
+  1081→                        <td className="px-4 py-3 text-right">
+  1082→                          <span className="inline-flex items-center gap-0.5 text-emerald-400 font-medium">
+  1083→                            <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+  1084→                          </span>
+  1085→                        </td>
+  1086→                        <td className="px-4 py-3 text-right">
+  1087→                          <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono">
+  1088→                            {stock.volGainPct.toFixed(0)}%
+  1089→                          </Badge>
+  1090→                        </td>
+  1091→                        <td className="px-4 py-3 text-center">
+  1092→                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedStock(stock); }}>
+  1093→                            <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+  1094→                          </Button>
+  1095→                        </td>
+  1096→                      </motion.tr>
+  1097→                    ))}
+  1098→                  </tbody>
+  1099→                </table>
+  1100→                {filteredStocks.length === 0 && (
+  1101→                  <div className="p-12 text-center text-muted-foreground">
+  1102→                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match your search."}
+  1103→                  </div>
+  1104→                )}
+  1105→              </div>
+  1106→
+  1107→              {/* Mobile Cards */}
+  1108→              <div className="md:hidden space-y-2">
+  1109→                {filteredStocks.map((stock, idx) => (
+  1110→                  <motion.div key={stock.ticker} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03, duration: 0.2 }}>
+  1111→                    <Card className="border-border hover:border-primary/30 transition-colors cursor-pointer" onClick={() => setSelectedStock(stock)}>
+  1112→                      <CardContent className="p-4">
+  1113→                        <div className="flex items-start justify-between gap-2">
+  1114→                          <div className="min-w-0">
+  1115→                            <p className="font-medium text-foreground truncate">{stock.name}</p>
+  1116→                            <p className="text-xs text-muted-foreground">{stock.ticker}</p>
+  1117→                          </div>
+  1118→                          <div className="text-right shrink-0">
+  1119→                            <p className="font-mono font-medium">{stock.close.toFixed(2)}</p>
+  1120→                            <span className="inline-flex items-center gap-0.5 text-emerald-400 text-xs font-medium">
+  1121→                              <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+  1122→                            </span>
+  1123→                          </div>
+  1124→                        </div>
+  1125→                        <div className="flex items-center justify-between mt-2">
+  1126→                          <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-xs">
+  1127→                            Vol: {stock.volGainPct.toFixed(0)}%
+  1128→                          </Badge>
+  1129→                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+  1130→                            <Eye className="w-3 h-3" /> View Details
+  1131→                          </span>
+  1132→                        </div>
+  1133→                      </CardContent>
+  1134→                    </Card>
+  1135→                  </motion.div>
+  1136→                ))}
+  1137→                {filteredStocks.length === 0 && (
+  1138→                  <div className="p-12 text-center text-muted-foreground">
+  1139→                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match your search."}
+  1140→                  </div>
+  1141→                )}
+  1142→              </div>
+  1143→            </>
+  1144→          )}
+  1145→
+  1146→          {/* ═══════════════════════════════════════════════════════════
+  1147→              SUGGESTIONS VIEW (sector-rotation grouped)
+  1148→             ═══════════════════════════════════════════════════════════ */}
+  1149→          {!loading && !error && viewMode === "suggestions" && (
+  1150→            <div className="space-y-6">
+  1151→              {/* Loading state */}
+  1152→              {suggestionsLoading && (
+  1153→                <div className="flex flex-col items-center py-16 gap-4">
+  1154→                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+  1155→                  <div className="text-center">
+  1156→                    <p className="text-sm font-medium">Loading sector data for all stocks...</p>
+  1157→                    <p className="text-xs text-muted-foreground mt-1">
+  1158→                      Fetching sector info from Screener.in for {stocks.length} stocks
+  1159→                    </p>
+  1160→                  </div>
+  1161→                </div>
+  1162→              )}
+  1163→
+  1164→              {/* Empty state */}
+  1165→              {!suggestionsLoading && sectorInsights.length === 0 && (
+  1166→                <Card className="border-border">
+  1167→                  <CardContent className="p-8 text-center">
+  1168→                    <Activity className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+  1169→                    <p className="text-sm font-medium mb-1">Sector insights not available</p>
+  1170→                    <p className="text-xs text-muted-foreground">
+  1171→                      Click the <strong>Sectors</strong> button above to load sector rotation data first, then switch back here.
+  1172→                    </p>
+  1173→                  </CardContent>
+  1174→                </Card>
+  1175→              )}
+  1176→
+  1177→              {/* Suggestion groups */}
+  1178→              {!suggestionsLoading && suggestionGroups.length > 0 && (
+  1179→                <>
+  1180→                  <div className="flex items-center gap-2 mb-2">
+  1181→                    <Sparkles className="w-4 h-4 text-primary" />
+  1182→                    <p className="text-sm text-muted-foreground">
+  1183→                      Stocks rearranged by sector rotation strength. Bullish sectors appear first.
+  1184→                    </p>
+  1185→                  </div>
+  1186→
+  1187→                  {suggestionGroups.map((group) => {
+  1188→                    const tc = group.insight ? trendColor(group.insight.trend) : trendColor("Neutral");
+  1189→                    const isTop = group.trendKey === "Bullish" || group.trendKey === "Rotating In";
+  1190→                    const isBottom = group.trendKey === "other";
+  1191→
+  1192→                    return (
+  1193→                      <motion.div
+  1194→                        key={group.trendKey}
+  1195→                        initial={{ opacity: 0, y: 12 }}
+  1196→                        animate={{ opacity: 1, y: 0 }}
+  1197→                        transition={{ duration: 0.3 }}
+  1198→                      >
+  1199→                        <Card className={`border ${isTop ? "border-emerald-500/20" : isBottom ? "border-red-500/20" : "border-border"}`}>
+  1200→                          <CardHeader className="pb-2">
+  1201→                            <div className="flex items-center justify-between">
+  1202→                              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+  1203→                                {isTop && <Star className="w-4 h-4 text-emerald-400" />}
+  1204→                                {isBottom && <AlertTriangle className="w-4 h-4 text-red-400" />}
+  1205→                                {group.trendLabel}
+  1206→                                <Badge variant="secondary" className={`text-[10px] ${tc.bg} ${tc.text}`}>
+  1207→                                  {group.stocks.length} stock{group.stocks.length !== 1 ? "s" : ""}
+  1208→                                </Badge>
+  1209→                              </CardTitle>
+  1210→                              {group.insight && (
+  1211→                                <Badge variant="secondary" className={`text-[10px] ${tc.bg} ${tc.text} ${tc.border} border`}>
+  1212→                                  {group.insight.trend}
+  1213→                                </Badge>
+  1214→                              )}
+  1215→                            </div>
+  1216→                            {group.insight && (
+  1217→                              <p className="text-xs text-muted-foreground mt-1">
+  1218→                                {group.insight.description}
+  1219→                              </p>
+  1220→                            )}
+  1221→                          </CardHeader>
+  1222→                          <CardContent className="pt-0">
+  1223→                            <div className="space-y-1.5">
+  1224→                              {group.stocks.map((stock, idx) => (
+  1225→                                <div
+  1226→                                  key={stock.ticker}
+  1227→                                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/50 cursor-pointer transition-colors group"
+  1228→                                  onClick={() => setSelectedStock(stock)}
+  1229→                                >
+  1230→                                  <span className="text-xs text-muted-foreground w-5 text-center shrink-0">
+  1231→                                    {idx + 1}
+  1232→                                  </span>
+  1233→                                  <div className="flex-1 min-w-0">
+  1234→                                    <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+  1235→                                      {stock.name}
+  1236→                                    </p>
+  1237→                                    <div className="flex items-center gap-2">
+  1238→                                      <span className="text-xs text-muted-foreground">{stock.ticker}</span>
+  1239→                                      {stock.matchedSector && (
+  1240→                                        <>
+  1241→                                          <span className="text-muted-foreground/40">&middot;</span>
+  1242→                                          <span className="text-[10px] text-muted-foreground">{stock.matchedSector}</span>
+  1243→                                        </>
+  1244→                                      )}
+  1245→                                    </div>
+  1246→                                  </div>
+  1247→                                  <div className="text-right shrink-0">
+  1248→                                    <p className="text-sm font-mono font-medium">{stock.close.toFixed(2)}</p>
+  1249→                                    <div className="flex items-center gap-2">
+  1250→                                      <span className="text-xs text-emerald-400 font-medium">+{stock.change.toFixed(2)}%</span>
+  1251→                                      <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono px-1.5">
+  1252→                                        {stock.volGainPct.toFixed(0)}%
+  1253→                                      </Badge>
+  1254→                                    </div>
+  1255→                                  </div>
+  1256→                                  <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0" />
+  1257→                                </div>
+  1258→                              ))}
+  1259→                            </div>
+  1260→                          </CardContent>
+  1261→                        </Card>
+  1262→                      </motion.div>
+  1263→                    );
+  1264→                  })}
+  1265→
+  1266→                  {filteredStocks.length === 0 && (
+  1267→                    <div className="p-12 text-center text-muted-foreground">
+  1268→                      {stocks.length === 0
+  1269→                        ? "No volume shockers found today."
+  1270→                        : "No stocks match your search."}
+  1271→                    </div>
+  1272→                  )}
+  1273→                </>
+  1274→              )}
+  1275→            </div>
+  1276→          )}
+  1277→
+  1278→          {/* ═══════════════════════════════════════════════════════════
+  1279→              SEARCH VIEW (universal stock search from Screener.in)
+  1280→             ═══════════════════════════════════════════════════════════ */}
+  1281→          {viewMode === "search" && (
+  1282→            <div>
+  1283→              {/* Search Input */}
+  1284→              <Card className="border-border mb-4">
+  1285→                <CardContent className="p-4">
+  1286→                  <div className="flex items-center gap-2 mb-2">
+  1287→                    <Globe className="w-4 h-4 text-primary" />
+  1288→                    <h3 className="text-sm font-semibold">Search Any Stock on Screener.in</h3>
+  1289→                  </div>
+  1290→                  <p className="text-xs text-muted-foreground mb-3">
+  1291→                    Type a company name or stock ticker (e.g., Reliance, TCS, HDFCBANK) to look up
+  1292→                    complete financial data from Screener.in. Covers all NSE &amp; BSE listed companies.
+  1293→                  </p>
+  1294→                  <div className="relative">
+  1295→                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+  1296→                    <Input
+  1297→                      placeholder="Search by company name or ticker..."
+  1298→                      className="pl-9 pr-20 bg-secondary border-border text-base"
+  1299→                      value={searchQuery}
+  1300→                      onChange={(e) => handleSearchInput(e.target.value)}
+  1301→                      onKeyDown={(e) => {
+  1302→                        if (e.key === "Enter" && searchQuery.trim().length >= 2) {
+  1303→                          performSearch(searchQuery);
+  1304→                        }
+  1305→                      }}
+  1306→                      autoFocus
+  1307→                    />
+  1308→                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+  1309→                      {searchLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+  1310→                      {searchQuery && (
+  1311→                        <button
+  1312→                          onClick={() => { setSearchQuery(""); setSearchResults([]); setSearchError(""); }}
+  1313→                          className="text-muted-foreground hover:text-foreground"
+  1314→                        >
+  1315→                          <X className="w-4 h-4" />
+  1316→                        </button>
+  1317→                      )}
+  1318→                    </div>
+  1319→                  </div>
+  1320→                </CardContent>
+  1321→              </Card>
+  1322→
+  1323→              {/* Search Loading */}
+  1324→              {searchLoading && (
+  1325→                <div className="space-y-2">
+  1326→                  {[...Array(5)].map((_, i) => (
+  1327→                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-secondary">
+  1328→                      <Skeleton className="h-10 w-10 rounded-lg" />
+  1329→                      <div className="flex-1 space-y-2">
+  1330→                        <Skeleton className="h-4 w-3/5" />
+  1331→                        <Skeleton className="h-3 w-1/3" />
+  1332→                      </div>
+  1333→                      <ArrowUpRight className="w-4 h-4 text-muted-foreground" />
+  1334→                    </div>
+  1335→                  ))}
+  1336→                </div>
+  1337→              )}
+  1338→
+  1339→              {/* Search Error */}
+  1340→              {searchError && !searchLoading && (
+  1341→                <Card className="border-border">
+  1342→                  <CardContent className="p-8 flex flex-col items-center text-center gap-2">
+  1343→                    <Search className="w-8 h-8 text-muted-foreground" />
+  1344→                    <p className="text-sm text-muted-foreground">{searchError}</p>
+  1345→                    <p className="text-xs text-muted-foreground/60">
+  1346→                      Try different keywords, the full company name, or the NSE/BSE ticker code.
+  1347→                    </p>
+  1348→                  </CardContent>
+  1349→                </Card>
+  1350→              )}
+  1351→
+  1352→              {/* Search Results */}
+  1353→              {!searchLoading && searchResults.length > 0 && (
+  1354→                <Card className="border-border">
+  1355→                  <CardHeader className="pb-2">
+  1356→                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+  1357→                      <Search className="w-3.5 h-3.5" />
+  1358→                      {searchResults.length} result{searchResults.length !== 1 ? "s" : ""} found
+  1359→                      {searchQuery && <span className="text-foreground font-semibold">for "{searchQuery}"</span>}
+  1360→                    </CardTitle>
+  1361→                  </CardHeader>
+  1362→                  <CardContent className="pt-0">
+  1363→                    <div className="space-y-1">
+  1364→                      {searchResults.map((result, idx) => (
+  1365→                        <motion.div
+  1366→                          key={result.ticker}
+  1367→                          initial={{ opacity: 0, y: 8 }}
+  1368→                          animate={{ opacity: 1, y: 0 }}
+  1369→                          transition={{ duration: 0.15, delay: idx * 0.03 }}
+  1370→                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/80 cursor-pointer transition-colors group"
+  1371→                          onClick={() => handleSearchSelect(result)}
+  1372→                        >
+  1373→                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+  1374→                            <span className="text-xs font-bold text-primary">
+  1375→                              {result.ticker.slice(0, 2)}
+  1376→                            </span>
+  1377→                          </div>
+  1378→                          <div className="flex-1 min-w-0">
+  1379→                            <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+  1380→                              {result.name}
+  1381→                            </p>
+  1382→                            <span className="text-xs text-muted-foreground font-mono">{result.ticker}</span>
+  1383→                          </div>
+  1384→                          <div className="flex items-center gap-2 shrink-0">
+  1385→                            <Tooltip>
+  1386→                              <TooltipTrigger asChild>
+  1387→                                <a
+  1388→                                  href={`https://www.screener.in/company/${result.ticker}/`}
+  1389→                                  target="_blank"
+  1390→                                  rel="noopener noreferrer"
+  1391→                                  onClick={(e) => e.stopPropagation()}
+  1392→                                >
+  1393→                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+  1394→                                    <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+  1395→                                  </Button>
+  1396→                                </a>
+  1397→                              </TooltipTrigger>
+  1398→                              <TooltipContent>Open on Screener.in</TooltipContent>
+  1399→                            </Tooltip>
+  1400→                            <Tooltip>
+  1401→                              <TooltipTrigger asChild>
+  1402→                                <a
+  1403→                                  href={tradingViewUrl(result.ticker)}
+  1404→                                  target="_blank"
+  1405→                                  rel="noopener noreferrer"
+  1406→                                  onClick={(e) => e.stopPropagation()}
+  1407→                                >
+  1408→                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+  1409→                                    <LineChart className="w-3.5 h-3.5 text-muted-foreground" />
+  1410→                                  </Button>
+  1411→                                </a>
+  1412→                              </TooltipTrigger>
+  1413→                              <TooltipContent>Open on TradingView</TooltipContent>
+  1414→                            </Tooltip>
+  1415→                            <ArrowUpRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+  1416→                          </div>
+  1417→                        </motion.div>
+  1418→                      ))}
+  1419→                    </div>
+  1420→                  </CardContent>
+  1421→                </Card>
+  1422→              )}
+  1423→
+  1424→              {/* Empty State */}
+  1425→              {!searchLoading && !searchError && searchQuery.length < 2 && (
+  1426→                <Card className="border-border">
+  1427→                  <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+  1428→                    <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+  1429→                      <Globe className="w-7 h-7 text-primary" />
+  1430→                    </div>
+  1431→                    <h3 className="text-sm font-semibold text-foreground">Search Any Indian Stock</h3>
+  1432→                    <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+  1433→                      Look up complete financial data for any company listed on NSE or BSE.
+  1434→                      Search by company name (e.g., &quot;Reliance Industries&quot;) or ticker
+  1435→                      (e.g., &quot;TCS&quot;, &quot;HDFCBANK&quot;).
+  1436→                    </p>
+  1437→                    <div className="flex flex-wrap gap-2 mt-2">
+  1438→                      {["RELIANCE", "TCS", "HDFCBANK", "INFY", "ITC", "SBIN"].map((t) => (
+  1439→                        <button
+  1440→                          key={t}
+  1441→                          onClick={() => handleSearchInput(t)}
+  1442→                          className="px-3 py-1 rounded-full bg-secondary text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors"
+  1443→                        >
+  1444→                          {t}
+  1445→                        </button>
+  1446→                      ))}
+  1447→                    </div>
+  1448→                  </CardContent>
+  1449→                </Card>
+  1450→              )}
+  1451→            </div>
+  1452→          )}
+  1453→
+  1454→          {/* ─── HISTORY VIEW ─────────────────────────────────────── */}
+  1455→          {viewMode === "history" && (
+  1456→            <div>
+  1457→              {/* Date list */}
+  1458→              {!selectedHistoryDate && (
+  1459→                <div>
+  1460→                  {historyDates.length === 0 ? (
+  1461→                    <Card className="border-border">
+  1462→                      <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+  1463→                        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+  1464→                          <History className="w-7 h-7 text-primary" />
+  1465→                        </div>
+  1466→                        <h3 className="text-sm font-semibold text-foreground">Daily History</h3>
+  1467→                        <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+  1468→                          Every day&apos;s volume shocker stocks are automatically saved here.
+  1469→                          Browse past days to see which stocks had volume spikes.
+  1470→                        </p>
+  1471→                        <p className="text-xs text-muted-foreground/60 mt-1">
+  1472→                          Today&apos;s data will appear after the first refresh.
+  1473→                        </p>
+  1474→                      </CardContent>
+  1475→                    </Card>
+  1476→                  ) : (
+  1477→                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+  1478→                      {historyDates.map((h) => (
+  1479→                        <button
+  1480→                          key={h.date}
+  1481→                          onClick={() => fetchHistoryStocks(h.date)}
+  1482→                          className="rounded-lg border border-border p-3 text-left hover:bg-secondary/50 hover:border-primary/20 transition-colors group"
+  1483→                        >
+  1484→                          <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+  1485→                            {formatDate(h.date)}
+  1486→                          </p>
+  1487→                          <p className="text-xs text-muted-foreground mt-1">
+  1488→                            {h.stockCount} stock{h.stockCount !== 1 ? "s" : ""}
+  1489→                          </p>
+  1490→                        </button>
+  1491→                      ))}
+  1492→                    </div>
+  1493→                  )}
+  1494→                </div>
+  1495→              )}
+  1496→
+  1497→              {/* Stocks for selected date */}
+  1498→              {selectedHistoryDate && (
+  1499→                <div>
+  1500→                  <div className="flex items-center gap-3 mb-4">
+  1501→                    <Button variant="ghost" size="sm" onClick={() => { setSelectedHistoryDate(null); setHistoryStocks([]); }}>
+  1502→                      <ArrowLeft className="w-4 h-4 mr-1" />
+  1503→                      Back
+  1504→                    </Button>
+  1505→                    <div>
+  1506→                      <h2 className="text-sm font-semibold text-foreground">{formatDate(selectedHistoryDate)}</h2>
+  1507→                      <p className="text-xs text-muted-foreground">{historyStocks.length} volume shockers</p>
+  1508→                    </div>
+  1509→                  </div>
+  1510→
+  1511→                  {historyLoading ? (
+  1512→                    <div className="flex flex-col items-center py-16 gap-4">
+  1513→                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+  1514→                      <p className="text-sm text-muted-foreground">Loading historical data...</p>
+  1515→                    </div>
+  1516→                  ) : historyStocks.length > 0 ? (
+  1517→                    <>
+  1518→                      {/* Desktop Table */}
+  1519→                      <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+  1520→                        <table className="w-full text-sm">
+  1521→                          <thead>
+  1522→                            <tr className="bg-secondary/80">
+  1523→                              <th className="text-left px-4 py-3 font-medium text-muted-foreground w-12">#</th>
+  1524→                              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Stock</th>
+  1525→                              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Close</th>
+  1526→                              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Change</th>
+  1527→                              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Vol Gain</th>
+  1528→                              <th className="text-center px-4 py-3 font-medium text-muted-foreground w-20">Action</th>
+  1529→                            </tr>
+  1530→                          </thead>
+  1531→                          <tbody>
+  1532→                            {historyStocks.map((stock, idx) => (
+  1533→                              <tr
+  1534→                                key={stock.ticker}
+  1535→                                className="border-t border-border hover:bg-secondary/50 cursor-pointer transition-colors group"
+  1536→                                onClick={() => setSelectedStock(stock)}
+  1537→                              >
+  1538→                                <td className="px-4 py-3 text-muted-foreground text-xs">{idx + 1}</td>
+  1539→                                <td className="px-4 py-3">
+  1540→                                  <div className="font-medium text-foreground group-hover:text-primary transition-colors">{stock.name}</div>
+  1541→                                  <div className="text-xs text-muted-foreground">{stock.ticker}</div>
+  1542→                                </td>
+  1543→                                <td className="px-4 py-3 text-right font-mono">{stock.close.toFixed(2)}</td>
+  1544→                                <td className="px-4 py-3 text-right">
+  1545→                                  <span className="inline-flex items-center gap-0.5 text-emerald-400 font-medium">
+  1546→                                    <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+  1547→                                  </span>
+  1548→                                </td>
+  1549→                                <td className="px-4 py-3 text-right">
+  1550→                                  <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono">
+  1551→                                    {stock.volGainPct.toFixed(0)}%
+  1552→                                  </Badge>
+  1553→                                </td>
+  1554→                                <td className="px-4 py-3 text-center">
+  1555→                                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedStock(stock); }}>
+  1556→                                    <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+  1557→                                  </Button>
+  1558→                                </td>
+  1559→                              </tr>
+  1560→                            ))}
+  1561→                          </tbody>
+  1562→                        </table>
+  1563→                      </div>
+  1564→
+  1565→                      {/* Mobile Cards */}
+  1566→                      <div className="md:hidden space-y-2">
+  1567→                        {historyStocks.map((stock) => (
+  1568→                          <Card key={stock.ticker} className="border-border hover:border-primary/30 transition-colors cursor-pointer" onClick={() => setSelectedStock(stock)}>
+  1569→                            <CardContent className="p-4">
+  1570→                              <div className="flex items-start justify-between gap-2">
+  1571→                                <div className="min-w-0">
+  1572→                                  <p className="font-medium text-foreground truncate">{stock.name}</p>
+  1573→                                  <p className="text-xs text-muted-foreground">{stock.ticker}</p>
+  1574→                                </div>
+  1575→                                <div className="text-right shrink-0">
+  1576→                                  <p className="font-mono font-medium">{stock.close.toFixed(2)}</p>
+  1577→                                  <span className="inline-flex items-center gap-0.5 text-emerald-400 text-xs font-medium">
+  1578→                                    <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+  1579→                                  </span>
+  1580→                                </div>
+  1581→                              </div>
+  1582→                              <div className="mt-2 flex items-center gap-2">
+  1583→                                <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono">
+  1584→                                  Vol {stock.volGainPct.toFixed(0)}%
+  1585→                                </Badge>
+  1586→                              </div>
+  1587→                            </CardContent>
+  1588→                          </Card>
+  1589→                        ))}
+  1590→                      </div>
+  1591→                    </>
+  1592→                  ) : (
+  1593→                    <Card className="border-border">
+  1594→                      <CardContent className="p-12 text-center text-muted-foreground text-sm">
+  1595→                        No stocks found for this date.
+  1596→                      </CardContent>
+  1597→                    </Card>
+  1598→                  )}
+  1599→                </div>
+  1600→              )}
+  1601→            </div>
+  1602→          )}
+  1603→
+  1604→        </main>
+  1605→
+  1606→        {/* ─── STOCK DETAIL PANEL ────────────────────────────────── */}
+  1607→        <AnimatePresence>
+  1608→          {selectedStock && (
+  1609→            <motion.div
+  1610→              initial={{ x: "100%" }}
+  1611→              animate={{ x: 0 }}
+  1612→              exit={{ x: "100%" }}
+  1613→              transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
+  1614→              className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-background border-l border-border shadow-2xl flex flex-col"
+  1615→            >
+  1616→              {/* Panel Header */}
+  1617→              <div className="shrink-0 bg-background/90 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
+  1618→                <Button variant="ghost" size="sm" onClick={() => setSelectedStock(null)}>
+  1619→                  <ArrowLeft className="w-4 h-4 mr-1" />
+  1620→                  Back
+  1621→                </Button>
+  1622→                <div className="flex items-center gap-2">
+  1623→                  {/* TradingView Chart Button */}
+  1624→                  <Tooltip>
+  1625→                    <TooltipTrigger asChild>
+  1626→                      <a
+  1627→                        href={tradingViewUrl(selectedStock.ticker)}
+  1628→                        target="_blank"
+  1629→                        rel="noopener noreferrer"
+  1630→                      >
+  1631→                        <Button variant="outline" size="sm">
+  1632→                          <LineChart className="w-4 h-4 mr-1" />
+  1633→                          <span className="hidden sm:inline">Chart</span>
+  1634→                        </Button>
+  1635→                      </a>
+  1636→                    </TooltipTrigger>
+  1637→                    <TooltipContent>Open chart on TradingView</TooltipContent>
+  1638→                  </Tooltip>
+  1639→                  <a href={`https://www.screener.in/company/${selectedStock.ticker}/`} target="_blank" rel="noopener noreferrer">
+  1640→                    <Button variant="outline" size="sm">
+  1641→                      <ExternalLink className="w-4 h-4 mr-1" />
+  1642→                      <span className="hidden sm:inline">Screener.in</span>
+  1643→                    </Button>
+  1644→                  </a>
+  1645→                </div>
+  1646→              </div>
+  1647→
+  1648→              {detailLoading && (
+  1649→                <div className="p-4 space-y-4">
+  1650→                  <Skeleton className="h-6 w-3/4" />
+  1651→                  <Skeleton className="h-4 w-1/2" />
+  1652→                  {[...Array(6)].map((_, i) => (
+  1653→                    <Skeleton key={i} className="h-12 w-full" />
+  1654→                  ))}
+  1655→                </div>
+  1656→              )}
+  1657→
+  1658→              {detailError && !detailLoading && (
+  1659→                <div className="p-6 text-center">
+  1660→                  <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
+  1661→                  <p className="text-sm text-destructive mb-3">{detailError}</p>
+  1662→                  <a href={`https://www.screener.in/company/${selectedStock.ticker}/`} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+  1663→                    View directly on Screener.in &rarr;
+  1664→                  </a>
+  1665→                </div>
+  1666→              )}
+  1667→
+  1668→              {stockDetail && !detailLoading && !detailError && (
+  1669→                <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+  1670→                  {/* ═══ SCROLLABLE CONTENT ═══ */}
+  1671→                  <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 scrollbar-none">
+  1672→
+  1673→                    {/* ──── SCREENER-STYLE HEADER ──── */}
+  1674→                    <div className="pb-4 border-b border-border -mx-4 px-4 -mt-4 pt-0">
+  1675→                      <div className="flex items-start justify-between gap-3">
+  1676→                        <div className="min-w-0">
+  1677→                          <h2 className="text-lg font-bold leading-tight">{stockDetail.name}</h2>
+  1678→                          {/* Sector / Industry breadcrumbs like screener */}
+  1679→                          <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 mt-1 text-[11px] text-muted-foreground">
+  1680→                            {stockDetail.sector && (
+  1681→                              <>
+  1682→                                <Activity className="w-3 h-3 shrink-0" />
+  1683→                                <span className="hover:text-foreground cursor-default">{stockDetail.sector}</span>
+  1684→                              </>
+  1685→                            )}
+  1686→                            {stockDetail.sector && stockDetail.industry && (
+  1687→                              <span className="opacity-40">&rsaquo;</span>
+  1688→                            )}
+  1689→                            {stockDetail.industry && (
+  1690→                              <span className="hover:text-foreground cursor-default">{stockDetail.industry}</span>
+  1691→                            )}
+  1692→                          </div>
+  1693→                          {/* BSE / NSE links */}
+  1694→                          <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[10px]">
+  1695→                            {stockDetail.bseCode && (
+  1696→                              <a
+  1697→                                href={`https://www.bseindia.com/stock-share-price/`}
+  1698→                                target="_blank"
+  1699→                                rel="noopener noreferrer"
+  1700→                                className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+  1701→                              >
+  1702→                                <ExternalLink className="w-2.5 h-2.5" />
+  1703→                                BSE: {stockDetail.bseCode}
+  1704→                              </a>
+  1705→                            )}
+  1706→                            <span className="text-muted-foreground/60 font-medium uppercase tracking-wide">
+  1707→                              NSE: {selectedStock.ticker}
+  1708→                            </span>
+  1709→                          </div>
+  1710→                        </div>
+  1711→                        {/* Price badge (for Volume Shockers) */}
+  1712→                        {!isSearchedStock && selectedStock.close > 0 && (
+  1713→                          <div className="text-right shrink-0">
+  1714→                            <p className="text-xl font-bold font-mono leading-none">
+  1715→                              <span className="text-xs font-normal text-muted-foreground mr-0.5">&#8377;</span>
+  1716→                              {selectedStock.close.toFixed(2)}
+  1717→                            </p>
+  1718→                            <p className="text-xs text-emerald-400 font-medium mt-0.5">
+  1719→                              +{selectedStock.change.toFixed(2)}%
+  1720→                            </p>
+  1721→                          </div>
+  1722→                        )}
+  1723→                      </div>
+  1724→
+  1725→                      {/* Sector Outlook strip */}
+  1726→                      {selectedSectorSuggestion && (
+  1727→                        <div className={`mt-3 rounded-lg border px-3 py-2 ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).border}`}>
+  1728→                          <div className="flex items-center justify-between">
+  1729→                            <div className="flex items-center gap-1.5 min-w-0">
+  1730→                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${confidenceDot(selectedSectorSuggestion.confidence)}`} />
+  1731→                              <span className="text-[11px] font-medium text-foreground truncate">
+  1732→                                {selectedSectorSuggestion.sector}
+  1733→                              </span>
+  1734→                              <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">
+  1735→                                &mdash; {selectedSectorSuggestion.description}
+  1736→                              </span>
+  1737→                            </div>
+  1738→                            <Badge variant="secondary" className={`text-[10px] shrink-0 ml-2 ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).text} border-0`}>
+  1739→                              {selectedSectorSuggestion.trend}
+  1740→                            </Badge>
+  1741→                          </div>
+  1742→                        </div>
+  1743→                      )}
+  1744→
+  1745→                      {/* Volume shocker badges */}
+  1746→                      {!isSearchedStock && selectedStock.volGainPct > 0 && (
+  1747→                        <div className="flex items-center gap-2 mt-2">
+  1748→                          <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px]">
+  1749→                            <Zap className="w-3 h-3 mr-1" />
+  1750→                            Vol {selectedStock.volGainPct.toFixed(0)}%
+  1751→                          </Badge>
+  1752→                          {isSearchedStock && (
+  1753→                            <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/30 text-[10px]">
+  1754→                              <Globe className="w-3 h-3 mr-1" />
+  1755→                              Screener.in
+  1756→                            </Badge>
+  1757→                          )}
+  1758→                        </div>
+  1759→                      )}
+  1760→
+  1761→                      {/* Index memberships */}
+  1762→                      {stockDetail.indices && stockDetail.indices.length > 0 && (
+  1763→                        <div className="mt-2.5">
+  1764→                          <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">Part of</span>
+  1765→                          <div className="flex flex-wrap gap-1.5 mt-1">
+  1766→                            {stockDetail.indices.map((idx) => (
+  1767→                              <Badge key={idx} variant="secondary" className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-[10px] font-medium">
+  1768→                                {idx}
+  1769→                              </Badge>
+  1770→                            ))}
+  1771→                          </div>
+  1772→                        </div>
+  1773→                      )}
+  1774→                    </div>
+  1775→
+  1776→                    {/* ──── TOP RATIOS (screener-style flex list) ──── */}
+  1777→                    {Object.keys(stockDetail.metrics).length > 0 && (
+  1778→                      <div>
+  1779→                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+  1780→                          Key Ratios
+  1781→                        </h3>
+  1782→                        <div className="rounded-lg border border-border overflow-hidden">
+  1783→                          {Object.entries(stockDetail.metrics).map(([key, val], idx) => (
+  1784→                            <div
+  1785→                              key={key}
+  1786→                              className={`flex items-center justify-between px-3 py-2 ${
+  1787→                                idx % 2 === 0 ? "bg-secondary/40" : "bg-transparent"
+  1788→                              }`}
+  1789→                            >
+  1790→                              <span className="text-xs text-muted-foreground">{key}</span>
+  1791→                              <span className="text-xs font-semibold font-mono text-foreground">{val}</span>
+  1792→                            </div>
+  1793→                          ))}
+  1794→                        </div>
+  1795→                      </div>
+  1796→                    )}
+  1797→
+  1798→                    {/* ──── ABOUT (screener-style) ──── */}
+  1799→                    {stockDetail.about && (
+  1800→                      <div>
+  1801→                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+  1802→                          About
+  1803→                        </h3>
+  1804→                        <p className="text-xs text-muted-foreground leading-relaxed">{stockDetail.about}</p>
+  1805→                      </div>
+  1806→                    )}
+  1807→
+  1808→                    {/* ──── PROS & CONS (side by side like screener) ──── */}
+  1809→                    {((stockDetail.pros && stockDetail.pros.length > 0) || (stockDetail.cons && stockDetail.cons.length > 0)) && (
+  1810→                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+  1811→                        {stockDetail.pros && stockDetail.pros.length > 0 && (
+  1812→                          <div>
+  1813→                            <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1.5">
+  1814→                              <CheckCircle className="w-3 h-3 inline mr-1 -mt-0.5" />Pros
+  1815→                            </h3>
+  1816→                            <ul className="space-y-1">
+  1817→                              {stockDetail.pros.map((pro, i) => (
+  1818→                                <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+  1819→                                  <span className="text-emerald-500 mt-0.5 shrink-0">&bull;</span>
+  1820→                                  <span>{pro}</span>
+  1821→                                </li>
+  1822→                              ))}
+  1823→                            </ul>
+  1824→                          </div>
+  1825→                        )}
+  1826→                        {stockDetail.cons && stockDetail.cons.length > 0 && (
+  1827→                          <div>
+  1828→                            <h3 className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-1.5">
+  1829→                              <XCircle className="w-3 h-3 inline mr-1 -mt-0.5" />Cons
+  1830→                            </h3>
+  1831→                            <ul className="space-y-1">
+  1832→                              {stockDetail.cons.map((con, i) => (
+  1833→                                <li key={i} className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+  1834→                                  <span className="text-red-500 mt-0.5 shrink-0">&bull;</span>
+  1835→                                  <span>{con}</span>
+  1836→                                </li>
+  1837→                              ))}
+  1838→                            </ul>
+  1839→                          </div>
+  1840→                        )}
+  1841→                      </div>
+  1842→                    )}
+  1843→
+  1844→                    {/* ──── QUARTERLY RESULTS (screener-style table) ──── */}
+  1845→                    {stockDetail.quarters.length > 0 && (
+  1846→                      <div>
+  1847→                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+  1848→                          Quarterly Results
+  1849→                          <span className="normal-case tracking-normal font-normal text-muted-foreground/60 ml-1">
+  1850→                            (Standalone, Rs. Cr.)
+  1851→                          </span>
+  1852→                        </h3>
+  1853→                        <div className="rounded-lg border border-border overflow-x-auto">
+  1854→                          <ScreenerTable
+  1855→                            headers={["", ...stockDetail.quarters.map((q) => q.label)]}
+  1856→                            fiscalYearEnds={stockDetail.quarters
+  1857→                              .map((q, i) => (/Mar/i.test(q.label) ? i : -1))
+  1858→                              .filter((i) => i >= 0)}
+  1859→                          >
+  1860→                            <ScreenerRow label="Sales" values={stockDetail.quarters.map((q) => q.sales)} />
+  1861→                            <ScreenerRow label="Net Profit" values={stockDetail.quarters.map((q) => q.netProfit)} />
+  1862→                            {stockDetail.quarters[0]?.opm && stockDetail.quarters[0].opm !== "-" && (
+  1863→                              <ScreenerRow label="OPM %" values={stockDetail.quarters.map((q) => q.opm)} />
+  1864→                            )}
+  1865→                          </ScreenerTable>
+  1866→                        </div>
+  1867→                      </div>
+  1868→                    )}
+  1869→
+  1870→                    {/* ──── BALANCE SHEET ──── */}
+  1871→                    {stockDetail.balanceSheet && stockDetail.balanceSheet.length > 0 && (
+  1872→                      <div>
+  1873→                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+  1874→                          Balance Sheet
+  1875→                          <span className="normal-case tracking-normal font-normal text-muted-foreground/60 ml-1">
+  1876→                            (Rs. Cr.)
+  1877→                          </span>
+  1878→                        </h3>
+  1879→                        <div className="rounded-lg border border-border overflow-x-auto">
+  1880→                          <ScreenerTable
+  1881→                            headers={["", ...stockDetail.balanceSheet.map((bs) => bs.label)]}
+  1882→                            fiscalYearEnds={stockDetail.balanceSheet
+  1883→                              .map((bs, i) => (/Mar/i.test(bs.label) ? i : -1))
+  1884→                              .filter((i) => i >= 0)}
+  1885→                          >
+  1886→                            <ScreenerRow label="Reserves" values={stockDetail.balanceSheet.map((bs) => bs.reserves)} />
+  1887→                            <ScreenerRow label="Borrowings" values={stockDetail.balanceSheet.map((bs) => bs.borrowing)} />
+  1888→                            <ScreenerRow label="Other Liab." values={stockDetail.balanceSheet.map((bs) => bs.otherLiab)} />
+  1889→                            <ScreenerRow label="Total Liab." values={stockDetail.balanceSheet.map((bs) => bs.totalLiab)} />
+  1890→                            <ScreenerRow label="Fixed Assets" values={stockDetail.balanceSheet.map((bs) => bs.fixedAssets)} />
+  1891→                            <ScreenerRow label="CWIP" values={stockDetail.balanceSheet.map((bs) => bs.cwip)} />
+  1892→                            <ScreenerRow label="Total Assets" values={stockDetail.balanceSheet.map((bs) => bs.totalAssets)} />
+  1893→                          </ScreenerTable>
+  1894→                        </div>
+  1895→                      </div>
+  1896→                    )}
+  1897→
+  1898→                    {/* ──── CASH FLOW ──── */}
+  1899→                    {stockDetail.cashFlow && stockDetail.cashFlow.length > 0 && (
+  1900→                      <div>
+  1901→                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+  1902→                          Cash Flow
+  1903→                          <span className="normal-case tracking-normal font-normal text-muted-foreground/60 ml-1">
+  1904→                            (Rs. Cr.)
+  1905→                          </span>
+  1906→                        </h3>
+  1907→                        <div className="rounded-lg border border-border overflow-x-auto">
+  1908→                          <ScreenerTable
+  1909→                            headers={["", ...stockDetail.cashFlow.map((cf) => cf.label)]}
+  1910→                            fiscalYearEnds={stockDetail.cashFlow
+  1911→                              .map((cf, i) => (/Mar/i.test(cf.label) ? i : -1))
+  1912→                              .filter((i) => i >= 0)}
+  1913→                          >
+  1914→                            <ScreenerRow label="Operating CF" values={stockDetail.cashFlow.map((cf) => cf.operatingCF)} />
+  1915→                            <ScreenerRow label="Investing CF" values={stockDetail.cashFlow.map((cf) => cf.investingCF)} />
+  1916→                            <ScreenerRow label="Financing CF" values={stockDetail.cashFlow.map((cf) => cf.financingCF)} />
+  1917→                          </ScreenerTable>
+  1918→                        </div>
+  1919→                      </div>
+  1920→                    )}
+  1921→
+  1922→                    {/* ──── SHAREHOLDING PATTERN ──── */}
+  1923→                    {stockDetail.shareholding && stockDetail.shareholding.length > 0 && (
+  1924→                      <div>
+  1925→                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+  1926→                          Shareholding Pattern
+  1927→                        </h3>
+  1928→                        <div className="rounded-lg border border-border overflow-hidden">
+  1929→                          {stockDetail.shareholding.map((sh) => (
+  1930→                            <div key={sh.category}>
+  1931→                              <div className="px-3 py-1.5 bg-primary/10 border-b border-border">
+  1932→                                <span className="text-[10px] font-semibold text-primary">{sh.category}</span>
+  1933→                              </div>
+  1934→                              {sh.values.map((v, vi) => (
+  1935→                                <div
+  1936→                                  key={v.label}
+  1937→                                  className={`flex items-center justify-between px-3 py-1.5 ${
+  1938→                                    vi % 2 === 0 ? "bg-secondary/40" : ""
+  1939→                                  }`}
+  1940→                                >
+  1941→                                  <span className="text-[11px] text-muted-foreground truncate mr-2">{v.label}</span>
+  1942→                                  <span className="text-[11px] font-mono font-medium shrink-0">{v.value}</span>
+  1943→                                </div>
+  1944→                              ))}
+  1945→                            </div>
+  1946→                          ))}
+  1947→                        </div>
+  1948→                      </div>
+  1949→                    )}
+  1950→
+  1951→                    {/* ──── ANNUAL RESULTS ──── */}
+  1952→                    {stockDetail.annualResults && stockDetail.annualResults.length > 0 && (
+  1953→                      <div>
+  1954→                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+  1955→                          Annual Results
+  1956→                          <span className="normal-case tracking-normal font-normal text-muted-foreground/60 ml-1">
+  1957→                            (Rs. Cr.)
+  1958→                          </span>
+  1959→                        </h3>
+  1960→                        <div className="rounded-lg border border-border overflow-x-auto">
+  1961→                          <ScreenerTable
+  1962→                            headers={["", ...stockDetail.annualResults.map((ar) => ar.label)]}
+  1963→                            fiscalYearEnds={stockDetail.annualResults
+  1964→                              .map((ar, i) => (/Mar/i.test(ar.label) ? i : -1))
+  1965→                              .filter((i) => i >= 0)}
+  1966→                          >
+  1967→                            <ScreenerRow label="Sales" values={stockDetail.annualResults.map((ar) => ar.sales)} />
+  1968→                            <ScreenerRow label="Net Profit" values={stockDetail.annualResults.map((ar) => ar.netProfit)} />
+  1969→                          </ScreenerTable>
+  1970→                        </div>
+  1971→                      </div>
+  1972→                    )}
+  1973→
+  1974→                    {/* ──── PEER COMPANIES (clickable, like screener) ──── */}
+  1975→                    {stockDetail.peers.length > 0 && (
+  1976→                      <div>
+  1977→                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+  1978→                          Peer Companies
+  1979→                        </h3>
+  1980→                        <div className="rounded-lg border border-border overflow-hidden">
+  1981→                          {stockDetail.peers.map((peer, idx) => (
+  1982→                            <button
+  1983→                              key={peer.ticker}
+  1984→                              disabled={peerLoading}
+  1985→                              className={`w-full text-left flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-primary/5 disabled:opacity-50 ${
+  1986→                                idx % 2 === 0 ? "bg-secondary/30" : ""
+  1987→                              }`}
+  1988→                              onClick={() => handlePeerClick(peer.name, peer.ticker)}
+  1989→                            >
+  1990→                              <div className="flex items-center gap-2 min-w-0">
+  1991→                                <span className="text-[10px] text-muted-foreground w-4 text-center shrink-0">{idx + 1}</span>
+  1992→                                {peerLoading ? (
+  1993→                                  <Loader2 className="w-3 h-3 animate-spin text-primary shrink-0" />
+  1994→                                ) : null}
+  1995→                                <span className="text-xs font-medium text-foreground truncate hover:text-primary transition-colors">
+  1996→                                  {peer.name}
+  1997→                                </span>
+  1998→                                <span className="text-[10px] text-muted-foreground/50 font-mono shrink-0">
+  1999→                                  {peer.ticker}
+  2000→                                </span>
+
+[showing lines 1-2000 of 2171; use offset=2001 with limit to continue reading]

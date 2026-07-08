@@ -251,12 +251,7 @@ function ScreenerRow({
 }
 
 // ─── Main Component ──────────────────────────────────────────────────
-const ACCESS_PASSWORD = "stockh2025";
-
 export default function Home() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [passwordError, setPasswordError] = useState("");
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [filteredStocks, setFilteredStocks] = useState<Stock[]>([]);
   const { theme, setTheme } = useTheme();
@@ -663,57 +658,6 @@ export default function Home() {
     const d = new Date(dateStr + "T00:00:00");
     return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
   };
-
-  // Check session storage for existing auth
-  useEffect(() => {
-    const session = sessionStorage.getItem("stockh_auth");
-    if (session === "true") setIsAuthenticated(true);
-  }, []);
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (passwordInput === ACCESS_PASSWORD) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem("stockh_auth", "true");
-      setPasswordError("");
-    } else {
-      setPasswordError("Wrong password");
-    }
-  };
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="w-full max-w-sm">
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-primary/20 flex items-center justify-center mb-4">
-              <BarChart3 className="w-7 h-7 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight">StockH</h1>
-            <p className="text-sm text-muted-foreground mt-1">Private access only</p>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <Input
-                type="password"
-                placeholder="Enter password"
-                value={passwordInput}
-                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(""); }}
-                className="h-11 text-center text-lg tracking-widest"
-                autoFocus
-              />
-              {passwordError && (
-                <p className="text-xs text-destructive mt-2 text-center">{passwordError}</p>
-              )}
-            </div>
-            <Button type="submit" className="w-full h-11" size="lg">
-              Enter
-            </Button>
-          </form>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <TooltipProvider>
