@@ -70,6 +70,8 @@ interface SectorInsight {
 interface StockDetail {
   name: string;
   ticker: string;
+  bseCode?: string;
+  nseCode?: string;
   sector?: string;
   industry?: string;
   about?: string;
@@ -1527,7 +1529,7 @@ export default function Home() {
                             </tr>
                           </thead>
                           <tbody>
-                            {historyStocks.map((stock) => (
+                            {historyStocks.map((stock, idx) => (
                               <tr
                                 key={stock.ticker}
                                 className="border-t border-border hover:bg-secondary/50 cursor-pointer transition-colors group"
