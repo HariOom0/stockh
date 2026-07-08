@@ -1069,7 +1069,7 @@ export default function Home() {
                         className="border-t border-border hover:bg-secondary/50 cursor-pointer transition-colors group"
                         onClick={() => setSelectedStock(stock)}
                       >
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{stock.sr}</td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{idx + 1}</td>
                         <td className="px-4 py-3">
                           <div className="font-medium text-foreground group-hover:text-primary transition-colors">{stock.name}</div>
                           <div className="text-xs text-muted-foreground">{stock.ticker}</div>
@@ -1532,7 +1532,7 @@ export default function Home() {
                                 className="border-t border-border hover:bg-secondary/50 cursor-pointer transition-colors group"
                                 onClick={() => setSelectedStock(stock)}
                               >
-                                <td className="px-4 py-3 text-muted-foreground text-xs">{stock.sr}</td>
+                                <td className="px-4 py-3 text-muted-foreground text-xs">{idx + 1}</td>
                                 <td className="px-4 py-3">
                                   <div className="font-medium text-foreground group-hover:text-primary transition-colors">{stock.name}</div>
                                   <div className="text-xs text-muted-foreground">{stock.ticker}</div>
