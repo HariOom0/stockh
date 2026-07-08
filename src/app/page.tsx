@@ -744,7 +744,7 @@ export default function Home() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => { setShowSectors(!showSectors); if (!showSectors) fetchSectors(); }}
+                onClick={() => { setShowSectors(!showSectors); setShowIndices(false); if (!showSectors) fetchSectors(); }}
               >
                 <Activity className="w-4 h-4 mr-1" />
                 <span className="hidden sm:inline">Sectors</span>
@@ -752,7 +752,7 @@ export default function Home() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => { setShowIndices(!showIndices); if (!showIndices) fetchIndices(); }}
+                onClick={() => { setShowIndices(!showIndices); setShowSectors(false); if (!showIndices) fetchIndices(); }}
               >
                 <TrendingDown className="w-4 h-4 mr-1" />
                 <span className="hidden sm:inline">Indices</span>
