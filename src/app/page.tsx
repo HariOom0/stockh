@@ -19,7 +19,6 @@ import {
   Zap,
   ArrowUpDown,
   Eye,
-  Shield,
   Clock,
   Info,
   ArrowLeft,
@@ -659,7 +658,7 @@ export default function Home() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen flex flex-col bg-background">
+      <div className="h-screen flex flex-col bg-background overflow-hidden">
         {/* ─── HEADER ─────────────────────────────────────────────── */}
         <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
@@ -2008,19 +2007,7 @@ export default function Home() {
           )}
         </AnimatePresence>
 
-        {/* ─── FOOTER ─────────────────────────────────────────────── */}
-        <footer className="mt-auto border-t border-border py-4 px-4 sm:px-6">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-            <p>
-              StockPulse &middot; Data from Chartink &amp; Screener.in &middot;
-              For informational purposes only. Not financial advice.
-            </p>
-            <p className="flex items-center gap-1">
-              <Shield className="w-3 h-3" />
-              Always do your own research before investing.
-            </p>
-          </div>
-        </footer>
+
       </div>
     </TooltipProvider>
   );
