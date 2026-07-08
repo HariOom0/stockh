@@ -1207,27 +1207,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* ─── DATA SOURCE FOOTER ───────────────────────────────── */}
-          {!loading && stocks.length > 0 && (
-            <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Info className="w-3 h-3" />
-                Data sourced from{" "}
-                <a href="https://chartink.com/eodscanner/Volume-Shockers.html" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                  Chartink.com
-                </a>{" "}
-                &middot; Refreshes daily at 7:00 PM IST
-              </span>
-              <span className="hidden sm:inline">&middot;</span>
-              <span className="flex items-center gap-1">
-                <Shield className="w-3 h-3" />
-                Stock details from{" "}
-                <a href="https://www.screener.in/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                  Screener.in
-                </a>
-              </span>
-            </div>
-          )}
         </main>
 
         {/* ─── STOCK DETAIL PANEL ────────────────────────────────── */}
