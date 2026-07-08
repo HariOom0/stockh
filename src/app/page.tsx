@@ -726,6 +726,65 @@ export default function Home() {
               </Tooltip>
             </div>
           </div>
+          {/* ─── VIEW TABS (sticky sub-header) ──────────────── */}
+          {(stocks.length > 0 || viewMode === "search" || viewMode === "history") && (
+            <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-2">
+              <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary w-fit">
+                <button
+                  onClick={() => handleViewSwitch("list")}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === "list"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    All Stocks
+                  </span>
+                </button>
+                <button
+                  onClick={() => handleViewSwitch("suggestions")}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === "suggestions"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Suggestions
+                  </span>
+                </button>
+                <button
+                  onClick={() => handleViewSwitch("search")}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === "search"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5" />
+                    Search
+                  </span>
+                </button>
+                <button
+                  onClick={() => handleViewSwitch("history")}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === "history"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <History className="w-3.5 h-3.5" />
+                    History
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
         </header>
 
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
@@ -867,64 +926,6 @@ export default function Home() {
               </motion.section>
             )}
           </AnimatePresence>
-
-          {/* ─── VIEW TABS ────────────────────────────────────────── */}
-          {(stocks.length > 0 || viewMode === "search" || viewMode === "history") && (
-            <div className="flex items-center gap-1 mb-5 p-1 rounded-lg bg-secondary w-fit">
-              <button
-                onClick={() => handleViewSwitch("list")}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  viewMode === "list"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  <BarChart3 className="w-3.5 h-3.5" />
-                  All Stocks
-                </span>
-              </button>
-              <button
-                onClick={() => handleViewSwitch("suggestions")}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  viewMode === "suggestions"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Suggestions
-                </span>
-              </button>
-              <button
-                onClick={() => handleViewSwitch("search")}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  viewMode === "search"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5" />
-                  Search
-                </span>
-              </button>
-              <button
-                onClick={() => handleViewSwitch("history")}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  viewMode === "history"
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <span className="flex items-center gap-1.5">
-                  <History className="w-3.5 h-3.5" />
-                  History
-                </span>
-              </button>
-            </div>
-          )}
 
           {/* ─── SEARCH ───────────────────────────────────────────── */}
           {viewMode !== "search" && (
