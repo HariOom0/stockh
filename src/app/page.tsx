@@ -658,7 +658,7 @@ export default function Home() {
 
   return (
     <TooltipProvider>
-      <div className="h-screen flex flex-col bg-background overflow-hidden">
+      <div className="min-h-screen flex flex-col bg-background">
         {/* ─── HEADER ─────────────────────────────────────────────── */}
         <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
@@ -867,18 +867,6 @@ export default function Home() {
               </motion.section>
             )}
           </AnimatePresence>
-
-          {/* ─── STATS BAR ────────────────────────────────────────── */}
-          {!error && stocks.length > 0 && (
-            <div className="flex flex-wrap gap-3 mb-5">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-sm font-medium text-emerald-400">
-                  {stats.filtered} Stocks
-                </span>
-              </div>
-            </div>
-          )}
 
           {/* ─── VIEW TABS ────────────────────────────────────────── */}
           {(stocks.length > 0 || viewMode === "search" || viewMode === "history") && (
