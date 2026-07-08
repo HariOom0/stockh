@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "StockPulse - Volume Shockers India",
+  title: "StockH - Volume Shockers India",
   description: "Daily curated list of Indian stocks with volume shocks (>180%) and positive momentum. Data from Chartink & Screener.in with AI-powered sector rotation insights.",
   keywords: ["Indian stocks", "volume shockers", "stock screener", "NSE", "BSE", "stock market India", "sector rotation"],
   icons: {

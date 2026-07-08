@@ -667,7 +667,7 @@ export default function Home() {
                 <BarChart3 className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h1 className="text-lg font-bold tracking-tight">StockPulse</h1>
+                <h1 className="text-lg font-bold tracking-tight">StockH</h1>
                 <p className="text-xs text-muted-foreground hidden sm:block">
                   Volume Shockers &middot; Indian Market
                 </p>
