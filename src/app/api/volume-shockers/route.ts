@@ -18,8 +18,20 @@ export async function GET() {
   try {
     const now = Date.now();
 
-    // Return cached data if still fresh
+    // Return cached data if still fresh, but still save to DB
     if (cachedData && now - cachedData.timestamp < CACHE_TTL) {
+      // Ensure today's snapshot is in DB (fire-and-forget)
+      const today = getTodayDate();
+      const snapshotPayload = cachedData.stocks.map((s) => ({
+        name: s.name, ticker: s.ticker, close: s.close,
+        change: s.change, volGainPct: s.volGainPct, isPositive: s.isPositive,
+      }));
+      db.dailyStockSnapshot.upsert({
+        where: { date: today },
+        update: { stockCount: snapshotPayload.length, stocksJson: JSON.stringify(snapshotPayload) },
+        create: { date: today, stockCount: snapshotPayload.length, stocksJson: JSON.stringify(snapshotPayload) },
+      }).catch((err) => console.error("Failed to save snapshot:", err));
+
       return NextResponse.json({
         stocks: cachedData.stocks,
         cached: true,
