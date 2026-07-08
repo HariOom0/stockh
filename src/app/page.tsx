@@ -1294,97 +1294,97 @@ export default function Home() {
 
               {stockDetail && !detailLoading && !detailError && (
                 <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-                  {/* ═══ SCREENER-STYLE HEADER ═══ */}
-                  <div className="px-4 pt-4 pb-3 border-b border-border">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h2 className="text-lg font-bold leading-tight">{stockDetail.name}</h2>
-                        {/* Sector / Industry breadcrumbs like screener */}
-                        <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 mt-1 text-[11px] text-muted-foreground">
-                          {stockDetail.sector && (
-                            <>
-                              <Activity className="w-3 h-3 shrink-0" />
-                              <span className="hover:text-foreground cursor-default">{stockDetail.sector}</span>
-                            </>
-                          )}
-                          {stockDetail.sector && stockDetail.industry && (
-                            <span className="opacity-40">&rsaquo;</span>
-                          )}
-                          {stockDetail.industry && (
-                            <span className="hover:text-foreground cursor-default">{stockDetail.industry}</span>
-                          )}
+                  {/* ═══ SCROLLABLE CONTENT ═══ */}
+                  <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 scrollbar-none">
+
+                    {/* ──── SCREENER-STYLE HEADER ──── */}
+                    <div className="pb-4 border-b border-border -mx-4 px-4 -mt-4 pt-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h2 className="text-lg font-bold leading-tight">{stockDetail.name}</h2>
+                          {/* Sector / Industry breadcrumbs like screener */}
+                          <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 mt-1 text-[11px] text-muted-foreground">
+                            {stockDetail.sector && (
+                              <>
+                                <Activity className="w-3 h-3 shrink-0" />
+                                <span className="hover:text-foreground cursor-default">{stockDetail.sector}</span>
+                              </>
+                            )}
+                            {stockDetail.sector && stockDetail.industry && (
+                              <span className="opacity-40">&rsaquo;</span>
+                            )}
+                            {stockDetail.industry && (
+                              <span className="hover:text-foreground cursor-default">{stockDetail.industry}</span>
+                            )}
+                          </div>
+                          {/* BSE / NSE links */}
+                          <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[10px]">
+                            {stockDetail.bseCode && (
+                              <a
+                                href={`https://www.bseindia.com/stock-share-price/`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                              >
+                                <ExternalLink className="w-2.5 h-2.5" />
+                                BSE: {stockDetail.bseCode}
+                              </a>
+                            )}
+                            <span className="text-muted-foreground/60 font-medium uppercase tracking-wide">
+                              NSE: {selectedStock.ticker}
+                            </span>
+                          </div>
                         </div>
-                        {/* BSE / NSE links */}
-                        <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[10px]">
-                          {stockDetail.bseCode && (
-                            <a
-                              href={`https://www.bseindia.com/stock-share-price/`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" />
-                              BSE: {stockDetail.bseCode}
-                            </a>
-                          )}
-                          <span className="text-muted-foreground/60 font-medium uppercase tracking-wide">
-                            NSE: {selectedStock.ticker}
-                          </span>
-                        </div>
+                        {/* Price badge (for Volume Shockers) */}
+                        {!isSearchedStock && selectedStock.close > 0 && (
+                          <div className="text-right shrink-0">
+                            <p className="text-xl font-bold font-mono leading-none">
+                              <span className="text-xs font-normal text-muted-foreground mr-0.5">&#8377;</span>
+                              {selectedStock.close.toFixed(2)}
+                            </p>
+                            <p className="text-xs text-emerald-400 font-medium mt-0.5">
+                              +{selectedStock.change.toFixed(2)}%
+                            </p>
+                          </div>
+                        )}
                       </div>
-                      {/* Price badge (for Volume Shockers) */}
-                      {!isSearchedStock && selectedStock.close > 0 && (
-                        <div className="text-right shrink-0">
-                          <p className="text-xl font-bold font-mono leading-none">
-                            <span className="text-xs font-normal text-muted-foreground mr-0.5">&#8377;</span>
-                            {selectedStock.close.toFixed(2)}
-                          </p>
-                          <p className="text-xs text-emerald-400 font-medium mt-0.5">
-                            +{selectedStock.change.toFixed(2)}%
-                          </p>
+
+                      {/* Sector Outlook strip */}
+                      {selectedSectorSuggestion && (
+                        <div className={`mt-3 rounded-lg border px-3 py-2 ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).border}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${confidenceDot(selectedSectorSuggestion.confidence)}`} />
+                              <span className="text-[11px] font-medium text-foreground truncate">
+                                {selectedSectorSuggestion.sector}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">
+                                &mdash; {selectedSectorSuggestion.description}
+                              </span>
+                            </div>
+                            <Badge variant="secondary" className={`text-[10px] shrink-0 ml-2 ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).text} border-0`}>
+                              {selectedSectorSuggestion.trend}
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Volume shocker badges */}
+                      {!isSearchedStock && selectedStock.volGainPct > 0 && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px]">
+                            <Zap className="w-3 h-3 mr-1" />
+                            Vol {selectedStock.volGainPct.toFixed(0)}%
+                          </Badge>
+                          {isSearchedStock && (
+                            <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/30 text-[10px]">
+                              <Globe className="w-3 h-3 mr-1" />
+                              Screener.in
+                            </Badge>
+                          )}
                         </div>
                       )}
                     </div>
-
-                    {/* Sector Outlook strip */}
-                    {selectedSectorSuggestion && (
-                      <div className={`mt-3 rounded-lg border px-3 py-2 ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).border}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${confidenceDot(selectedSectorSuggestion.confidence)}`} />
-                            <span className="text-[11px] font-medium text-foreground truncate">
-                              {selectedSectorSuggestion.sector}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground truncate hidden sm:inline">
-                              &mdash; {selectedSectorSuggestion.description}
-                            </span>
-                          </div>
-                          <Badge variant="secondary" className={`text-[10px] shrink-0 ml-2 ${trendColor(selectedSectorSuggestion.trend).bg} ${trendColor(selectedSectorSuggestion.trend).text} border-0`}>
-                            {selectedSectorSuggestion.trend}
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Volume shocker badges */}
-                    {!isSearchedStock && selectedStock.volGainPct > 0 && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px]">
-                          <Zap className="w-3 h-3 mr-1" />
-                          Vol {selectedStock.volGainPct.toFixed(0)}%
-                        </Badge>
-                        {isSearchedStock && (
-                          <Badge variant="secondary" className="bg-primary/15 text-primary border-primary/30 text-[10px]">
-                            <Globe className="w-3 h-3 mr-1" />
-                            Screener.in
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* ═══ SCROLLABLE CONTENT ═══ */}
-                  <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 scrollbar-none">
 
                     {/* ──── TOP RATIOS (screener-style flex list) ──── */}
                     {Object.keys(stockDetail.metrics).length > 0 && (
