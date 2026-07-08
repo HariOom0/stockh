@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchVolumeShockers } from "@/lib/scraper";
+import { db } from "@/lib/db";
 
 // In-memory cache
 let cachedData: {
@@ -8,6 +9,10 @@ let cachedData: {
 } | null = null;
 
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+function getTodayDate(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // "2026-07-08"
+}
 
 export async function GET() {
   try {
@@ -32,6 +37,33 @@ export async function GET() {
     filtered.sort((a, b) => b.volGainPct - a.volGainPct);
 
     cachedData = { stocks: filtered, timestamp: now };
+
+    // Save today's snapshot to DB (fire-and-forget, don't block response)
+    const today = getTodayDate();
+    const snapshotPayload = filtered.map((s) => ({
+      name: s.name,
+      ticker: s.ticker,
+      close: s.close,
+      change: s.change,
+      volGainPct: s.volGainPct,
+      isPositive: s.isPositive,
+    }));
+
+    db.dailyStockSnapshot
+      .upsert({
+        where: { date: today },
+        update: {
+          stockCount: snapshotPayload.length,
+          stocksJson: JSON.stringify(snapshotPayload),
+        },
+        create: {
+          date: today,
+          stockCount: snapshotPayload.length,
+          stocksJson: JSON.stringify(snapshotPayload),
+        },
+      })
+      .then(() => console.log(`Snapshot saved for ${today}: ${snapshotPayload.length} stocks`))
+      .catch((err) => console.error("Failed to save snapshot:", err));
 
     return NextResponse.json({
       stocks: filtered,

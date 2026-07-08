@@ -31,6 +31,7 @@ import {
   XCircle,
   Users,
   DollarSign,
+  History,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -120,7 +121,7 @@ interface SearchResult {
   ticker: string;
 }
 
-type ViewMode = "list" | "suggestions" | "search";
+type ViewMode = "list" | "suggestions" | "search" | "history";
 
 // ─── Trend Colors ─────────────────────────────────────────────────────
 function trendColor(trend: string) {
@@ -274,6 +275,10 @@ export default function Home() {
 
   // ─── Suggestions state ───────────────────────────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [historyDates, setHistoryDates] = useState<{ date: string; stockCount: number }[]>([]);
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null);
+  const [historyStocks, setHistoryStocks] = useState<Stock[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [sectorMap, setSectorMap] = useState<Map<string, StockSectorMap>>(new Map());
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsLoaded, setSuggestionsLoaded] = useState(false);
@@ -573,6 +578,50 @@ export default function Home() {
     if (mode === "suggestions" && !suggestionsLoaded && !suggestionsLoading) {
       fetchSuggestions();
     }
+    if (mode === "history") {
+      fetchHistoryDates();
+    }
+  };
+
+  // ─── History functions ───────────────────────────────────────────
+  const fetchHistoryDates = async () => {
+    try {
+      const res = await fetch("/api/stock-history");
+      const data = await res.json();
+      if (data.snapshots) setHistoryDates(data.snapshots);
+    } catch (err) {
+      console.error("Failed to fetch history dates:", err);
+    }
+  };
+
+  const fetchHistoryStocks = async (date: string) => {
+    setSelectedHistoryDate(date);
+    setHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/stock-history?date=${date}`);
+      const data = await res.json();
+      if (data.stocks) {
+        const stocks: Stock[] = data.stocks.map((s: Record<string, unknown>, i: number) => ({
+          sr: i + 1,
+          name: s.name as string,
+          ticker: s.ticker as string,
+          close: s.close as number,
+          change: s.change as number,
+          volGainPct: s.volGainPct as number,
+          isPositive: s.isPositive as boolean,
+        }));
+        setHistoryStocks(stocks);
+      }
+    } catch (err) {
+      console.error("Failed to fetch history stocks:", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
   };
 
   return (
@@ -698,7 +747,7 @@ export default function Home() {
           )}
 
           {/* ─── VIEW TABS ────────────────────────────────────────── */}
-          {(stocks.length > 0 || viewMode === "search") && (
+          {(stocks.length > 0 || viewMode === "search" || viewMode === "history") && (
             <div className="flex items-center gap-1 mb-5 p-1 rounded-lg bg-secondary w-fit">
               <button
                 onClick={() => handleViewSwitch("list")}
@@ -737,6 +786,19 @@ export default function Home() {
                 <span className="flex items-center gap-1.5">
                   <Globe className="w-3.5 h-3.5" />
                   Search
+                </span>
+              </button>
+              <button
+                onClick={() => handleViewSwitch("history")}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  viewMode === "history"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="flex items-center gap-1.5">
+                  <History className="w-3.5 h-3.5" />
+                  History
                 </span>
               </button>
             </div>
@@ -1203,6 +1265,156 @@ export default function Home() {
                     </div>
                   </CardContent>
                 </Card>
+              )}
+            </div>
+          )}
+
+          {/* ─── HISTORY VIEW ─────────────────────────────────────── */}
+          {viewMode === "history" && (
+            <div>
+              {/* Date list */}
+              {!selectedHistoryDate && (
+                <div>
+                  {historyDates.length === 0 ? (
+                    <Card className="border-border">
+                      <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+                        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                          <History className="w-7 h-7 text-primary" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-foreground">Daily History</h3>
+                        <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+                          Every day&apos;s volume shocker stocks are automatically saved here.
+                          Browse past days to see which stocks had volume spikes.
+                        </p>
+                        <p className="text-xs text-muted-foreground/60 mt-1">
+                          Today&apos;s data will appear after the first refresh.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                      {historyDates.map((h) => (
+                        <button
+                          key={h.date}
+                          onClick={() => fetchHistoryStocks(h.date)}
+                          className="rounded-lg border border-border p-3 text-left hover:bg-secondary/50 hover:border-primary/20 transition-colors group"
+                        >
+                          <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+                            {formatDate(h.date)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {h.stockCount} stock{h.stockCount !== 1 ? "s" : ""}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Stocks for selected date */}
+              {selectedHistoryDate && (
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedHistoryDate(null); setHistoryStocks([]); }}>
+                      <ArrowLeft className="w-4 h-4 mr-1" />
+                      Back
+                    </Button>
+                    <div>
+                      <h2 className="text-sm font-semibold text-foreground">{formatDate(selectedHistoryDate)}</h2>
+                      <p className="text-xs text-muted-foreground">{historyStocks.length} volume shockers</p>
+                    </div>
+                  </div>
+
+                  {historyLoading ? (
+                    <div className="flex flex-col items-center py-16 gap-4">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      <p className="text-sm text-muted-foreground">Loading historical data...</p>
+                    </div>
+                  ) : historyStocks.length > 0 ? (
+                    <>
+                      {/* Desktop Table */}
+                      <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-secondary/80">
+                              <th className="text-left px-4 py-3 font-medium text-muted-foreground w-12">#</th>
+                              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Stock</th>
+                              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Close</th>
+                              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Change</th>
+                              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Vol Gain</th>
+                              <th className="text-center px-4 py-3 font-medium text-muted-foreground w-20">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {historyStocks.map((stock) => (
+                              <tr
+                                key={stock.ticker}
+                                className="border-t border-border hover:bg-secondary/50 cursor-pointer transition-colors group"
+                                onClick={() => setSelectedStock(stock)}
+                              >
+                                <td className="px-4 py-3 text-muted-foreground text-xs">{stock.sr}</td>
+                                <td className="px-4 py-3">
+                                  <div className="font-medium text-foreground group-hover:text-primary transition-colors">{stock.name}</div>
+                                  <div className="text-xs text-muted-foreground">{stock.ticker}</div>
+                                </td>
+                                <td className="px-4 py-3 text-right font-mono">{stock.close.toFixed(2)}</td>
+                                <td className="px-4 py-3 text-right">
+                                  <span className="inline-flex items-center gap-0.5 text-emerald-400 font-medium">
+                                    <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono">
+                                    {stock.volGainPct.toFixed(0)}%
+                                  </Badge>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedStock(stock); }}>
+                                    <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile Cards */}
+                      <div className="md:hidden space-y-2">
+                        {historyStocks.map((stock) => (
+                          <Card key={stock.ticker} className="border-border hover:border-primary/30 transition-colors cursor-pointer" onClick={() => setSelectedStock(stock)}>
+                            <CardContent className="p-4">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="font-medium text-foreground truncate">{stock.name}</p>
+                                  <p className="text-xs text-muted-foreground">{stock.ticker}</p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="font-mono font-medium">{stock.close.toFixed(2)}</p>
+                                  <span className="inline-flex items-center gap-0.5 text-emerald-400 text-xs font-medium">
+                                    <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="mt-2 flex items-center gap-2">
+                                <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono">
+                                  Vol {stock.volGainPct.toFixed(0)}%
+                                </Badge>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <Card className="border-border">
+                      <CardContent className="p-12 text-center text-muted-foreground text-sm">
+                        No stocks found for this date.
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
               )}
             </div>
           )}
