@@ -11,24 +11,40 @@ let cachedData: {
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 /**
- * Get the actual trading date for the EOD data.
+ * Get the actual trading date for the EOD data (YYYY-MM-DD format).
  * Chartink EOD data is from the previous trading day if current IST time
  * is before 7:00 PM (data updates after market close + processing delay).
  * After 7 PM IST, data is from today's trading session.
  */
 function getTradingDate(): string {
   const now = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const utc = now.getTime() + now.getTimezoneOffset() * 60 * 1000;
-  const ist = new Date(utc + istOffset);
-  const hour = ist.getHours();
 
-  // Before 7 PM IST → data is from previous day
-  if (hour < 19) {
-    ist.setDate(ist.getDate() - 1);
+  // Format as YYYY-MM-DD in IST using Intl
+  const istDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+
+  // Get current IST hour to decide if we need previous day
+  const istHour = parseInt(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      hour12: false,
+    }).format(now),
+    10
+  );
+
+  // Before 7 PM IST → data is from previous trading day
+  if (istHour < 19) {
+    const d = new Date(istDate + "T00:00:00");
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().slice(0, 10);
   }
 
-  return ist.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  return istDate;
 }
 
 function saveSnapshot(stocks: typeof cachedData extends { stocks: infer T } | null ? T : never) {
