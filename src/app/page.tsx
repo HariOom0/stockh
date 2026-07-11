@@ -306,6 +306,7 @@ export default function Home() {
   };
 
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [tradingDate, setTradingDate] = useState<string | null>(null);
   const [stats, setStats] = useState({ total: 0, filtered: 0 });
 
   // ─── Suggestions state ───────────────────────────────────────────
@@ -337,6 +338,7 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || "Failed to fetch");
       setStocks(data.stocks);
       setLastUpdated(data.lastUpdated);
+      if (data.tradingDate) setTradingDate(data.tradingDate);
       setStats({ total: data.totalOnChartink, filtered: data.filteredCount });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load stocks");
@@ -673,7 +675,7 @@ export default function Home() {
               <div>
                 <h1 className="text-base sm:text-lg font-bold tracking-tight">StockH</h1>
                 <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
-                  Volume Shockers &middot; Indian Market
+                  {tradingDate ? `${new Date(tradingDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · Indian Market` : "Volume Shockers · Indian Market"}
                 </p>
               </div>
             </div>

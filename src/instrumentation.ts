@@ -1,9 +1,10 @@
 /**
  * Next.js instrumentation — runs once when the server starts.
  * Sets up a daily timer to auto-save volume shockers snapshot to the DB
- * at 7:15 PM IST every day (skips weekends automatically since
- * Chartink has no new EOD data on Saturdays/Sundays).
+ * at 7:15 PM IST every trading day (skips weekends & NSE holidays).
  */
+import { isMarketClosed } from "@/lib/trading-calendar";
+
 export async function register() {
   // Only run on the server side
   if (typeof window !== "undefined") return;
@@ -37,9 +38,8 @@ function scheduleDailySnapshot() {
     let targetHour = 19;
     let targetMinute = 15;
 
-    // If current IST time is past 19:15, schedule for tomorrow
+    // If current IST time is past 19:15, schedule for ~24 hours
     if (istHour > targetHour || (istHour === targetHour && istMinute >= targetMinute)) {
-      // Schedule for ~24 hours from now
       return 24 * 60 * 60 * 1000;
     }
 
@@ -59,12 +59,12 @@ function scheduleDailySnapshot() {
       const res = await fetch(url, { cache: "no-store" });
       const data = await res.json();
       if (res.ok && data.stocks) {
-        console.log(`[AutoSnapshot] ✅ Saved ${data.stocks.length} stocks to DB`);
+        console.log(`[AutoSnapshot] Saved ${data.stocks.length} stocks for ${data.tradingDate}`);
       } else {
-        console.error(`[AutoSnapshot] ❌ Error:`, data.error || res.status);
+        console.error(`[AutoSnapshot] Error:`, data.error || res.status);
       }
     } catch (err) {
-      console.error("[AutoSnapshot] ❌ Failed:", err);
+      console.error("[AutoSnapshot] Failed:", err);
     }
   }
 
@@ -76,14 +76,16 @@ function scheduleDailySnapshot() {
     );
 
     setTimeout(async () => {
-      const istDay = new Intl.DateTimeFormat("en-US", {
+      // Get today's IST date to check market status
+      const istDate = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Kolkata",
-        weekday: "short",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
       }).format(new Date());
 
-      // Skip weekends (Chartink has no new EOD data)
-      if (istDay === "Sat" || istDay === "Sun") {
-        console.log(`[AutoSnapshot] Skipping weekend (${istDay})`);
+      if (isMarketClosed(istDate)) {
+        console.log(`[AutoSnapshot] Skipping ${istDate} — market closed (weekend or holiday)`);
       } else {
         await triggerSnapshot();
       }
