@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/stock-history          → list all snapshot dates
 // GET /api/stock-history?date=2026-07-08 → get stocks for a specific date
 export async function GET(request: Request) {
@@ -19,11 +21,16 @@ export async function GET(request: Request) {
       }
 
       const stocks = JSON.parse(snapshot.stocksJson);
-      return NextResponse.json({
-        date: snapshot.date,
-        stockCount: snapshot.stockCount,
-        stocks,
-      });
+      return NextResponse.json(
+        {
+          date: snapshot.date,
+          stockCount: snapshot.stockCount,
+          stocks,
+        },
+        {
+          headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+        }
+      );
     }
 
     // Return all snapshot dates (newest first)
@@ -36,7 +43,12 @@ export async function GET(request: Request) {
       },
     });
 
-    return NextResponse.json({ snapshots });
+    return NextResponse.json(
+      { snapshots },
+      {
+        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+      }
+    );
   } catch (error) {
     console.error("Error fetching stock history:", error);
     return NextResponse.json(

@@ -623,7 +623,7 @@ export default function Home() {
   // ─── History functions ───────────────────────────────────────────
   const fetchHistoryDates = async () => {
     try {
-      const res = await fetch("/api/stock-history");
+      const res = await fetch("/api/stock-history", { cache: "no-store" });
       const data = await res.json();
       if (data.snapshots) setHistoryDates(data.snapshots);
     } catch (err) {
@@ -635,7 +635,7 @@ export default function Home() {
     setSelectedHistoryDate(date);
     setHistoryLoading(true);
     try {
-      const res = await fetch(`/api/stock-history?date=${date}`);
+      const res = await fetch(`/api/stock-history?date=${date}`, { cache: "no-store" });
       const data = await res.json();
       if (data.stocks) {
         const stocks: Stock[] = data.stocks.map((s: Record<string, unknown>, i: number) => ({
