@@ -262,14 +262,28 @@ export default function Home() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
 
-  // Lock body scroll when detail panel is open
+  // ─── Browser back-button integration for detail panel ─────────
+  // When a stock is selected, push a history entry so the mobile
+  // browser back button closes the panel instead of leaving the site.
   useEffect(() => {
     if (selectedStock) {
+      window.history.pushState({ stockPanel: true }, "");
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
     }
     return () => { document.body.style.overflow = ""; };
+  }, [selectedStock]);
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (selectedStock) {
+        setSelectedStock(null);
+        window.history.pushState({ stockPanel: true }, "");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [selectedStock]);
   const [stockDetail, setStockDetail] = useState<StockDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -1562,7 +1576,7 @@ export default function Home() {
             >
               {/* Panel Header */}
               <div className="shrink-0 bg-background/90 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
-                <Button variant="ghost" size="sm" onClick={() => setSelectedStock(null)}>
+                <Button variant="ghost" size="sm" onClick={() => { setSelectedStock(null); window.history.back(); }}>
                   <ArrowLeft className="w-4 h-4 mr-1" />
                   Back
                 </Button>
@@ -1997,7 +2011,7 @@ export default function Home() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-              onClick={() => setSelectedStock(null)}
+              onClick={() => { setSelectedStock(null); window.history.back(); }}
             />
           )}
         </AnimatePresence>
