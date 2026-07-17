@@ -265,26 +265,31 @@ export default function Home() {
   // ─── Browser back-button integration for detail panel ─────────
   // When a stock is selected, push a history entry so the mobile
   // browser back button closes the panel instead of leaving the site.
+  const panelHistoryRef = useRef(false);
   useEffect(() => {
     if (selectedStock) {
       window.history.pushState({ stockPanel: true }, "");
+      panelHistoryRef.current = true;
       document.body.style.overflow = "hidden";
     } else {
+      if (panelHistoryRef.current) {
+        panelHistoryRef.current = false;
+      }
       document.body.style.overflow = "";
     }
     return () => { document.body.style.overflow = ""; };
   }, [selectedStock]);
 
   useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
-      if (selectedStock) {
+    const handlePopState = () => {
+      if (panelHistoryRef.current) {
+        panelHistoryRef.current = false;
         setSelectedStock(null);
-        window.history.pushState({ stockPanel: true }, "");
       }
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [selectedStock]);
+  }, []);
   const [stockDetail, setStockDetail] = useState<StockDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
@@ -1576,7 +1581,7 @@ export default function Home() {
             >
               {/* Panel Header */}
               <div className="shrink-0 bg-background/90 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
-                <Button variant="ghost" size="sm" onClick={() => { setSelectedStock(null); window.history.back(); }}>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedStock(null)}>
                   <ArrowLeft className="w-4 h-4 mr-1" />
                   Back
                 </Button>
@@ -2011,7 +2016,7 @@ export default function Home() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-              onClick={() => { setSelectedStock(null); window.history.back(); }}
+              onClick={() => setSelectedStock(null)}
             />
           )}
         </AnimatePresence>
