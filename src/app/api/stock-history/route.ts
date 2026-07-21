@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/stock-history          → list all snapshot dates
 // GET /api/stock-history?date=2026-07-08 → get stocks for a specific date
 export async function GET(request: Request) {
+  // Gracefully handle missing DATABASE_URL
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json(
+      { error: "Database not configured. Set DATABASE_URL environment variable.", snapshots: [] },
+      { status: 503 }
+    );
+  }
+
   try {
+    const { db } = await import("@/lib/db");
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
 

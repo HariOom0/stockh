@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { fetchVolumeShockers } from "@/lib/scraper";
-import { db } from "@/lib/db";
 import { getTradingDate } from "@/lib/trading-calendar";
 
 export const dynamic = "force-dynamic";
@@ -25,19 +24,36 @@ type VolumeShockerData = {
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 /**
+ * Safely load Prisma DB client. Returns null if DATABASE_URL is not set.
+ */
+async function getDb() {
+  if (!process.env.DATABASE_URL) {
+    console.warn("[VolumeShockers] DATABASE_URL not set — DB features disabled");
+    return null;
+  }
+  try {
+    const { db } = await import("@/lib/db");
+    return db;
+  } catch {
+    console.warn("[VolumeShockers] Failed to load Prisma client");
+    return null;
+  }
+}
+
+/**
  * Build a lightweight fingerprint from a stock list so we can detect
- * whether Chartink returned the exact same data as the last saved snapshot
- * (which happens on non-trading days / holidays).
+ * whether Chartink returned the exact same data as the last saved snapshot.
  */
 function fingerprint(stocks: { ticker: string; close: number }[]): string {
   return stocks.map((s) => `${s.ticker}:${s.close}`).join("|");
 }
 
 /**
- * Save a snapshot to the DB, but ONLY if no entry already exists for
- * this trading date.
+ * Save a snapshot to the DB (fire-and-forget). Silently fails if DB is unavailable.
  */
 function saveSnapshotIfNew(stocks: VolumeShockerData[], tradingDate: string) {
+  if (!process.env.DATABASE_URL) return; // Skip if no DB configured
+
   const snapshotPayload = stocks.map((s) => ({
     name: s.name,
     ticker: s.ticker,
@@ -47,19 +63,21 @@ function saveSnapshotIfNew(stocks: VolumeShockerData[], tradingDate: string) {
     isPositive: s.isPositive,
   }));
 
-  db.dailyStockSnapshot
-    .upsert({
-      where: { date: tradingDate },
-      update: {
-        stockCount: snapshotPayload.length,
-        stocksJson: JSON.stringify(snapshotPayload),
-      },
-      create: {
-        date: tradingDate,
-        stockCount: snapshotPayload.length,
-        stocksJson: JSON.stringify(snapshotPayload),
-      },
-    })
+  import("@/lib/db")
+    .then(({ db }) =>
+      db.dailyStockSnapshot.upsert({
+        where: { date: tradingDate },
+        update: {
+          stockCount: snapshotPayload.length,
+          stocksJson: JSON.stringify(snapshotPayload),
+        },
+        create: {
+          date: tradingDate,
+          stockCount: snapshotPayload.length,
+          stocksJson: JSON.stringify(snapshotPayload),
+        },
+      })
+    )
     .then(() =>
       console.log(`[Snapshot] Saved for ${tradingDate}: ${snapshotPayload.length} stocks`)
     )
@@ -80,24 +98,31 @@ export async function GET() {
     });
   }
 
+  // ── 2. Check DB for today's data (skip if DATABASE_URL not set) ────
   try {
-    // ── 2. Check if DB already has data for this trading date ─────────
-    const existing = await db.dailyStockSnapshot.findUnique({
-      where: { date: tradingDate },
-    });
-
-    if (existing) {
-      const existingStocks: VolumeShockerData[] = JSON.parse(existing.stocksJson);
-      cachedData = { stocks: existingStocks, timestamp: now, tradingDate };
-      return NextResponse.json({
-        stocks: existingStocks,
-        cached: true,
-        lastUpdated: now,
-        tradingDate: existing.date,
+    const db = await getDb();
+    if (db) {
+      const existing = await db.dailyStockSnapshot.findUnique({
+        where: { date: tradingDate },
       });
-    }
 
-    // ── 3. Try to scrape fresh data from Chartink ─────────────────────
+      if (existing) {
+        const existingStocks: VolumeShockerData[] = JSON.parse(existing.stocksJson);
+        cachedData = { stocks: existingStocks, timestamp: now, tradingDate };
+        return NextResponse.json({
+          stocks: existingStocks,
+          cached: true,
+          lastUpdated: now,
+          tradingDate: existing.date,
+        });
+      }
+    }
+  } catch (dbError) {
+    console.error("[VolumeShockers] DB read failed (non-fatal):", dbError);
+  }
+
+  // ── 3. Scrape fresh data from Chartink ─────────────────────────────
+  try {
     const allStocks = await fetchVolumeShockers();
     // Filter: positive change AND volume gain > 180%
     const filtered = allStocks.filter(
@@ -107,28 +132,35 @@ export async function GET() {
 
     if (filtered.length > 0) {
       // ── 4. Duplicate-data guard (non-trading-day safety net) ────────
-      const lastSnapshot = await db.dailyStockSnapshot.findFirst({
-        orderBy: { date: "desc" },
-        select: { date: true, stocksJson: true },
-      });
-
-      if (lastSnapshot) {
-        const lastStocks: VolumeShockerData[] = JSON.parse(lastSnapshot.stocksJson);
-        if (fingerprint(filtered) === fingerprint(lastStocks)) {
-          console.log(
-            `[VolumeShockers] Data unchanged vs ${lastSnapshot.date} — likely non-trading day.`
-          );
-          cachedData = { stocks: lastStocks, timestamp: now, tradingDate: lastSnapshot.date };
-          return NextResponse.json({
-            stocks: lastStocks,
-            cached: true,
-            lastUpdated: now,
-            tradingDate: lastSnapshot.date,
+      try {
+        const db = await getDb();
+        if (db) {
+          const lastSnapshot = await db.dailyStockSnapshot.findFirst({
+            orderBy: { date: "desc" },
+            select: { date: true, stocksJson: true },
           });
+
+          if (lastSnapshot) {
+            const lastStocks: VolumeShockerData[] = JSON.parse(lastSnapshot.stocksJson);
+            if (fingerprint(filtered) === fingerprint(lastStocks)) {
+              console.log(
+                `[VolumeShockers] Data unchanged vs ${lastSnapshot.date} — likely non-trading day.`
+              );
+              cachedData = { stocks: lastStocks, timestamp: now, tradingDate: lastSnapshot.date };
+              return NextResponse.json({
+                stocks: lastStocks,
+                cached: true,
+                lastUpdated: now,
+                tradingDate: lastSnapshot.date,
+              });
+            }
+          }
         }
+      } catch {
+        // Duplicate guard is optional — skip if DB fails
       }
 
-      // ── 5. New trading-day data — save to DB ────────────────────────
+      // ── 5. New trading-day data — save to DB & return ──────────────
       cachedData = { stocks: filtered, timestamp: now, tradingDate };
       saveSnapshotIfNew(filtered, tradingDate);
 
@@ -141,27 +173,30 @@ export async function GET() {
         tradingDate,
       });
     }
-  } catch (error) {
-    console.error("[VolumeShockers] Scraping failed:", error);
+  } catch (scrapeError) {
+    console.error("[VolumeShockers] Scraping failed:", scrapeError);
   }
 
   // ── 6. Fallback: return most recent data from DB ───────────────────
   try {
-    const lastSnapshot = await db.dailyStockSnapshot.findFirst({
-      orderBy: { date: "desc" },
-      select: { date: true, stocksJson: true },
-    });
-
-    if (lastSnapshot) {
-      const lastStocks: VolumeShockerData[] = JSON.parse(lastSnapshot.stocksJson);
-      cachedData = { stocks: lastStocks, timestamp: now, tradingDate: lastSnapshot.date };
-      return NextResponse.json({
-        stocks: lastStocks,
-        cached: true,
-        lastUpdated: now,
-        tradingDate: lastSnapshot.date,
-        usingFallbackDate: lastSnapshot.date,
+    const db = await getDb();
+    if (db) {
+      const lastSnapshot = await db.dailyStockSnapshot.findFirst({
+        orderBy: { date: "desc" },
+        select: { date: true, stocksJson: true },
       });
+
+      if (lastSnapshot) {
+        const lastStocks: VolumeShockerData[] = JSON.parse(lastSnapshot.stocksJson);
+        cachedData = { stocks: lastStocks, timestamp: now, tradingDate: lastSnapshot.date };
+        return NextResponse.json({
+          stocks: lastStocks,
+          cached: true,
+          lastUpdated: now,
+          tradingDate: lastSnapshot.date,
+          usingFallbackDate: lastSnapshot.date,
+        });
+      }
     }
   } catch (dbError) {
     console.error("[VolumeShockers] DB fallback also failed:", dbError);
@@ -170,7 +205,7 @@ export async function GET() {
   // ── 7. Nothing at all — return empty ────────────────────────────────
   return NextResponse.json(
     {
-      error: "No data available. The database has no stock snapshots yet. Please run the daily snapshot cron after market hours.",
+      error: "No data available yet. Stock data is fetched every trading day after market hours (7:15 PM IST). If the market is open, data will appear here after close.",
       stocks: [],
       cached: false,
       tradingDate,

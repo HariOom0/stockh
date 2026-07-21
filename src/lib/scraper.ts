@@ -3,8 +3,187 @@ import * as cheerio from "cheerio";
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-const CHARTINK_SCAN_CONDITION =
-  "( ( 57369.11*(latest_volume/latest_avg_volume_30_cumulative ) ) >= 180 )";
+// ─── NSE Stock Universe ──────────────────────────────────────────────
+// Nifty 50 + popular F&O + high-liquidity mid/small caps (~150 stocks)
+// These are the stocks most likely to show volume shocks.
+const NSE_STOCKS: { ticker: string; name: string }[] = [
+  // Nifty 50
+  { ticker: "RELIANCE", name: "Reliance Industries" },
+  { ticker: "TCS", name: "Tata Consultancy Services" },
+  { ticker: "HDFCBANK", name: "HDFC Bank" },
+  { ticker: "INFY", name: "Infosys" },
+  { ticker: "ICICIBANK", name: "ICICI Bank" },
+  { ticker: "HINDUNILVR", name: "Hindustan Unilever" },
+  { ticker: "SBIN", name: "State Bank of India" },
+  { ticker: "BHARTIARTL", name: "Bharti Airtel" },
+  { ticker: "ITC", name: "ITC" },
+  { ticker: "KOTAKBANK", name: "Kotak Mahindra Bank" },
+  { ticker: "LT", name: "Larsen & Toubro" },
+  { ticker: "AXISBANK", name: "Axis Bank" },
+  { ticker: "WIPRO", name: "Wipro" },
+  { ticker: "HCLTECH", name: "HCL Technologies" },
+  { ticker: "BAJFINANCE", name: "Bajaj Finance" },
+  { ticker: "MARUTI", name: "Maruti Suzuki" },
+  { ticker: "SUNPHARMA", name: "Sun Pharma" },
+  { ticker: "TATAMOTORS", name: "Tata Motors" },
+  { ticker: "TATASTEEL", name: "Tata Steel" },
+  { ticker: "ADANIENT", name: "Adani Enterprises" },
+  { ticker: "ASIANPAINT", name: "Asian Paints" },
+  { ticker: "HINDALCO", name: "Hindalco Industries" },
+  { ticker: "TITAN", name: "Titan Company" },
+  { ticker: "DMART", name: "Avenue Supermarts" },
+  { ticker: "POWERGRID", name: "Power Grid Corp" },
+  { ticker: "NTPC", name: "NTPC" },
+  { ticker: "ONGC", name: "Oil & Natural Gas Corp" },
+  { ticker: "COALINDIA", name: "Coal India" },
+  { ticker: "ULTRACEMCO", name: "UltraTech Cement" },
+  { ticker: "NESTLEIND", name: "Nestle India" },
+  { ticker: "TECHM", name: "Tech Mahindra" },
+  { ticker: "BAJAJFINSV", name: "Bajaj Finserv" },
+  { ticker: "INDUSINDBK", name: "IndusInd Bank" },
+  { ticker: "HDFCLIFE", name: "HDFC Life" },
+  { ticker: "SBILIFE", name: "SBI Life" },
+  { ticker: "DIVISLAB", name: "Divi's Laboratories" },
+  { ticker: "DRREDDY", name: "Dr Reddy's Labs" },
+  { ticker: "CIPLA", name: "Cipla" },
+  { ticker: "EICHERMOT", name: "Eicher Motors" },
+  { ticker: "HEROMOTOCO", name: "Hero MotoCorp" },
+  { ticker: "BPCL", name: "Bharat Petroleum" },
+  { ticker: "GRASIM", name: "Grasim Industries" },
+  { ticker: "APOLLOHOSP", name: "Apollo Hospitals" },
+  { ticker: "M_M", name: "Mahindra & Mahindra" },
+  { ticker: "BRITANNIA", name: "Britannia Industries" },
+  { ticker: "UPL", name: "UPL" },
+  { ticker: "JSWSTEEL", name: "JSW Steel" },
+  { ticker: "TATACONSUM", name: "Tata Consumer Products" },
+  { ticker: "ADANIPORTS", name: "Adani Ports" },
+  { ticker: "DLF", name: "DLF" },
+  // Popular F&O / High-liquidity stocks
+  { ticker: "IRFC", name: "IRFC" },
+  { ticker: "RVNL", name: "RVNL" },
+  { ticker: "TATAPOWER", name: "Tata Power" },
+  { ticker: "YESBANK", name: "Yes Bank" },
+  { ticker: "PNB", name: "Punjab National Bank" },
+  { ticker: "IDFCFIRSTB", name: "IDFC First Bank" },
+  { ticker: "SUZLON", name: "Suzlon Energy" },
+  { ticker: "IRCTC", name: "IRCTC" },
+  { ticker: "ZOMATO", name: "Zomato" },
+  { ticker: "TRENT", name: "Trent" },
+  { ticker: "FEDERALBNK", name: "Federal Bank" },
+  { ticker: "MANAPPURAM", name: "Manappuram Finance" },
+  { ticker: "MUTHOOTFIN", name: "Muthoot Finance" },
+  { ticker: "DIXON", name: "Dixon Technologies" },
+  { ticker: "DEEPAKNTR", name: "Deepak Nitrite" },
+  { ticker: "PCBL", name: "PCBL" },
+  { ticker: "KEI", name: "KEI Industries" },
+  { ticker: "POLYCAB", name: "Polycab India" },
+  { ticker: "KPITTECH", name: "KPIT Technologies" },
+  { ticker: "COFORGE", name: "Coforge" },
+  { ticker: "PERSISTENT", name: "Persistent Systems" },
+  { ticker: "MPHASIS", name: "Mphasis" },
+  { ticker: "AFFLE", name: "Affle India" },
+  { ticker: "TATAMTRDVR", name: "Tata Motors DVR" },
+  { ticker: "BANDHANBNK", name: "Bandhan Bank" },
+  { ticker: "IBULHSGFIN", name: "Indiabulls Housing" },
+  { ticker: "NIFTYBEES", name: "Nippon India ETF" },
+  { ticker: "JIOFIN", name: "Jio Financial Services" },
+  { ticker: "HDFCAMC", name: "HDFC AMC" },
+  { ticker: "BAJAJAUTO", name: "Bajaj Auto" },
+  { ticker: "BERGEPAINT", name: "Berger Paints" },
+  { ticker: "DABUR", name: "Dabur India" },
+  { ticker: "GODREJCP", name: "Godrej Consumer Products" },
+  { ticker: "HINDPETRO", name: "HPCL" },
+  { ticker: "IOC", name: "Indian Oil Corp" },
+  { ticker: "PIDILITIND", name: "Pidilite Industries" },
+  { ticker: "TITAGARH", name: "Titagarh Rail Systems" },
+  { ticker: "VBL", name: "Varun Beverages" },
+  { ticker: "COROMANDEL", name: "Coromandel International" },
+  { ticker: "EDELWEISS", name: "Edelweiss Financial" },
+  { ticker: "RECLTD", name: "REC" },
+  { ticker: "PFC", name: "PFC" },
+  { ticker: "NATIONALUM", name: "National Aluminium" },
+  { ticker: "CUMMINSIND", name: "Cummins India" },
+  { ticker: "VOLTAS", name: "Voltas" },
+  { ticker: "EMAMILTD", name: "Emami" },
+  { ticker: "GLAXO", name: "GlaxoSmithKline Pharma" },
+  { ticker: "LALPATHLAB", name: "Lal PathLabs" },
+  { ticker: "AUBANK", name: "AU Small Finance Bank" },
+  { ticker: "CHOLAFIN", name: "Cholamandalam Finance" },
+  { ticker: "SHRIRAMFIN", name: "Shriram Finance" },
+  { ticker: "MOTHERSUMI", name: "Mother Sumi" },
+  { ticker: "TORNTPOWER", name: "Torrent Power" },
+  { ticker: "TATAELXSI", name: "Tata Elxsi" },
+  { ticker: "LTIEMIND", name: "LTIMindtree" },
+  { ticker: "L&TFH", name: "L&T Finance Holdings" },
+  { ticker: "HONAUT", name: "Honda India Power" },
+  { ticker: "TVSMOTOR", name: "TVS Motor Company" },
+  { ticker: "MRF", name: "MRF" },
+  { ticker: "BOSCHLTD", name: "Bosch" },
+  { ticker: "PAGEIND", name: "Page Industries" },
+  { ticker: "3MINDIA", name: "3M India" },
+  { ticker: "SIEMENS", name: "Siemens" },
+  { ticker: "ABB", name: "ABB India" },
+  { ticker: "HONEYWELL", name: "Honeywell Automation" },
+  { ticker: "SKFINDIA", name: "SKF India" },
+  { ticker: "TIMKEN", name: "Timken India" },
+  { ticker: "SNOWMAN", name: "Snowman Logistics" },
+  { ticker: "SPARC", name: "Sparc Systems" },
+  { ticker: "DATAPATTNS", name: "Data Patterns" },
+  { ticker: "CIGNITI", name: "Cigniti Technologies" },
+  { ticker: "LTTS", name: "L&T Technology Services" },
+  { ticker: "RAJESHEXPO", name: "Rajesh Exports" },
+  { ticker: "JINDALSTEL", name: "Jindal Steel" },
+  { ticker: "VEDL", name: "Vedanta" },
+  { ticker: "HINDZINC", name: "Hindustan Zinc" },
+  { ticker: "NMDC", name: "NMDC" },
+  { ticker: "NALCO", name: "NALCO" },
+  { ticker: "SRF", name: "SRF" },
+  { ticker: "INDIAMART", name: "IndiaMART InterMESH" },
+  { ticker: "JUSTDIAL", name: "Just Dial" },
+  { ticker: "TRIDENT", name: "Trident" },
+  { ticker: "VIPIND", name: "VIP Industries" },
+  { ticker: "JBM", name: "JBM Auto" },
+  { ticker: "ENDURANCE", name: "Endurance Technologies" },
+  { ticker: "SONATSOFTW", name: "Sonata Software" },
+  { ticker: "INTELLECT", name: "Intellect Design Arena" },
+  { ticker: "TRIVENI", name: "Triveni Engineering" },
+  { ticker: "ATUL", name: "Atul" },
+  { ticker: "AARTIDRUG", name: "Aarti Drugs" },
+  { ticker: "LAURUSLABS", name: "Laurus Labs" },
+  { ticker: "STRTECH", name: "Stratech" },
+  { ticker: "CAPLIPOINT", name: "Caplin Point Labs" },
+  { ticker: "GRANULES", name: "Granules India" },
+  { ticker: "TORNTPHARM", name: "Torrent Pharma" },
+  { ticker: "ALKEM", name: "Alkem Labs" },
+  { ticker: "LUPIN", name: "Lupin" },
+  { ticker: "BIOCON", name: "Biocon" },
+  { ticker: "ALEMBICLTD", name: "Alembic Pharma" },
+  { ticker: "THERMAX", name: "Thermax" },
+  { ticker: "WELCORP", name: "Welspun Corp" },
+  { ticker: "ARVIND", name: "Arvind" },
+  { ticker: "RAYMOND", name: "Raymond" },
+  { ticker: "VARDMRL", name: "Vardhman Textiles" },
+  { ticker: "WELSPUNLIV", name: "Welspun Living" },
+  { ticker: "CENTURYPLY", name: "Century Plyboards" },
+  { ticker: "GREENPLY", name: "GreenPly Industries" },
+  { ticker: "AIAENG", name: "AIA Engineering" },
+  { ticker: "BALAMINES", name: "Balaji Amines" },
+  { ticker: "SOLARINDS", name: "Solar Industries" },
+  { ticker: "HIMADRI", name: "Himadri Speciality" },
+  { ticker: "GRAPHITE", name: "Graphite India" },
+  { ticker: "IGL", name: "Indraprastha Gas" },
+  { ticker: "MGL", name: "Mahanagar Gas" },
+  { ticker: "GUJGASLTD", name: "Gujarat Gas" },
+  { ticker: "PETRONET", name: "Petronet LNG" },
+  { ticker: "GAIL", name: "GAIL India" },
+  { ticker: "CONCOR", name: "Container Corp" },
+];
+
+// Deduplicate by ticker
+const STOCK_MAP = new Map<string, string>();
+for (const s of NSE_STOCKS) {
+  if (!STOCK_MAP.has(s.ticker)) STOCK_MAP.set(s.ticker, s.name);
+}
 
 export interface VolumeShockerStock {
   sr: number;
@@ -16,133 +195,138 @@ export interface VolumeShockerStock {
   isPositive: boolean;
 }
 
-/**
- * Fetch volume shockers from Chartink using their screener API.
- * Uses a 2-step flow: GET for session/CSRF, then POST to the API.
- */
-async function fetchViaChartinkAPI(): Promise<VolumeShockerStock[]> {
-  // Step 1: Visit the screener page to get session cookies + CSRF token
-  const pageResp = await fetch("https://chartink.com/screener/process", {
-    headers: { "User-Agent": USER_AGENT },
-    redirect: "follow",
-    signal: AbortSignal.timeout(15000),
-  });
-
-  if (!pageResp.ok) throw new Error(`Chartink session init failed: ${pageResp.status}`);
-
-  const pageHtml = await pageResp.text();
-  const csrfMatch = pageHtml.match(/csrf-token" content="([^"]+)"/);
-  const csrf = csrfMatch?.[1];
-  if (!csrf) throw new Error("Could not extract CSRF token from Chartink");
-
-  // Build cookie string from Set-Cookie headers
-  const setCookies = pageResp.headers.getSetCookie?.() || [];
-  const cookieStr = setCookies.map((c) => c.split(";")[0]).join("; ");
-
-  // Step 2: POST to the screener API
-  const apiResp = await fetch("https://chartink.com/screener/process", {
-    method: "POST",
-    headers: {
-      "User-Agent": USER_AGENT,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-      "X-CSRF-Token": csrf,
-      Origin: "https://chartink.com",
-      Referer: "https://chartink.com/screener",
-      Cookie: cookieStr,
-    },
-    body: JSON.stringify({ scan_condition: CHARTINK_SCAN_CONDITION }),
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!apiResp.ok) throw new Error(`Chartink API failed: ${apiResp.status}`);
-
-  const json = await apiResp.json();
-  const data: Record<string, unknown>[] = json.data || [];
-
-  if (data.length === 0) {
-    throw new Error("Chartink API returned 0 results (may require browser session)");
-  }
-
-  // Map API fields to our interface
-  // Chartink API fields: n=name, sl=slug/ticker, c=close, chg=change %,
-  // v=volume, vg=volume gain %
-  return data.map((row, idx) => ({
-    sr: idx + 1,
-    name: String(row.n || ""),
-    ticker: String(row.sl || row.ticker || ""),
-    close: Number(row.c) || 0,
-    change: Number(row.chg) || 0,
-    volGainPct: Number(row.vg || row.vol_gain_pct) || 0,
-    isPositive: Number(row.chg) > 0,
-  }));
+interface YahooChartResult {
+  meta: {
+    symbol: string;
+    regularMarketPrice?: number;
+    previousClose?: number;
+  };
+  timestamp: number[];
+  indicators: {
+    quote: {
+      close: (number | null)[];
+      volume: (number | null)[];
+    }[];
+  };
 }
 
 /**
- * Fetch volume shockers — tries the API first, falls back to HTML scraping.
+ * Fetch 5-day OHLCV data for tickers from Yahoo Finance v8 API.
+ * Uses concurrent individual requests (batch endpoint is deprecated).
+ */
+async function fetchYahooData(
+  tickers: string[]
+): Promise<Map<string, { closes: number[]; volumes: number[] }>> {
+  const results = new Map<string, { closes: number[]; volumes: number[] }>();
+  const CONCURRENCY = 15; // Max parallel requests
+
+  // Process in chunks to avoid rate limits
+  for (let i = 0; i < tickers.length; i += CONCURRENCY) {
+    const chunk = tickers.slice(i, i + CONCURRENCY);
+
+    const chunkResults = await Promise.allSettled(
+      chunk.map(async (ticker) => {
+        const url = `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}.NS?range=5d&interval=1d&includePrePost=false`;
+
+        const resp = await fetch(url, {
+          headers: { "User-Agent": USER_AGENT },
+          signal: AbortSignal.timeout(10000),
+        });
+
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+        const data = await resp.json();
+        const result: YahooChartResult = data.chart?.result?.[0];
+        if (!result) throw new Error("No result");
+
+        const closes = result.indicators.quote[0].close.filter(
+          (c): c is number => c !== null
+        );
+        const volumes = result.indicators.quote[0].volume.filter(
+          (v): v is number => v !== null
+        );
+
+        return { ticker, closes, volumes };
+      })
+    );
+
+    for (const r of chunkResults) {
+      if (r.status === "fulfilled") {
+        results.set(r.value.ticker, {
+          closes: r.value.closes,
+          volumes: r.value.volumes,
+        });
+      }
+      // Silently skip failures (404 = delisted/invalid symbol)
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Fetch volume shockers using Yahoo Finance data.
+ * Compares latest trading day vs previous day to find volume spikes.
+ */
+async function fetchViaYahoo(): Promise<VolumeShockerStock[]> {
+  const tickers = Array.from(STOCK_MAP.keys());
+  console.log(`[Scraper] Scanning ${tickers.length} stocks via Yahoo Finance...`);
+
+  const yahooData = await fetchYahooData(tickers);
+  console.log(`[Scraper] Got data for ${yahooData.size}/${tickers.length} stocks`);
+
+  const results: VolumeShockerStock[] = [];
+
+  for (const [ticker, { closes, volumes }] of yahooData) {
+    if (closes.length < 2 || volumes.length < 2) continue;
+
+    const latestClose = closes[closes.length - 1];
+    const prevClose = closes[closes.length - 2];
+    const latestVol = volumes[volumes.length - 1];
+    const prevVol = volumes[volumes.length - 2];
+
+    if (prevClose <= 0 || prevVol <= 0 || latestClose <= 0) continue;
+
+    const changePct = ((latestClose / prevClose) - 1) * 100;
+    const volGainPct = ((latestVol / prevVol) - 1) * 100;
+
+    // Volume shocker: positive price change AND volume gain >= 100%
+    if (changePct > 0 && volGainPct >= 100) {
+      results.push({
+        sr: 0, // Will be assigned after sorting
+        name: STOCK_MAP.get(ticker) || ticker,
+        ticker,
+        close: Math.round(latestClose * 100) / 100,
+        change: Math.round(changePct * 100) / 100,
+        volGainPct: Math.round(volGainPct * 10) / 10,
+        isPositive: true,
+      });
+    }
+  }
+
+  // Sort by volume gain percentage (highest first)
+  results.sort((a, b) => b.volGainPct - a.volGainPct);
+
+  // Assign serial numbers
+  results.forEach((r, i) => (r.sr = i + 1));
+
+  console.log(
+    `[Scraper] Found ${results.length} volume shockers (vol gain >= 100%)`
+  );
+
+  return results;
+}
+
+/**
+ * Fetch volume shockers — tries Yahoo Finance API.
  */
 export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
-  // Strategy 1: Try the Chartink API
-  try {
-    const stocks = await fetchViaChartinkAPI();
-    if (stocks.length > 0) return stocks;
-  } catch (err) {
-    console.warn("[Scraper] Chartink API failed, trying HTML fallback:", err);
-  }
-
-  // Strategy 2: Fall back to HTML scraping (may work if Chartink changes back)
-  const url = "https://chartink.com/eodscanner/Volume-Shockers.html";
-  const res = await fetch(url, {
-    headers: { "User-Agent": USER_AGENT },
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!res.ok) throw new Error(`Failed to fetch chartink: ${res.status}`);
-
-  const html = await res.text();
-  const $ = cheerio.load(html);
-
-  const stocks: VolumeShockerStock[] = [];
-
-  $("#stocklisttable tbody tr").each((_, el) => {
-    const $row = $(el);
-    const cells = $row.find("td.stocklistbo");
-
-    if (cells.length < 6) return;
-
-    const sr = parseInt($(cells[0]).text().trim(), 10);
-    if (isNaN(sr)) return;
-
-    const nameAnchor = $(cells[1]).find("a");
-    const name = nameAnchor.text().trim();
-    const href = nameAnchor.attr("href") || "";
-    const tickerMatch = href.match(/\/stocks\/([A-Z0-9]+)\.html/);
-    const ticker = tickerMatch ? tickerMatch[1] : "";
-
-    const closeText = $(cells[3]).text().trim().replace(/,/g, "");
-    const close = parseFloat(closeText);
-
-    const changeHtml = $(cells[4]).html() || "";
-    const changeText = $(cells[4]).text().trim();
-    const changeMatch = changeText.match(/\[([-\d.]+)%\]/);
-    const change = changeMatch ? parseFloat(changeMatch[1]) : 0;
-    const isPositive = changeHtml.includes("green") || change > 0;
-
-    const volGainText = $(cells[5]).text().trim().replace(/%/g, "");
-    const volGainPct = parseFloat(volGainText);
-
-    if (!isNaN(close) && !isNaN(change) && !isNaN(volGainPct)) {
-      stocks.push({ sr, name, ticker, close, change, volGainPct, isPositive });
-    }
-  });
-
-  if (stocks.length === 0) {
-    throw new Error("Both API and HTML scraping returned no data. Chartink may require a browser to load data.");
-  }
-
-  return stocks;
+  return fetchViaYahoo();
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Stock Detail Scraper (Screener.in) — unchanged, still works
+// ═══════════════════════════════════════════════════════════════════════
 
 export interface StockDetail {
   name: string;
@@ -161,7 +345,6 @@ export interface StockDetail {
     opm: string;
   }[];
   peers: { name: string; ticker: string }[];
-  // Extended data
   pros?: string[];
   cons?: string[];
   balanceSheet?: {
@@ -219,14 +402,14 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     .trim()
     .replace(/\s+/g, " ");
 
-  // BSE / NSE codes from the company info area
+  // BSE / NSE codes
   const companyInfoText = $(".company-info-strip").text() || "";
   const bseMatch = companyInfoText.match(/BSE:\s*(\d+)/);
   const nseMatch = companyInfoText.match(/NSE:\s*(\w+)/);
   if (bseMatch) detail.bseCode = bseMatch[1];
   if (nseMatch) detail.nseCode = nseMatch[1];
 
-  // Sector & Industry from peers section (more reliably present)
+  // Sector & Industry
   const peersSection = $("#peers");
   if (peersSection.length) {
     const links = peersSection.find("a[title]");
@@ -238,29 +421,26 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     });
   }
 
-  // About section
+  // About
   detail.about = $(".about p")
     .first()
     .text()
     .trim()
     .replace(/\s+/g, " ");
 
-  // ─── Key metrics from the top ratios section ────────────────────────
+  // Key metrics
   const ratioRows = $("#top-ratios li.flex.flex-space-between");
   ratioRows.each((_, el) => {
     const labelEl = $(el).find(".name");
     const valueEl = $(el).find(".value .number");
     const label = labelEl.text().trim();
     const value = valueEl.first().text().trim();
-    if (label && value) {
-      detail.metrics[label] = value;
-    }
+    if (label && value) detail.metrics[label] = value;
   });
 
-  // ─── Pros & Cons ───────────────────────────────────────────────────
+  // Pros & Cons
   const prosList: string[] = [];
   const consList: string[] = [];
-
   $("div.pros ul li").each((_, el) => {
     const text = $(el).text().trim();
     if (text) prosList.push(text);
@@ -269,19 +449,15 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     const text = $(el).text().trim();
     if (text) consList.push(text);
   });
-
   if (prosList.length > 0) detail.pros = prosList;
   if (consList.length > 0) detail.cons = consList;
 
-  // ─── Quarterly results table ────────────────────────────────────────
+  // Quarterly results
   const quarterlyTable = $("#quarters table");
   if (quarterlyTable.length) {
     const headers: string[] = [];
-    quarterlyTable.find("thead th").each((_, el) => {
-      headers.push($(el).text().trim());
-    });
+    quarterlyTable.find("thead th").each((_, el) => headers.push($(el).text().trim()));
 
-    // Find row indices for Sales, Net Profit, and OPM
     const rows = quarterlyTable.find("tbody tr");
     let salesRow: cheerio.Cheerio<cheerio.Element> | null = null;
     let profitRow: cheerio.Cheerio<cheerio.Element> | null = null;
@@ -289,38 +465,26 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
 
     rows.each((_, el) => {
       const firstCell = $(el).find("td").first().text().trim().toLowerCase();
-      if (firstCell.includes("sales") || firstCell.includes("revenue")) {
-        salesRow = $(el);
-      }
-      if (firstCell.includes("net profit") || firstCell.includes("profit for")) {
-        profitRow = $(el);
-      }
-      if (firstCell.includes("opm") || firstCell.includes("operating")) {
-        opmRow = $(el);
-      }
+      if (firstCell.includes("sales") || firstCell.includes("revenue")) salesRow = $(el);
+      if (firstCell.includes("net profit") || firstCell.includes("profit for")) profitRow = $(el);
+      if (firstCell.includes("opm") || firstCell.includes("operating")) opmRow = $(el);
     });
 
-    // Build quarter data (skip first header column)
     for (let i = 1; i < headers.length; i++) {
-      const q: StockDetail["quarters"][number] = {
+      detail.quarters.push({
         label: headers[i],
         sales: salesRow ? salesRow.find("td").eq(i).text().trim() : "-",
         netProfit: profitRow ? profitRow.find("td").eq(i).text().trim() : "-",
         opm: opmRow ? opmRow.find("td").eq(i).text().trim() : "-",
-      };
-      detail.quarters.push(q);
+      });
     }
   }
 
-  // ─── Annual results (compounded sales/profit growth) ────────────────
-  // Screener.in shows a "Compounded Sales Growth" and "Compounded Profit Growth" section
-  // Also the "Financials > Quarterly Results" table has yearly data
+  // Annual results
   const annualTable = $("table#annual-results-table, #annual table");
   if (annualTable.length) {
     const annHeaders: string[] = [];
-    annualTable.find("thead th").each((_, el) => {
-      annHeaders.push($(el).text().trim());
-    });
+    annualTable.find("thead th").each((_, el) => annHeaders.push($(el).text().trim()));
 
     const annRows = annualTable.find("tbody tr");
     let annSalesRow: cheerio.Cheerio<cheerio.Element> | null = null;
@@ -328,12 +492,8 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
 
     annRows.each((_, el) => {
       const firstCell = $(el).find("td").first().text().trim().toLowerCase();
-      if (firstCell.includes("sales") || firstCell.includes("revenue")) {
-        annSalesRow = $(el);
-      }
-      if (firstCell.includes("net profit") || firstCell.includes("profit for")) {
-        annProfitRow = $(el);
-      }
+      if (firstCell.includes("sales") || firstCell.includes("revenue")) annSalesRow = $(el);
+      if (firstCell.includes("net profit") || firstCell.includes("profit for")) annProfitRow = $(el);
     });
 
     if (annSalesRow || annProfitRow) {
@@ -350,28 +510,18 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     }
   }
 
-  // ─── Balance Sheet data ────────────────────────────────────────────
+  // Balance Sheet
   const bsTable = $("#balance-sheet table");
   if (bsTable.length) {
     const bsHeaders: string[] = [];
-    bsTable.find("thead th").each((_, el) => {
-      bsHeaders.push($(el).text().trim());
-    });
+    bsTable.find("thead th").each((_, el) => bsHeaders.push($(el).text().trim()));
 
     const bsRows = bsTable.find("tbody tr");
     const bsData: Record<string, cheerio.Cheerio<cheerio.Element>> = {};
 
     bsRows.each((_, el) => {
       const firstCell = $(el).find("td").first().text().trim().toLowerCase();
-      if (
-        firstCell.includes("reserves") ||
-        firstCell.includes("borrowing") ||
-        firstCell.includes("other liabilities") ||
-        firstCell.includes("total liabilities") ||
-        firstCell.includes("fixed assets") ||
-        firstCell.includes("cwip") ||
-        firstCell.includes("total assets")
-      ) {
+      if (["reserves", "borrowing", "other liabilities", "total liabilities", "fixed assets", "cwip", "total assets"].some(k => firstCell.includes(k))) {
         bsData[firstCell] = $(el);
       }
     });
@@ -393,13 +543,11 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     if (balanceSheet.length > 0) detail.balanceSheet = balanceSheet;
   }
 
-  // ─── Cash Flow data ────────────────────────────────────────────────
+  // Cash Flow
   const cfTable = $("#cash-flow table");
   if (cfTable.length) {
     const cfHeaders: string[] = [];
-    cfTable.find("thead th").each((_, el) => {
-      cfHeaders.push($(el).text().trim());
-    });
+    cfTable.find("thead th").each((_, el) => cfHeaders.push($(el).text().trim()));
 
     const cfRows = cfTable.find("tbody tr");
     let cfOperRow: cheerio.Cheerio<cheerio.Element> | null = null;
@@ -408,15 +556,9 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
 
     cfRows.each((_, el) => {
       const firstCell = $(el).find("td").first().text().trim().toLowerCase();
-      if (firstCell.includes("operating") || firstCell.includes("cash from")) {
-        cfOperRow = $(el);
-      }
-      if (firstCell.includes("investing")) {
-        cfInvestRow = $(el);
-      }
-      if (firstCell.includes("financing")) {
-        cfFinanceRow = $(el);
-      }
+      if (firstCell.includes("operating") || firstCell.includes("cash from")) cfOperRow = $(el);
+      if (firstCell.includes("investing")) cfInvestRow = $(el);
+      if (firstCell.includes("financing")) cfFinanceRow = $(el);
     });
 
     if (cfOperRow || cfInvestRow || cfFinanceRow) {
@@ -433,17 +575,14 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     }
   }
 
-  // ─── Shareholding pattern ───────────────────────────────────────────
+  // Shareholding
   const shSection = $("#shareholding");
   if (shSection.length) {
     const shTable = shSection.find("table.data-table");
     if (shTable.length) {
       const shHeaders: string[] = [];
-      shTable.find("thead th").each((_, el) => {
-        shHeaders.push($(el).text().trim());
-      });
+      shTable.find("thead th").each((_, el) => shHeaders.push($(el).text().trim()));
 
-      // Build a single shareholding entry with periods as columns
       const values: { label: string; value: string }[] = [];
       const seenLabels = new Set<string>();
       shTable.find("tbody tr").each((_, rowEl) => {
@@ -453,72 +592,53 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
         if (!label || label.length < 2 || seenLabels.has(label)) return;
         seenLabels.add(label);
 
-        // Get the latest period value (last non-empty cell)
         let latestValue = "";
         for (let i = cells.length - 1; i >= 1; i--) {
           const val = $(cells[i]).text().trim();
           if (val) { latestValue = val; break; }
         }
-        if (latestValue) {
-          values.push({ label, value: latestValue });
-        }
+        if (latestValue) values.push({ label, value: latestValue });
       });
 
       if (values.length > 0) {
-        // Use the latest period from headers as category
         const latestPeriod = shHeaders[shHeaders.length - 1] || "Latest";
         detail.shareholding = [{ category: latestPeriod, values }];
       }
     }
 
-    // Fallback: look for list-style format
     if (!detail.shareholding || detail.shareholding.length === 0) {
       const shItems: { label: string; value: string }[] = [];
       shSection.find("li.flex.flex-space-between").each((_, el) => {
         const label = $(el).find(".name").text().trim();
         const value = $(el).find(".value .number").first().text().trim();
-        if (label && value) {
-          shItems.push({ label, value });
-        }
+        if (label && value) shItems.push({ label, value });
       });
-      if (shItems.length > 0) {
-        detail.shareholding = [{ category: "Shareholding", values: shItems }];
-      }
+      if (shItems.length > 0) detail.shareholding = [{ category: "Shareholding", values: shItems }];
     }
   }
 
-  // ─── Peers ─────────────────────────────────────────────────────────
-  // Extract index/benchmark names from #benchmarks .tag links
+  // Indices / Benchmarks
   const indices: string[] = [];
   $("#peers #benchmarks a.tag").each((_, el) => {
     const name = $(el).text().trim();
-    if (name && !$(el).hasClass("hidden")) {
-      indices.push(name);
-    }
+    if (name && !$(el).hasClass("hidden")) indices.push(name);
   });
   if (indices.length > 0) detail.indices = indices;
 
-  // The #peers section on screener.in contains benchmark/index links (Nifty 50, BSE Sensex, etc.)
-  // inside #benchmarks with class "tag". The actual peer companies are loaded via JavaScript
-  // and are NOT in the static HTML. So we:
-  // 1. Skip ALL benchmark links (they have class "tag" and are inside #benchmarks)
-  // 2. Extract the sector URL to fetch real companies from the sector classification page
-  let sectorUrl = "";
-  const sectorLink = $("#peers a[title='Sector']");
-  if (sectorLink.length) {
-    const href = sectorLink.attr("href") || "";
-    if (href.startsWith("/market/")) {
-      sectorUrl = href;
-    }
-  }
-
-  // Known index/benchmark keywords to filter out just in case
+  // Peers
   const indexKeywords = [
     "nifty", "bse", "sensex", "dollex", "cnx", "nft", "lix",
     "index", "benchmark", "equal weight", "low volatility",
     "value 20", "liquid 15", "esg", "largecap", "midcap",
     "commodities", "infrastructure", "energy", "mobility",
   ];
+
+  let sectorUrl = "";
+  const sectorLink = $("#peers a[title='Sector']");
+  if (sectorLink.length) {
+    const href = sectorLink.attr("href") || "";
+    if (href.startsWith("/market/")) sectorUrl = href;
+  }
 
   $("#peers a[href^='/company/']").each((_, el) => {
     const $el = $(el);
@@ -528,47 +648,27 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     const tickerMatch = href.match(/\/company\/([A-Z0-9]+)\//);
     const peerTicker = tickerMatch ? tickerMatch[1] : "";
 
-    // Skip benchmark/index links (they have "tag" class)
     if (classes.includes("tag")) return;
-
-    // Skip if name matches any index keyword
     const lower = peerName.toLowerCase();
     if (indexKeywords.some((kw) => lower.includes(kw))) return;
 
-    // Skip category-like entries
-    if (
-      peerName &&
-      peerName.length > 2 &&
-      !peerName.includes("Discretionary") &&
-      !peerName.includes("Services") &&
-      !peerName.includes("Consumer") &&
-      peerName !== "Edit Columns"
-    ) {
+    if (peerName && peerName.length > 2 && !peerName.includes("Discretionary") && !peerName.includes("Services") && !peerName.includes("Consumer") && peerName !== "Edit Columns") {
       detail.peers.push({ name: peerName, ticker: peerTicker || peerName.replace(/[^A-Z0-9]/gi, "").toUpperCase() });
     }
   });
 
-  // If no peers found from static HTML (expected), fetch from sector page
   if (detail.peers.length === 0 && sectorUrl) {
     try {
       detail.peers = await fetchSectorPeers(sectorUrl, ticker);
     } catch {
-      // Silently fail — peers are optional
+      // Peers are optional
     }
   }
 
   return detail;
 }
 
-/**
- * Fetch peer companies from a screener.in sector/industry classification page.
- * The peer table on the main company page is JS-loaded and unavailable in static HTML,
- * so we scrape the sector classification page instead.
- */
-async function fetchSectorPeers(
-  sectorPath: string,
-  currentTicker: string
-): Promise<string[]> {
+async function fetchSectorPeers(sectorPath: string, currentTicker: string): Promise<{ name: string; ticker: string }[]> {
   const url = `https://www.screener.in${sectorPath}`;
   const res = await fetch(url, {
     headers: { "User-Agent": USER_AGENT },
@@ -583,7 +683,6 @@ async function fetchSectorPeers(
   const peers: { name: string; ticker: string }[] = [];
   const seen = new Set<string>();
 
-  // Look for company links in the data table
   $("table.data-table a[href^='/company/']").each((_, el) => {
     const $el = $(el);
     const name = $el.text().trim();
@@ -592,18 +691,9 @@ async function fetchSectorPeers(
 
     if (name && name.length > 2 && tickerMatch) {
       const peerTicker = tickerMatch[1];
-      // Exclude numeric-only codes (these are BSE codes, not useful)
       if (/^\d+$/.test(peerTicker)) return;
-      // Exclude the current company
       if (peerTicker === currentTicker.toUpperCase()) return;
-      // Exclude known index tickers
-      if (
-        ["NIFTY", "CNX100", "CNX500", "CNX200INDE", "CNXCOMMODI"].includes(
-          peerTicker
-        )
-      )
-        return;
-      // Deduplicate by ticker
+      if (["NIFTY", "CNX100", "CNX500", "CNX200INDE", "CNXCOMMODI"].includes(peerTicker)) return;
       if (!seen.has(peerTicker)) {
         seen.add(peerTicker);
         peers.push({ name, ticker: peerTicker });
@@ -611,5 +701,5 @@ async function fetchSectorPeers(
     }
   });
 
-  return peers.slice(0, 15); // Limit to 15 peers
+  return peers.slice(0, 15);
 }
