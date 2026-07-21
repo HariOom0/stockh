@@ -326,6 +326,8 @@ export default function Home() {
 
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [tradingDate, setTradingDate] = useState<string | null>(null);
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [fallbackDate, setFallbackDate] = useState<string | null>(null);
   const [stats, setStats] = useState({ total: 0, filtered: 0 });
 
   // ─── Suggestions state ───────────────────────────────────────────
@@ -351,14 +353,22 @@ export default function Home() {
   const fetchStocks = useCallback(async () => {
     setLoading(true);
     setError("");
+    setUsingFallback(false);
     try {
-      const res = await fetch("/api/volume-shockers");
+      const res = await fetch("/api/volume-shockers", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch");
+      if (data.stocks.length === 0 && !data.error) {
+        throw new Error("No stocks found. Data may not be available yet for today.");
+      }
       setStocks(data.stocks);
       setLastUpdated(data.lastUpdated);
       if (data.tradingDate) setTradingDate(data.tradingDate);
       setStats({ total: data.totalOnChartink, filtered: data.filteredCount });
+      if (data.usingFallbackDate) {
+        setUsingFallback(true);
+        setFallbackDate(data.usingFallbackDate);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load stocks");
     } finally {
@@ -695,6 +705,9 @@ export default function Home() {
                 <h1 className="text-base sm:text-lg font-bold tracking-tight">StockH</h1>
                 <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
                   {tradingDate ? `${new Date(tradingDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · Indian Market` : "Volume Shockers · Indian Market"}
+                  {usingFallback && fallbackDate && (
+                    <span className="ml-1 text-amber-500">(Showing {new Date(fallbackDate + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })} data)</span>
+                  )}
                 </p>
               </div>
             </div>

@@ -3,6 +3,9 @@ import * as cheerio from "cheerio";
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+const CHARTINK_SCAN_CONDITION =
+  "( ( 57369.11*(latest_volume/latest_avg_volume_30_cumulative ) ) >= 180 )";
+
 export interface VolumeShockerStock {
   sr: number;
   name: string;
@@ -13,7 +16,82 @@ export interface VolumeShockerStock {
   isPositive: boolean;
 }
 
+/**
+ * Fetch volume shockers from Chartink using their screener API.
+ * Uses a 2-step flow: GET for session/CSRF, then POST to the API.
+ */
+async function fetchViaChartinkAPI(): Promise<VolumeShockerStock[]> {
+  // Step 1: Visit the screener page to get session cookies + CSRF token
+  const pageResp = await fetch("https://chartink.com/screener/process", {
+    headers: { "User-Agent": USER_AGENT },
+    redirect: "follow",
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!pageResp.ok) throw new Error(`Chartink session init failed: ${pageResp.status}`);
+
+  const pageHtml = await pageResp.text();
+  const csrfMatch = pageHtml.match(/csrf-token" content="([^"]+)"/);
+  const csrf = csrfMatch?.[1];
+  if (!csrf) throw new Error("Could not extract CSRF token from Chartink");
+
+  // Build cookie string from Set-Cookie headers
+  const setCookies = pageResp.headers.getSetCookie?.() || [];
+  const cookieStr = setCookies.map((c) => c.split(";")[0]).join("; ");
+
+  // Step 2: POST to the screener API
+  const apiResp = await fetch("https://chartink.com/screener/process", {
+    method: "POST",
+    headers: {
+      "User-Agent": USER_AGENT,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Requested-With": "XMLHttpRequest",
+      "X-CSRF-Token": csrf,
+      Origin: "https://chartink.com",
+      Referer: "https://chartink.com/screener",
+      Cookie: cookieStr,
+    },
+    body: JSON.stringify({ scan_condition: CHARTINK_SCAN_CONDITION }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!apiResp.ok) throw new Error(`Chartink API failed: ${apiResp.status}`);
+
+  const json = await apiResp.json();
+  const data: Record<string, unknown>[] = json.data || [];
+
+  if (data.length === 0) {
+    throw new Error("Chartink API returned 0 results (may require browser session)");
+  }
+
+  // Map API fields to our interface
+  // Chartink API fields: n=name, sl=slug/ticker, c=close, chg=change %,
+  // v=volume, vg=volume gain %
+  return data.map((row, idx) => ({
+    sr: idx + 1,
+    name: String(row.n || ""),
+    ticker: String(row.sl || row.ticker || ""),
+    close: Number(row.c) || 0,
+    change: Number(row.chg) || 0,
+    volGainPct: Number(row.vg || row.vol_gain_pct) || 0,
+    isPositive: Number(row.chg) > 0,
+  }));
+}
+
+/**
+ * Fetch volume shockers — tries the API first, falls back to HTML scraping.
+ */
 export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
+  // Strategy 1: Try the Chartink API
+  try {
+    const stocks = await fetchViaChartinkAPI();
+    if (stocks.length > 0) return stocks;
+  } catch (err) {
+    console.warn("[Scraper] Chartink API failed, trying HTML fallback:", err);
+  }
+
+  // Strategy 2: Fall back to HTML scraping (may work if Chartink changes back)
   const url = "https://chartink.com/eodscanner/Volume-Shockers.html";
   const res = await fetch(url, {
     headers: { "User-Agent": USER_AGENT },
@@ -34,24 +112,21 @@ export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
     if (cells.length < 6) return;
 
     const sr = parseInt($(cells[0]).text().trim(), 10);
-    if (isNaN(sr)) return; // Skip header row
+    if (isNaN(sr)) return;
 
     const nameAnchor = $(cells[1]).find("a");
     const name = nameAnchor.text().trim();
     const href = nameAnchor.attr("href") || "";
-    // Extract ticker from URL like /stocks/TAJGVK.html
     const tickerMatch = href.match(/\/stocks\/([A-Z0-9]+)\.html/);
     const ticker = tickerMatch ? tickerMatch[1] : "";
 
     const closeText = $(cells[3]).text().trim().replace(/,/g, "");
     const close = parseFloat(closeText);
 
-    // Parse change - format: [5.43%] or [-3.21%]
     const changeHtml = $(cells[4]).html() || "";
     const changeText = $(cells[4]).text().trim();
     const changeMatch = changeText.match(/\[([-\d.]+)%\]/);
     const change = changeMatch ? parseFloat(changeMatch[1]) : 0;
-    // Check HTML for color="green" attribute (text() strips HTML tags)
     const isPositive = changeHtml.includes("green") || change > 0;
 
     const volGainText = $(cells[5]).text().trim().replace(/%/g, "");
@@ -61,6 +136,10 @@ export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
       stocks.push({ sr, name, ticker, close, change, volGainPct, isPositive });
     }
   });
+
+  if (stocks.length === 0) {
+    throw new Error("Both API and HTML scraping returned no data. Chartink may require a browser to load data.");
+  }
 
   return stocks;
 }
