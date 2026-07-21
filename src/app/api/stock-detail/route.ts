@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchStockDetail } from "@/lib/scraper";
 
+export const maxDuration = 30;
+
 // In-memory cache per ticker
 const cache = new Map<
   string,

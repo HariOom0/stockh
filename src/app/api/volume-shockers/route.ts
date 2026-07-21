@@ -3,6 +3,8 @@ import { fetchVolumeShockers } from "@/lib/scraper";
 import { db } from "@/lib/db";
 import { getTradingDate, isMarketClosed } from "@/lib/trading-calendar";
 
+export const maxDuration = 30; // Vercel: extend timeout for slow Chartink scraping
+
 // In-memory cache
 let cachedData: {
   stocks: ReturnType<typeof fetchVolumeShockers> extends Promise<infer T> ? T : never;
