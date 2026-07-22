@@ -333,6 +333,7 @@ export default function Home() {
   // ─── Suggestions state ───────────────────────────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [historyDates, setHistoryDates] = useState<{ date: string; stockCount: number }[]>([]);
+  const [historyError, setHistoryError] = useState("");
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null);
   const [historyStocks, setHistoryStocks] = useState<Stock[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -651,12 +652,17 @@ export default function Home() {
 
   // ─── History functions ───────────────────────────────────────────
   const fetchHistoryDates = async () => {
+    setHistoryError("");
     try {
       const res = await fetch("/api/stock-history", { cache: "no-store" });
       const data = await res.json();
+      if (data.error) {
+        setHistoryError(data.error);
+      }
       if (data.snapshots) setHistoryDates(data.snapshots);
     } catch (err) {
       console.error("Failed to fetch history dates:", err);
+      setHistoryError("Failed to connect to the server.");
     }
   };
 
@@ -1443,13 +1449,26 @@ export default function Home() {
                           <History className="w-7 h-7 text-primary" />
                         </div>
                         <h3 className="text-sm font-semibold text-foreground">Daily History</h3>
-                        <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
-                          Every day&apos;s volume shocker stocks are automatically saved here.
-                          Browse past days to see which stocks had volume spikes.
-                        </p>
-                        <p className="text-xs text-muted-foreground/60 mt-1">
-                          Today&apos;s data will appear after the first refresh.
-                        </p>
+                        {historyError ? (
+                          <>
+                            <p className="text-xs text-destructive max-w-xs leading-relaxed">
+                              {historyError}
+                            </p>
+                            <p className="text-xs text-muted-foreground/60 max-w-xs leading-relaxed">
+                              To enable history, add a <code className="text-xs bg-secondary px-1.5 py-0.5 rounded">DATABASE_URL</code> (postgresql://...) environment variable in your Vercel project settings.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+                              Every day&apos;s volume shocker stocks are automatically saved here.
+                              Browse past days to see which stocks had volume spikes.
+                            </p>
+                            <p className="text-xs text-muted-foreground/60 mt-1">
+                              Today&apos;s data will appear after the first refresh.
+                            </p>
+                          </>
+                        )}
                       </CardContent>
                     </Card>
                   ) : (

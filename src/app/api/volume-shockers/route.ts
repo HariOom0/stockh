@@ -3,7 +3,7 @@ import { fetchVolumeShockers } from "@/lib/scraper";
 import { getTradingDate } from "@/lib/trading-calendar";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 // In-memory cache
 let cachedData: {
@@ -127,7 +127,7 @@ export async function GET() {
     console.error("[VolumeShockers] DB read failed (non-fatal):", dbError);
   }
 
-  // 3. Fetch fresh data via Yahoo Finance
+  // 3. Fetch fresh data via Chartink (+ Yahoo for volume averages)
   try {
     const allStocks = await fetchVolumeShockers();
 

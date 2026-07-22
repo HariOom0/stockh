@@ -1,189 +1,17 @@
 import * as cheerio from "cheerio";
 
 const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
-// ─── NSE Stock Universe ──────────────────────────────────────────────
-// Nifty 50 + popular F&O + high-liquidity mid/small caps (~150 stocks)
-// These are the stocks most likely to show volume shocks.
-const NSE_STOCKS: { ticker: string; name: string }[] = [
-  // Nifty 50
-  { ticker: "RELIANCE", name: "Reliance Industries" },
-  { ticker: "TCS", name: "Tata Consultancy Services" },
-  { ticker: "HDFCBANK", name: "HDFC Bank" },
-  { ticker: "INFY", name: "Infosys" },
-  { ticker: "ICICIBANK", name: "ICICI Bank" },
-  { ticker: "HINDUNILVR", name: "Hindustan Unilever" },
-  { ticker: "SBIN", name: "State Bank of India" },
-  { ticker: "BHARTIARTL", name: "Bharti Airtel" },
-  { ticker: "ITC", name: "ITC" },
-  { ticker: "KOTAKBANK", name: "Kotak Mahindra Bank" },
-  { ticker: "LT", name: "Larsen & Toubro" },
-  { ticker: "AXISBANK", name: "Axis Bank" },
-  { ticker: "WIPRO", name: "Wipro" },
-  { ticker: "HCLTECH", name: "HCL Technologies" },
-  { ticker: "BAJFINANCE", name: "Bajaj Finance" },
-  { ticker: "MARUTI", name: "Maruti Suzuki" },
-  { ticker: "SUNPHARMA", name: "Sun Pharma" },
-  { ticker: "TATAMOTORS", name: "Tata Motors" },
-  { ticker: "TATASTEEL", name: "Tata Steel" },
-  { ticker: "ADANIENT", name: "Adani Enterprises" },
-  { ticker: "ASIANPAINT", name: "Asian Paints" },
-  { ticker: "HINDALCO", name: "Hindalco Industries" },
-  { ticker: "TITAN", name: "Titan Company" },
-  { ticker: "DMART", name: "Avenue Supermarts" },
-  { ticker: "POWERGRID", name: "Power Grid Corp" },
-  { ticker: "NTPC", name: "NTPC" },
-  { ticker: "ONGC", name: "Oil & Natural Gas Corp" },
-  { ticker: "COALINDIA", name: "Coal India" },
-  { ticker: "ULTRACEMCO", name: "UltraTech Cement" },
-  { ticker: "NESTLEIND", name: "Nestle India" },
-  { ticker: "TECHM", name: "Tech Mahindra" },
-  { ticker: "BAJAJFINSV", name: "Bajaj Finserv" },
-  { ticker: "INDUSINDBK", name: "IndusInd Bank" },
-  { ticker: "HDFCLIFE", name: "HDFC Life" },
-  { ticker: "SBILIFE", name: "SBI Life" },
-  { ticker: "DIVISLAB", name: "Divi's Laboratories" },
-  { ticker: "DRREDDY", name: "Dr Reddy's Labs" },
-  { ticker: "CIPLA", name: "Cipla" },
-  { ticker: "EICHERMOT", name: "Eicher Motors" },
-  { ticker: "HEROMOTOCO", name: "Hero MotoCorp" },
-  { ticker: "BPCL", name: "Bharat Petroleum" },
-  { ticker: "GRASIM", name: "Grasim Industries" },
-  { ticker: "APOLLOHOSP", name: "Apollo Hospitals" },
-  { ticker: "M_M", name: "Mahindra & Mahindra" },
-  { ticker: "BRITANNIA", name: "Britannia Industries" },
-  { ticker: "UPL", name: "UPL" },
-  { ticker: "JSWSTEEL", name: "JSW Steel" },
-  { ticker: "TATACONSUM", name: "Tata Consumer Products" },
-  { ticker: "ADANIPORTS", name: "Adani Ports" },
-  { ticker: "DLF", name: "DLF" },
-  // Popular F&O / High-liquidity stocks
-  { ticker: "IRFC", name: "IRFC" },
-  { ticker: "RVNL", name: "RVNL" },
-  { ticker: "TATAPOWER", name: "Tata Power" },
-  { ticker: "YESBANK", name: "Yes Bank" },
-  { ticker: "PNB", name: "Punjab National Bank" },
-  { ticker: "IDFCFIRSTB", name: "IDFC First Bank" },
-  { ticker: "SUZLON", name: "Suzlon Energy" },
-  { ticker: "IRCTC", name: "IRCTC" },
-  { ticker: "ZOMATO", name: "Zomato" },
-  { ticker: "TRENT", name: "Trent" },
-  { ticker: "FEDERALBNK", name: "Federal Bank" },
-  { ticker: "MANAPPURAM", name: "Manappuram Finance" },
-  { ticker: "MUTHOOTFIN", name: "Muthoot Finance" },
-  { ticker: "DIXON", name: "Dixon Technologies" },
-  { ticker: "DEEPAKNTR", name: "Deepak Nitrite" },
-  { ticker: "PCBL", name: "PCBL" },
-  { ticker: "KEI", name: "KEI Industries" },
-  { ticker: "POLYCAB", name: "Polycab India" },
-  { ticker: "KPITTECH", name: "KPIT Technologies" },
-  { ticker: "COFORGE", name: "Coforge" },
-  { ticker: "PERSISTENT", name: "Persistent Systems" },
-  { ticker: "MPHASIS", name: "Mphasis" },
-  { ticker: "AFFLE", name: "Affle India" },
-  { ticker: "TATAMTRDVR", name: "Tata Motors DVR" },
-  { ticker: "BANDHANBNK", name: "Bandhan Bank" },
-  { ticker: "IBULHSGFIN", name: "Indiabulls Housing" },
-  { ticker: "NIFTYBEES", name: "Nippon India ETF" },
-  { ticker: "JIOFIN", name: "Jio Financial Services" },
-  { ticker: "HDFCAMC", name: "HDFC AMC" },
-  { ticker: "BAJAJAUTO", name: "Bajaj Auto" },
-  { ticker: "BERGEPAINT", name: "Berger Paints" },
-  { ticker: "DABUR", name: "Dabur India" },
-  { ticker: "GODREJCP", name: "Godrej Consumer Products" },
-  { ticker: "HINDPETRO", name: "HPCL" },
-  { ticker: "IOC", name: "Indian Oil Corp" },
-  { ticker: "PIDILITIND", name: "Pidilite Industries" },
-  { ticker: "TITAGARH", name: "Titagarh Rail Systems" },
-  { ticker: "VBL", name: "Varun Beverages" },
-  { ticker: "COROMANDEL", name: "Coromandel International" },
-  { ticker: "EDELWEISS", name: "Edelweiss Financial" },
-  { ticker: "RECLTD", name: "REC" },
-  { ticker: "PFC", name: "PFC" },
-  { ticker: "NATIONALUM", name: "National Aluminium" },
-  { ticker: "CUMMINSIND", name: "Cummins India" },
-  { ticker: "VOLTAS", name: "Voltas" },
-  { ticker: "EMAMILTD", name: "Emami" },
-  { ticker: "GLAXO", name: "GlaxoSmithKline Pharma" },
-  { ticker: "LALPATHLAB", name: "Lal PathLabs" },
-  { ticker: "AUBANK", name: "AU Small Finance Bank" },
-  { ticker: "CHOLAFIN", name: "Cholamandalam Finance" },
-  { ticker: "SHRIRAMFIN", name: "Shriram Finance" },
-  { ticker: "MOTHERSUMI", name: "Mother Sumi" },
-  { ticker: "TORNTPOWER", name: "Torrent Power" },
-  { ticker: "TATAELXSI", name: "Tata Elxsi" },
-  { ticker: "LTIEMIND", name: "LTIMindtree" },
-  { ticker: "L&TFH", name: "L&T Finance Holdings" },
-  { ticker: "HONAUT", name: "Honda India Power" },
-  { ticker: "TVSMOTOR", name: "TVS Motor Company" },
-  { ticker: "MRF", name: "MRF" },
-  { ticker: "BOSCHLTD", name: "Bosch" },
-  { ticker: "PAGEIND", name: "Page Industries" },
-  { ticker: "3MINDIA", name: "3M India" },
-  { ticker: "SIEMENS", name: "Siemens" },
-  { ticker: "ABB", name: "ABB India" },
-  { ticker: "HONEYWELL", name: "Honeywell Automation" },
-  { ticker: "SKFINDIA", name: "SKF India" },
-  { ticker: "TIMKEN", name: "Timken India" },
-  { ticker: "SNOWMAN", name: "Snowman Logistics" },
-  { ticker: "SPARC", name: "Sparc Systems" },
-  { ticker: "DATAPATTNS", name: "Data Patterns" },
-  { ticker: "CIGNITI", name: "Cigniti Technologies" },
-  { ticker: "LTTS", name: "L&T Technology Services" },
-  { ticker: "RAJESHEXPO", name: "Rajesh Exports" },
-  { ticker: "JINDALSTEL", name: "Jindal Steel" },
-  { ticker: "VEDL", name: "Vedanta" },
-  { ticker: "HINDZINC", name: "Hindustan Zinc" },
-  { ticker: "NMDC", name: "NMDC" },
-  { ticker: "NALCO", name: "NALCO" },
-  { ticker: "SRF", name: "SRF" },
-  { ticker: "INDIAMART", name: "IndiaMART InterMESH" },
-  { ticker: "JUSTDIAL", name: "Just Dial" },
-  { ticker: "TRIDENT", name: "Trident" },
-  { ticker: "VIPIND", name: "VIP Industries" },
-  { ticker: "JBM", name: "JBM Auto" },
-  { ticker: "ENDURANCE", name: "Endurance Technologies" },
-  { ticker: "SONATSOFTW", name: "Sonata Software" },
-  { ticker: "INTELLECT", name: "Intellect Design Arena" },
-  { ticker: "TRIVENI", name: "Triveni Engineering" },
-  { ticker: "ATUL", name: "Atul" },
-  { ticker: "AARTIDRUG", name: "Aarti Drugs" },
-  { ticker: "LAURUSLABS", name: "Laurus Labs" },
-  { ticker: "STRTECH", name: "Stratech" },
-  { ticker: "CAPLIPOINT", name: "Caplin Point Labs" },
-  { ticker: "GRANULES", name: "Granules India" },
-  { ticker: "TORNTPHARM", name: "Torrent Pharma" },
-  { ticker: "ALKEM", name: "Alkem Labs" },
-  { ticker: "LUPIN", name: "Lupin" },
-  { ticker: "BIOCON", name: "Biocon" },
-  { ticker: "ALEMBICLTD", name: "Alembic Pharma" },
-  { ticker: "THERMAX", name: "Thermax" },
-  { ticker: "WELCORP", name: "Welspun Corp" },
-  { ticker: "ARVIND", name: "Arvind" },
-  { ticker: "RAYMOND", name: "Raymond" },
-  { ticker: "VARDMRL", name: "Vardhman Textiles" },
-  { ticker: "WELSPUNLIV", name: "Welspun Living" },
-  { ticker: "CENTURYPLY", name: "Century Plyboards" },
-  { ticker: "GREENPLY", name: "GreenPly Industries" },
-  { ticker: "AIAENG", name: "AIA Engineering" },
-  { ticker: "BALAMINES", name: "Balaji Amines" },
-  { ticker: "SOLARINDS", name: "Solar Industries" },
-  { ticker: "HIMADRI", name: "Himadri Speciality" },
-  { ticker: "GRAPHITE", name: "Graphite India" },
-  { ticker: "IGL", name: "Indraprastha Gas" },
-  { ticker: "MGL", name: "Mahanagar Gas" },
-  { ticker: "GUJGASLTD", name: "Gujarat Gas" },
-  { ticker: "PETRONET", name: "Petronet LNG" },
-  { ticker: "GAIL", name: "GAIL India" },
-  { ticker: "CONCOR", name: "Container Corp" },
-];
+// ─── Chartink Configuration ───────────────────────────────────────────
+const CHARTINK_SCAN_CLAUSE =
+  "( {cash} ( daily volume > daily sma( volume,20 ) * 5 ) )";
+const CHARTINK_URL = "https://chartink.com/screener/process";
+const CHARTINK_PAGE = "https://chartink.com/screener/volume-shockers";
 
-// Deduplicate by ticker
-const STOCK_MAP = new Map<string, string>();
-for (const s of NSE_STOCKS) {
-  if (!STOCK_MAP.has(s.ticker)) STOCK_MAP.set(s.ticker, s.name);
-}
+// ═══════════════════════════════════════════════════════════════════════
+// Volume Shocker Types
+// ═══════════════════════════════════════════════════════════════════════
 
 export interface VolumeShockerStock {
   sr: number;
@@ -195,140 +23,231 @@ export interface VolumeShockerStock {
   isPositive: boolean;
 }
 
-interface YahooChartResult {
-  meta: {
-    symbol: string;
-    regularMarketPrice?: number;
-    previousClose?: number;
-  };
-  timestamp: number[];
-  indicators: {
-    quote: {
-      close: (number | null)[];
-      volume: (number | null)[];
-    }[];
-  };
-}
-
-/**
- * Fetch 5-day OHLCV data for tickers from Yahoo Finance v8 API.
- * Uses concurrent individual requests (batch endpoint is deprecated).
- */
-async function fetchYahooData(
-  tickers: string[]
-): Promise<Map<string, { closes: number[]; volumes: number[] }>> {
-  const results = new Map<string, { closes: number[]; volumes: number[] }>();
-  const CONCURRENCY = 15; // Max parallel requests
-
-  // Process in chunks to avoid rate limits
-  for (let i = 0; i < tickers.length; i += CONCURRENCY) {
-    const chunk = tickers.slice(i, i + CONCURRENCY);
-
-    const chunkResults = await Promise.allSettled(
-      chunk.map(async (ticker) => {
-        const url = `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}.NS?range=22d&interval=1d&includePrePost=false`;
-
-        const resp = await fetch(url, {
-          headers: { "User-Agent": USER_AGENT },
-          signal: AbortSignal.timeout(10000),
-        });
-
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
-        const data = await resp.json();
-        const result: YahooChartResult = data.chart?.result?.[0];
-        if (!result) throw new Error("No result");
-
-        const closes = result.indicators.quote[0].close.filter(
-          (c): c is number => c !== null
-        );
-        const volumes = result.indicators.quote[0].volume.filter(
-          (v): v is number => v !== null
-        );
-
-        return { ticker, closes, volumes };
-      })
-    );
-
-    for (const r of chunkResults) {
-      if (r.status === "fulfilled") {
-        results.set(r.value.ticker, {
-          closes: r.value.closes,
-          volumes: r.value.volumes,
-        });
-      }
-      // Silently skip failures (404 = delisted/invalid symbol)
-    }
-  }
-
-  return results;
-}
-
-/**
- * Fetch volume shockers using Yahoo Finance data.
- * Uses Chartink's exact criteria: daily volume > SMA(volume,20) * 5
- * Requires 22 days of data to compute a 20-day SMA.
- */
-async function fetchViaYahoo(): Promise<VolumeShockerStock[]> {
-  const tickers = Array.from(STOCK_MAP.keys());
-  console.log(`[Scraper] Scanning ${tickers.length} stocks via Yahoo Finance (Chartink criteria: vol > 5x SMA20)...`);
-
-  const yahooData = await fetchYahooData(tickers);
-  console.log(`[Scraper] Got data for ${yahooData.size}/${tickers.length} stocks`);
-
-  const results: VolumeShockerStock[] = [];
-
-  for (const [ticker, { closes, volumes }] of yahooData) {
-    // Need at least 21 data points for a 20-day SMA
-    if (volumes.length < 21 || closes.length < 2) continue;
-
-    const latestClose = closes[closes.length - 1];
-    const prevClose = closes[closes.length - 2];
-    const latestVol = volumes[volumes.length - 1];
-
-    if (prevClose <= 0 || latestClose <= 0 || latestVol <= 0) continue;
-
-    // Chartink criteria: daily volume > SMA(volume, 20) * 5
-    // Use the 20 days BEFORE the latest day (indices -21 to -2, i.e. 20 values)
-    const prev20Volumes = volumes.slice(-21, -1);
-    const sma20Vol = prev20Volumes.reduce((a, b) => a + b, 0) / prev20Volumes.length;
-
-    if (sma20Vol <= 0) continue;
-
-    const volMultiple = latestVol / sma20Vol;
-
-    if (volMultiple >= 5) {
-      const changePct = ((latestClose / prevClose) - 1) * 100;
-      const volGainPct = (volMultiple - 1) * 100;
-      results.push({
-        sr: 0,
-        name: STOCK_MAP.get(ticker) || ticker,
-        ticker,
-        close: Math.round(latestClose * 100) / 100,
-        change: Math.round(changePct * 100) / 100,
-        volGainPct: Math.round(volGainPct * 10) / 10,
-        isPositive: changePct > 0,
-      });
-    }
-  }
-
-  // Sort by volume multiple (highest first)
-  results.sort((a, b) => b.volGainPct - a.volGainPct);
-  results.forEach((r, i) => (r.sr = i + 1));
-
-  console.log(`[Scraper] Found ${results.length} volume shockers (Chartink: vol > 5x SMA20)`);
-  return results;
-}
-
-/**
- * Fetch volume shockers — tries Yahoo Finance API.
- */
-export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
-  return fetchViaYahoo();
+interface ChartinkRow {
+  sr: number;
+  nsecode: string;
+  name: string;
+  bsecode: string | null;
+  close: number;
+  per_chg: number;
+  volume: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Stock Detail Scraper (Screener.in) — unchanged, still works
+// Chartink Scraper (Primary Data Source)
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Fetch volume shockers from Chartink.
+ * Two-step process: GET page for cookies, then POST with XSRF token.
+ * Key: must send URL-encoded XSRF cookie value, and URL-decoded value in header.
+ */
+async function fetchChartinkStocks(): Promise<ChartinkRow[]> {
+  // Step 1: GET the screener page to obtain session cookies
+  const pageRes = await fetch(CHARTINK_PAGE, {
+    headers: { "User-Agent": USER_AGENT },
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!pageRes.ok) {
+    throw new Error(`Chartink page fetch failed: ${pageRes.status}`);
+  }
+
+  // Extract raw (URL-encoded) cookie values from Set-Cookie headers
+  const setCookieHeaders = pageRes.headers.getSetCookie?.() ?? [];
+  let rawXsrf = "";
+  let rawCiSession = "";
+
+  for (const h of setCookieHeaders) {
+    const m1 = h.match(/XSRF-TOKEN=(.+?);/);
+    if (m1) rawXsrf = m1[1];
+    const m2 = h.match(/ci_session=(.+?);/);
+    if (m2) rawCiSession = m2[1];
+  }
+
+  if (!rawXsrf || !rawCiSession) {
+    throw new Error("Chartink: failed to extract XSRF-TOKEN or ci_session cookies");
+  }
+
+  // Step 2: POST to screener/process with proper headers
+  // - Cookie header: raw URL-encoded values (as the browser sends them)
+  // - X-XSRF-TOKEN header: URL-decoded value
+  const decodedXsrf = decodeURIComponent(rawXsrf);
+
+  const postRes = await fetch(CHARTINK_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Cookie": `ci_session=${rawCiSession}; XSRF-TOKEN=${rawXsrf}`,
+      "X-XSRF-TOKEN": decodedXsrf,
+      "X-Requested-With": "XMLHttpRequest",
+      Accept: "application/json",
+      Referer: CHARTINK_PAGE,
+      "User-Agent": USER_AGENT,
+    },
+    body: `scan_clause=${encodeURIComponent(CHARTINK_SCAN_CLAUSE)}`,
+    signal: AbortSignal.timeout(15_000),
+  });
+
+  if (!postRes.ok) {
+    throw new Error(`Chartink API failed: ${postRes.status}`);
+  }
+
+  const json = await postRes.json();
+  const data: ChartinkRow[] = json.data ?? [];
+  console.log(`[Chartink] Fetched ${data.length} stocks (recordsTotal: ${json.recordsTotal})`);
+  return data;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Yahoo Finance — 20-day Volume Average (for volGainPct calculation)
+// ═══════════════════════════════════════════════════════════════════════
+
+interface YahooChartResult {
+  avgVol20d: number;
+  todayVolume: number;
+  prevClose: number;
+  todayClose: number;
+}
+
+/**
+ * Fetch 1-month chart data from Yahoo Finance and calculate 20-day volume average.
+ */
+async function fetchYahooVolAvg(ticker: string): Promise<YahooChartResult | null> {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}.NS?range=1mo&interval=1d`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(8_000),
+    });
+
+    if (!res.ok) return null;
+
+    const json = await res.json();
+    const result = json?.chart?.result?.[0];
+    if (!result) return null;
+
+    const quote = result.indicators?.quote?.[0];
+    if (!quote) return null;
+
+    const volumes: number[] = (quote.volume ?? []).filter(
+      (v: number | null) => v !== null && v > 0
+    );
+    const closes: number[] = (quote.close ?? []).filter(
+      (c: number | null) => c !== null
+    );
+
+    if (volumes.length < 5) return null;
+
+    const todayVolume = volumes[volumes.length - 1];
+    // Previous 20 trading days (or all available if < 20)
+    const prevVols = volumes.slice(-21, -1); // exclude today, take up to 20
+    const avgVol20d =
+      prevVols.length > 0
+        ? prevVols.reduce((a, b) => a + b, 0) / prevVols.length
+        : todayVolume;
+
+    const todayClose = closes[closes.length - 1] ?? 0;
+    const prevClose = closes[closes.length - 2] ?? todayClose;
+
+    return { avgVol20d, todayVolume, prevClose, todayClose };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch volume averages for multiple tickers with concurrency control.
+ */
+async function fetchVolumeAverages(
+  tickers: string[],
+  concurrency = 8
+): Promise<Map<string, YahooChartResult>> {
+  const results = new Map<string, YahooChartResult>();
+  let index = 0;
+
+  async function worker() {
+    while (index < tickers.length) {
+      const i = index++;
+      if (i >= tickers.length) break;
+      const ticker = tickers[i];
+      const data = await fetchYahooVolAvg(ticker);
+      if (data) results.set(ticker, data);
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, tickers.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Main: fetchVolumeShockers
+// ═══════════════════════════════════════════════════════════════════════
+
+/**
+ * Fetch volume shockers — Chartink primary, Yahoo for volume averages.
+ */
+export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
+  // Step 1: Get stock list from Chartink
+  const chartinkData = await fetchChartinkStocks();
+
+  if (chartinkData.length === 0) return [];
+
+  // Step 2: Get 20-day volume averages from Yahoo Finance (for volGainPct)
+  const tickers = chartinkData.map((s) => s.nsecode);
+  console.log(
+    `[Scraper] Fetching volume averages for ${tickers.length} stocks from Yahoo...`
+  );
+  const volAvgs = await fetchVolumeAverages(tickers);
+  console.log(
+    `[Scraper] Got volume averages for ${volAvgs.size}/${tickers.length} stocks`
+  );
+
+  // Step 3: Merge data — use Chartink for close/change, Yahoo for volGainPct only
+  const results: VolumeShockerStock[] = chartinkData.map((row, idx) => {
+    const yahoo = volAvgs.get(row.nsecode);
+    let volGainPct: number;
+
+    if (yahoo && yahoo.avgVol20d > 0) {
+      // Use Yahoo data for accurate volume gain calculation
+      volGainPct = Math.round(((yahoo.todayVolume / yahoo.avgVol20d) - 1) * 1000) / 10;
+    } else {
+      // Fallback: estimate as minimum 500% (scan requires > 5x)
+      volGainPct = 500;
+    }
+
+    // Clean up company name (remove ".Ltd", ".Limited" etc)
+    const name = row.name
+      .replace(/\s*(Ltd|Limited)\.?\s*$/i, "")
+      .trim();
+
+    return {
+      sr: idx + 1,
+      name,
+      ticker: row.nsecode,
+      close: row.close,
+      change: Math.round(row.per_chg * 100) / 100,
+      volGainPct,
+      isPositive: row.per_chg > 0,
+    };
+  });
+
+  // Sort by volGainPct (highest first)
+  results.sort((a, b) => b.volGainPct - a.volGainPct);
+  results.forEach((r, i) => (r.sr = i + 1));
+
+  console.log(
+    `[Scraper] Returning ${results.length} volume shockers from Chartink`
+  );
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Stock Detail Scraper (Screener.in) — unchanged
 // ═══════════════════════════════════════════════════════════════════════
 
 export interface StockDetail {

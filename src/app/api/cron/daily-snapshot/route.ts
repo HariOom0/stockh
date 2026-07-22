@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
     const res = await fetch(`${baseUrl}/api/volume-shockers`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(60_000), // 60s timeout for Yahoo scan
+      signal: AbortSignal.timeout(90_000), // 90s timeout for Chartink + Yahoo
     });
     const data = await res.json();
 

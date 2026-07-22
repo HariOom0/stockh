@@ -1,0 +1,708 @@
+     1→     1→import * as cheerio from "cheerio";
+     2→     2→
+     3→     3→const USER_AGENT =
+     4→     4→  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+     5→     5→
+     6→     6→// ─── NSE Stock Universe ──────────────────────────────────────────────
+     7→     7→// Nifty 50 + popular F&O + high-liquidity mid/small caps (~150 stocks)
+     8→     8→// These are the stocks most likely to show volume shocks.
+     9→     9→const NSE_STOCKS: { ticker: string; name: string }[] = [
+    10→    10→  // Nifty 50
+    11→    11→  { ticker: "RELIANCE", name: "Reliance Industries" },
+    12→    12→  { ticker: "TCS", name: "Tata Consultancy Services" },
+    13→    13→  { ticker: "HDFCBANK", name: "HDFC Bank" },
+    14→    14→  { ticker: "INFY", name: "Infosys" },
+    15→    15→  { ticker: "ICICIBANK", name: "ICICI Bank" },
+    16→    16→  { ticker: "HINDUNILVR", name: "Hindustan Unilever" },
+    17→    17→  { ticker: "SBIN", name: "State Bank of India" },
+    18→    18→  { ticker: "BHARTIARTL", name: "Bharti Airtel" },
+    19→    19→  { ticker: "ITC", name: "ITC" },
+    20→    20→  { ticker: "KOTAKBANK", name: "Kotak Mahindra Bank" },
+    21→    21→  { ticker: "LT", name: "Larsen & Toubro" },
+    22→    22→  { ticker: "AXISBANK", name: "Axis Bank" },
+    23→    23→  { ticker: "WIPRO", name: "Wipro" },
+    24→    24→  { ticker: "HCLTECH", name: "HCL Technologies" },
+    25→    25→  { ticker: "BAJFINANCE", name: "Bajaj Finance" },
+    26→    26→  { ticker: "MARUTI", name: "Maruti Suzuki" },
+    27→    27→  { ticker: "SUNPHARMA", name: "Sun Pharma" },
+    28→    28→  { ticker: "TATAMOTORS", name: "Tata Motors" },
+    29→    29→  { ticker: "TATASTEEL", name: "Tata Steel" },
+    30→    30→  { ticker: "ADANIENT", name: "Adani Enterprises" },
+    31→    31→  { ticker: "ASIANPAINT", name: "Asian Paints" },
+    32→    32→  { ticker: "HINDALCO", name: "Hindalco Industries" },
+    33→    33→  { ticker: "TITAN", name: "Titan Company" },
+    34→    34→  { ticker: "DMART", name: "Avenue Supermarts" },
+    35→    35→  { ticker: "POWERGRID", name: "Power Grid Corp" },
+    36→    36→  { ticker: "NTPC", name: "NTPC" },
+    37→    37→  { ticker: "ONGC", name: "Oil & Natural Gas Corp" },
+    38→    38→  { ticker: "COALINDIA", name: "Coal India" },
+    39→    39→  { ticker: "ULTRACEMCO", name: "UltraTech Cement" },
+    40→    40→  { ticker: "NESTLEIND", name: "Nestle India" },
+    41→    41→  { ticker: "TECHM", name: "Tech Mahindra" },
+    42→    42→  { ticker: "BAJAJFINSV", name: "Bajaj Finserv" },
+    43→    43→  { ticker: "INDUSINDBK", name: "IndusInd Bank" },
+    44→    44→  { ticker: "HDFCLIFE", name: "HDFC Life" },
+    45→    45→  { ticker: "SBILIFE", name: "SBI Life" },
+    46→    46→  { ticker: "DIVISLAB", name: "Divi's Laboratories" },
+    47→    47→  { ticker: "DRREDDY", name: "Dr Reddy's Labs" },
+    48→    48→  { ticker: "CIPLA", name: "Cipla" },
+    49→    49→  { ticker: "EICHERMOT", name: "Eicher Motors" },
+    50→    50→  { ticker: "HEROMOTOCO", name: "Hero MotoCorp" },
+    51→    51→  { ticker: "BPCL", name: "Bharat Petroleum" },
+    52→    52→  { ticker: "GRASIM", name: "Grasim Industries" },
+    53→    53→  { ticker: "APOLLOHOSP", name: "Apollo Hospitals" },
+    54→    54→  { ticker: "M_M", name: "Mahindra & Mahindra" },
+    55→    55→  { ticker: "BRITANNIA", name: "Britannia Industries" },
+    56→    56→  { ticker: "UPL", name: "UPL" },
+    57→    57→  { ticker: "JSWSTEEL", name: "JSW Steel" },
+    58→    58→  { ticker: "TATACONSUM", name: "Tata Consumer Products" },
+    59→    59→  { ticker: "ADANIPORTS", name: "Adani Ports" },
+    60→    60→  { ticker: "DLF", name: "DLF" },
+    61→    61→  // Popular F&O / High-liquidity stocks
+    62→    62→  { ticker: "IRFC", name: "IRFC" },
+    63→    63→  { ticker: "RVNL", name: "RVNL" },
+    64→    64→  { ticker: "TATAPOWER", name: "Tata Power" },
+    65→    65→  { ticker: "YESBANK", name: "Yes Bank" },
+    66→    66→  { ticker: "PNB", name: "Punjab National Bank" },
+    67→    67→  { ticker: "IDFCFIRSTB", name: "IDFC First Bank" },
+    68→    68→  { ticker: "SUZLON", name: "Suzlon Energy" },
+    69→    69→  { ticker: "IRCTC", name: "IRCTC" },
+    70→    70→  { ticker: "ZOMATO", name: "Zomato" },
+    71→    71→  { ticker: "TRENT", name: "Trent" },
+    72→    72→  { ticker: "FEDERALBNK", name: "Federal Bank" },
+    73→    73→  { ticker: "MANAPPURAM", name: "Manappuram Finance" },
+    74→    74→  { ticker: "MUTHOOTFIN", name: "Muthoot Finance" },
+    75→    75→  { ticker: "DIXON", name: "Dixon Technologies" },
+    76→    76→  { ticker: "DEEPAKNTR", name: "Deepak Nitrite" },
+    77→    77→  { ticker: "PCBL", name: "PCBL" },
+    78→    78→  { ticker: "KEI", name: "KEI Industries" },
+    79→    79→  { ticker: "POLYCAB", name: "Polycab India" },
+    80→    80→  { ticker: "KPITTECH", name: "KPIT Technologies" },
+    81→    81→  { ticker: "COFORGE", name: "Coforge" },
+    82→    82→  { ticker: "PERSISTENT", name: "Persistent Systems" },
+    83→    83→  { ticker: "MPHASIS", name: "Mphasis" },
+    84→    84→  { ticker: "AFFLE", name: "Affle India" },
+    85→    85→  { ticker: "TATAMTRDVR", name: "Tata Motors DVR" },
+    86→    86→  { ticker: "BANDHANBNK", name: "Bandhan Bank" },
+    87→    87→  { ticker: "IBULHSGFIN", name: "Indiabulls Housing" },
+    88→    88→  { ticker: "NIFTYBEES", name: "Nippon India ETF" },
+    89→    89→  { ticker: "JIOFIN", name: "Jio Financial Services" },
+    90→    90→  { ticker: "HDFCAMC", name: "HDFC AMC" },
+    91→    91→  { ticker: "BAJAJAUTO", name: "Bajaj Auto" },
+    92→    92→  { ticker: "BERGEPAINT", name: "Berger Paints" },
+    93→    93→  { ticker: "DABUR", name: "Dabur India" },
+    94→    94→  { ticker: "GODREJCP", name: "Godrej Consumer Products" },
+    95→    95→  { ticker: "HINDPETRO", name: "HPCL" },
+    96→    96→  { ticker: "IOC", name: "Indian Oil Corp" },
+    97→    97→  { ticker: "PIDILITIND", name: "Pidilite Industries" },
+    98→    98→  { ticker: "TITAGARH", name: "Titagarh Rail Systems" },
+    99→    99→  { ticker: "VBL", name: "Varun Beverages" },
+   100→   100→  { ticker: "COROMANDEL", name: "Coromandel International" },
+   101→   101→  { ticker: "EDELWEISS", name: "Edelweiss Financial" },
+   102→   102→  { ticker: "RECLTD", name: "REC" },
+   103→   103→  { ticker: "PFC", name: "PFC" },
+   104→   104→  { ticker: "NATIONALUM", name: "National Aluminium" },
+   105→   105→  { ticker: "CUMMINSIND", name: "Cummins India" },
+   106→   106→  { ticker: "VOLTAS", name: "Voltas" },
+   107→   107→  { ticker: "EMAMILTD", name: "Emami" },
+   108→   108→  { ticker: "GLAXO", name: "GlaxoSmithKline Pharma" },
+   109→   109→  { ticker: "LALPATHLAB", name: "Lal PathLabs" },
+   110→   110→  { ticker: "AUBANK", name: "AU Small Finance Bank" },
+   111→   111→  { ticker: "CHOLAFIN", name: "Cholamandalam Finance" },
+   112→   112→  { ticker: "SHRIRAMFIN", name: "Shriram Finance" },
+   113→   113→  { ticker: "MOTHERSUMI", name: "Mother Sumi" },
+   114→   114→  { ticker: "TORNTPOWER", name: "Torrent Power" },
+   115→   115→  { ticker: "TATAELXSI", name: "Tata Elxsi" },
+   116→   116→  { ticker: "LTIEMIND", name: "LTIMindtree" },
+   117→   117→  { ticker: "L&TFH", name: "L&T Finance Holdings" },
+   118→   118→  { ticker: "HONAUT", name: "Honda India Power" },
+   119→   119→  { ticker: "TVSMOTOR", name: "TVS Motor Company" },
+   120→   120→  { ticker: "MRF", name: "MRF" },
+   121→   121→  { ticker: "BOSCHLTD", name: "Bosch" },
+   122→   122→  { ticker: "PAGEIND", name: "Page Industries" },
+   123→   123→  { ticker: "3MINDIA", name: "3M India" },
+   124→   124→  { ticker: "SIEMENS", name: "Siemens" },
+   125→   125→  { ticker: "ABB", name: "ABB India" },
+   126→   126→  { ticker: "HONEYWELL", name: "Honeywell Automation" },
+   127→   127→  { ticker: "SKFINDIA", name: "SKF India" },
+   128→   128→  { ticker: "TIMKEN", name: "Timken India" },
+   129→   129→  { ticker: "SNOWMAN", name: "Snowman Logistics" },
+   130→   130→  { ticker: "SPARC", name: "Sparc Systems" },
+   131→   131→  { ticker: "DATAPATTNS", name: "Data Patterns" },
+   132→   132→  { ticker: "CIGNITI", name: "Cigniti Technologies" },
+   133→   133→  { ticker: "LTTS", name: "L&T Technology Services" },
+   134→   134→  { ticker: "RAJESHEXPO", name: "Rajesh Exports" },
+   135→   135→  { ticker: "JINDALSTEL", name: "Jindal Steel" },
+   136→   136→  { ticker: "VEDL", name: "Vedanta" },
+   137→   137→  { ticker: "HINDZINC", name: "Hindustan Zinc" },
+   138→   138→  { ticker: "NMDC", name: "NMDC" },
+   139→   139→  { ticker: "NALCO", name: "NALCO" },
+   140→   140→  { ticker: "SRF", name: "SRF" },
+   141→   141→  { ticker: "INDIAMART", name: "IndiaMART InterMESH" },
+   142→   142→  { ticker: "JUSTDIAL", name: "Just Dial" },
+   143→   143→  { ticker: "TRIDENT", name: "Trident" },
+   144→   144→  { ticker: "VIPIND", name: "VIP Industries" },
+   145→   145→  { ticker: "JBM", name: "JBM Auto" },
+   146→   146→  { ticker: "ENDURANCE", name: "Endurance Technologies" },
+   147→   147→  { ticker: "SONATSOFTW", name: "Sonata Software" },
+   148→   148→  { ticker: "INTELLECT", name: "Intellect Design Arena" },
+   149→   149→  { ticker: "TRIVENI", name: "Triveni Engineering" },
+   150→   150→  { ticker: "ATUL", name: "Atul" },
+   151→   151→  { ticker: "AARTIDRUG", name: "Aarti Drugs" },
+   152→   152→  { ticker: "LAURUSLABS", name: "Laurus Labs" },
+   153→   153→  { ticker: "STRTECH", name: "Stratech" },
+   154→   154→  { ticker: "CAPLIPOINT", name: "Caplin Point Labs" },
+   155→   155→  { ticker: "GRANULES", name: "Granules India" },
+   156→   156→  { ticker: "TORNTPHARM", name: "Torrent Pharma" },
+   157→   157→  { ticker: "ALKEM", name: "Alkem Labs" },
+   158→   158→  { ticker: "LUPIN", name: "Lupin" },
+   159→   159→  { ticker: "BIOCON", name: "Biocon" },
+   160→   160→  { ticker: "ALEMBICLTD", name: "Alembic Pharma" },
+   161→   161→  { ticker: "THERMAX", name: "Thermax" },
+   162→   162→  { ticker: "WELCORP", name: "Welspun Corp" },
+   163→   163→  { ticker: "ARVIND", name: "Arvind" },
+   164→   164→  { ticker: "RAYMOND", name: "Raymond" },
+   165→   165→  { ticker: "VARDMRL", name: "Vardhman Textiles" },
+   166→   166→  { ticker: "WELSPUNLIV", name: "Welspun Living" },
+   167→   167→  { ticker: "CENTURYPLY", name: "Century Plyboards" },
+   168→   168→  { ticker: "GREENPLY", name: "GreenPly Industries" },
+   169→   169→  { ticker: "AIAENG", name: "AIA Engineering" },
+   170→   170→  { ticker: "BALAMINES", name: "Balaji Amines" },
+   171→   171→  { ticker: "SOLARINDS", name: "Solar Industries" },
+   172→   172→  { ticker: "HIMADRI", name: "Himadri Speciality" },
+   173→   173→  { ticker: "GRAPHITE", name: "Graphite India" },
+   174→   174→  { ticker: "IGL", name: "Indraprastha Gas" },
+   175→   175→  { ticker: "MGL", name: "Mahanagar Gas" },
+   176→   176→  { ticker: "GUJGASLTD", name: "Gujarat Gas" },
+   177→   177→  { ticker: "PETRONET", name: "Petronet LNG" },
+   178→   178→  { ticker: "GAIL", name: "GAIL India" },
+   179→   179→  { ticker: "CONCOR", name: "Container Corp" },
+   180→   180→];
+   181→   181→
+   182→   182→// Deduplicate by ticker
+   183→   183→const STOCK_MAP = new Map<string, string>();
+   184→   184→for (const s of NSE_STOCKS) {
+   185→   185→  if (!STOCK_MAP.has(s.ticker)) STOCK_MAP.set(s.ticker, s.name);
+   186→   186→}
+   187→   187→
+   188→   188→export interface VolumeShockerStock {
+   189→   189→  sr: number;
+   190→   190→  name: string;
+   191→   191→  ticker: string;
+   192→   192→  close: number;
+   193→   193→  change: number;
+   194→   194→  volGainPct: number;
+   195→   195→  isPositive: boolean;
+   196→   196→}
+   197→   197→
+   198→   198→interface YahooChartResult {
+   199→   199→  meta: {
+   200→   200→    symbol: string;
+   201→   201→    regularMarketPrice?: number;
+   202→   202→    previousClose?: number;
+   203→   203→  };
+   204→   204→  timestamp: number[];
+   205→   205→  indicators: {
+   206→   206→    quote: {
+   207→   207→      close: (number | null)[];
+   208→   208→      volume: (number | null)[];
+   209→   209→    }[];
+   210→   210→  };
+   211→   211→}
+   212→   212→
+   213→   213→/**
+   214→   214→ * Fetch 5-day OHLCV data for tickers from Yahoo Finance v8 API.
+   215→   215→ * Uses concurrent individual requests (batch endpoint is deprecated).
+   216→   216→ */
+   217→   217→async function fetchYahooData(
+   218→   218→  tickers: string[]
+   219→   219→): Promise<Map<string, { closes: number[]; volumes: number[] }>> {
+   220→   220→  const results = new Map<string, { closes: number[]; volumes: number[] }>();
+   221→   221→  const CONCURRENCY = 15; // Max parallel requests
+   222→   222→
+   223→   223→  // Process in chunks to avoid rate limits
+   224→   224→  for (let i = 0; i < tickers.length; i += CONCURRENCY) {
+   225→   225→    const chunk = tickers.slice(i, i + CONCURRENCY);
+   226→   226→
+   227→   227→    const chunkResults = await Promise.allSettled(
+   228→   228→      chunk.map(async (ticker) => {
+   229→   229→        const url = `https://query2.finance.yahoo.com/v8/finance/chart/${ticker}.NS?range=22d&interval=1d&includePrePost=false`;
+   230→   230→
+   231→   231→        const resp = await fetch(url, {
+   232→   232→          headers: { "User-Agent": USER_AGENT },
+   233→   233→          signal: AbortSignal.timeout(10000),
+   234→   234→        });
+   235→   235→
+   236→   236→        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+   237→   237→
+   238→   238→        const data = await resp.json();
+   239→   239→        const result: YahooChartResult = data.chart?.result?.[0];
+   240→   240→        if (!result) throw new Error("No result");
+   241→   241→
+   242→   242→        const closes = result.indicators.quote[0].close.filter(
+   243→   243→          (c): c is number => c !== null
+   244→   244→        );
+   245→   245→        const volumes = result.indicators.quote[0].volume.filter(
+   246→   246→          (v): v is number => v !== null
+   247→   247→        );
+   248→   248→
+   249→   249→        return { ticker, closes, volumes };
+   250→   250→      })
+   251→   251→    );
+   252→   252→
+   253→   253→    for (const r of chunkResults) {
+   254→   254→      if (r.status === "fulfilled") {
+   255→   255→        results.set(r.value.ticker, {
+   256→   256→          closes: r.value.closes,
+   257→   257→          volumes: r.value.volumes,
+   258→   258→        });
+   259→   259→      }
+   260→   260→      // Silently skip failures (404 = delisted/invalid symbol)
+   261→   261→    }
+   262→   262→  }
+   263→   263→
+   264→   264→  return results;
+   265→   265→}
+   266→   266→
+   267→   267→/**
+   268→   268→ * Fetch volume shockers using Yahoo Finance data.
+   269→   269→ * Uses Chartink's exact criteria: daily volume > SMA(volume,20) * 5
+   270→   270→ * Requires 22 days of data to compute a 20-day SMA.
+   271→   271→ */
+   272→   272→async function fetchViaYahoo(): Promise<VolumeShockerStock[]> {
+   273→   273→  const tickers = Array.from(STOCK_MAP.keys());
+   274→   274→  console.log(`[Scraper] Scanning ${tickers.length} stocks via Yahoo Finance (Chartink criteria: vol > 5x SMA20)...`);
+   275→   275→
+   276→   276→  const yahooData = await fetchYahooData(tickers);
+   277→   277→  console.log(`[Scraper] Got data for ${yahooData.size}/${tickers.length} stocks`);
+   278→   278→
+   279→   279→  const results: VolumeShockerStock[] = [];
+   280→   280→
+   281→   281→  for (const [ticker, { closes, volumes }] of yahooData) {
+   282→   282→    // Need at least 21 data points for a 20-day SMA
+   283→   283→    if (volumes.length < 21 || closes.length < 2) continue;
+   284→   284→
+   285→   285→    const latestClose = closes[closes.length - 1];
+   286→   286→    const prevClose = closes[closes.length - 2];
+   287→   287→    const latestVol = volumes[volumes.length - 1];
+   288→   288→
+   289→   289→    if (prevClose <= 0 || latestClose <= 0 || latestVol <= 0) continue;
+   290→   290→
+   291→   291→    // Chartink criteria: daily volume > SMA(volume, 20) * 5
+   292→   292→    // Use the 20 days BEFORE the latest day (indices -21 to -2, i.e. 20 values)
+   293→   293→    const prev20Volumes = volumes.slice(-21, -1);
+   294→   294→    const sma20Vol = prev20Volumes.reduce((a, b) => a + b, 0) / prev20Volumes.length;
+   295→   295→
+   296→   296→    if (sma20Vol <= 0) continue;
+   297→   297→
+   298→   298→    const volMultiple = latestVol / sma20Vol;
+   299→   299→
+   300→   300→    if (volMultiple >= 5) {
+   301→   301→      const changePct = ((latestClose / prevClose) - 1) * 100;
+   302→   302→      const volGainPct = (volMultiple - 1) * 100;
+   303→   303→      results.push({
+   304→   304→        sr: 0,
+   305→   305→        name: STOCK_MAP.get(ticker) || ticker,
+   306→   306→        ticker,
+   307→   307→        close: Math.round(latestClose * 100) / 100,
+   308→   308→        change: Math.round(changePct * 100) / 100,
+   309→   309→        volGainPct: Math.round(volGainPct * 10) / 10,
+   310→   310→        isPositive: changePct > 0,
+   311→   311→      });
+   312→   312→    }
+   313→   313→  }
+   314→   314→
+   315→   315→  // Sort by volume multiple (highest first)
+   316→   316→  results.sort((a, b) => b.volGainPct - a.volGainPct);
+   317→   317→  results.forEach((r, i) => (r.sr = i + 1));
+   318→   318→
+   319→   319→  console.log(`[Scraper] Found ${results.length} volume shockers (Chartink: vol > 5x SMA20)`);
+   320→   320→  return results;
+   321→   321→}
+   322→   322→
+   323→   323→/**
+   324→   324→ * Fetch volume shockers — tries Yahoo Finance API.
+   325→   325→ */
+   326→   326→export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
+   327→   327→  return fetchViaYahoo();
+   328→   328→}
+   329→   329→
+   330→   330→// ═══════════════════════════════════════════════════════════════════════
+   331→   331→// Stock Detail Scraper (Screener.in) — unchanged, still works
+   332→   332→// ═══════════════════════════════════════════════════════════════════════
+   333→   333→
+   334→   334→export interface StockDetail {
+   335→   335→  name: string;
+   336→   336→  ticker: string;
+   337→   337→  bseCode?: string;
+   338→   338→  nseCode?: string;
+   339→   339→  sector?: string;
+   340→   340→  industry?: string;
+   341→   341→  about?: string;
+   342→   342→  indices?: string[];
+   343→   343→  metrics: Record<string, string>;
+   344→   344→  quarters: {
+   345→   345→    label: string;
+   346→   346→    sales: string;
+   347→   347→    netProfit: string;
+   348→   348→    opm: string;
+   349→   349→  }[];
+   350→   350→  peers: { name: string; ticker: string }[];
+   351→   351→  pros?: string[];
+   352→   352→  cons?: string[];
+   353→   353→  balanceSheet?: {
+   354→   354→    label: string;
+   355→   355→    reserves: string;
+   356→   356→    borrowing: string;
+   357→   357→    otherLiab: string;
+   358→   358→    totalLiab: string;
+   359→   359→    fixedAssets: string;
+   360→   360→    cwip: string;
+   361→   361→    totalAssets: string;
+   362→   362→  }[];
+   363→   363→  shareholding?: {
+   364→   364→    category: string;
+   365→   365→    values: { label: string; value: string }[];
+   366→   366→  }[];
+   367→   367→  annualResults?: {
+   368→   368→    label: string;
+   369→   369→    sales: string;
+   370→   370→    netProfit: string;
+   371→   371→    opm: string;
+   372→   372→  }[];
+   373→   373→  cashFlow?: {
+   374→   374→    label: string;
+   375→   375→    operatingCF: string;
+   376→   376→    investingCF: string;
+   377→   377→    financingCF: string;
+   378→   378→  }[];
+   379→   379→}
+   380→   380→
+   381→   381→export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
+   382→   382→  const url = `https://www.screener.in/company/${ticker}/`;
+   383→   383→  const res = await fetch(url, {
+   384→   384→    headers: { "User-Agent": USER_AGENT },
+   385→   385→    signal: AbortSignal.timeout(30000),
+   386→   386→  });
+   387→   387→
+   388→   388→  if (!res.ok) throw new Error(`Failed to fetch screener for ${ticker}: ${res.status}`);
+   389→   389→
+   390→   390→  const html = await res.text();
+   391→   391→  const $ = cheerio.load(html);
+   392→   392→
+   393→   393→  const detail: StockDetail = {
+   394→   394→    name: "",
+   395→   395→    ticker,
+   396→   396→    metrics: {},
+   397→   397→    quarters: [],
+   398→   398→    peers: [],
+   399→   399→  };
+   400→   400→
+   401→   401→  // Company name
+   402→   402→  detail.name = $("h1.h2")
+   403→   403→    .first()
+   404→   404→    .text()
+   405→   405→    .trim()
+   406→   406→    .replace(/\s+/g, " ");
+   407→   407→
+   408→   408→  // BSE / NSE codes
+   409→   409→  const companyInfoText = $(".company-info-strip").text() || "";
+   410→   410→  const bseMatch = companyInfoText.match(/BSE:\s*(\d+)/);
+   411→   411→  const nseMatch = companyInfoText.match(/NSE:\s*(\w+)/);
+   412→   412→  if (bseMatch) detail.bseCode = bseMatch[1];
+   413→   413→  if (nseMatch) detail.nseCode = nseMatch[1];
+   414→   414→
+   415→   415→  // Sector & Industry
+   416→   416→  const peersSection = $("#peers");
+   417→   417→  if (peersSection.length) {
+   418→   418→    const links = peersSection.find("a[title]");
+   419→   419→    links.each((_, el) => {
+   420→   420→      const title = $(el).attr("title") || "";
+   421→   421→      const text = $(el).text().trim();
+   422→   422→      if (title === "Sector" && text) detail.sector = text;
+   423→   423→      if (title === "Industry" && text) detail.industry = text;
+   424→   424→    });
+   425→   425→  }
+   426→   426→
+   427→   427→  // About
+   428→   428→  detail.about = $(".about p")
+   429→   429→    .first()
+   430→   430→    .text()
+   431→   431→    .trim()
+   432→   432→    .replace(/\s+/g, " ");
+   433→   433→
+   434→   434→  // Key metrics
+   435→   435→  const ratioRows = $("#top-ratios li.flex.flex-space-between");
+   436→   436→  ratioRows.each((_, el) => {
+   437→   437→    const labelEl = $(el).find(".name");
+   438→   438→    const valueEl = $(el).find(".value .number");
+   439→   439→    const label = labelEl.text().trim();
+   440→   440→    const value = valueEl.first().text().trim();
+   441→   441→    if (label && value) detail.metrics[label] = value;
+   442→   442→  });
+   443→   443→
+   444→   444→  // Pros & Cons
+   445→   445→  const prosList: string[] = [];
+   446→   446→  const consList: string[] = [];
+   447→   447→  $("div.pros ul li").each((_, el) => {
+   448→   448→    const text = $(el).text().trim();
+   449→   449→    if (text) prosList.push(text);
+   450→   450→  });
+   451→   451→  $("div.cons ul li").each((_, el) => {
+   452→   452→    const text = $(el).text().trim();
+   453→   453→    if (text) consList.push(text);
+   454→   454→  });
+   455→   455→  if (prosList.length > 0) detail.pros = prosList;
+   456→   456→  if (consList.length > 0) detail.cons = consList;
+   457→   457→
+   458→   458→  // Quarterly results
+   459→   459→  const quarterlyTable = $("#quarters table");
+   460→   460→  if (quarterlyTable.length) {
+   461→   461→    const headers: string[] = [];
+   462→   462→    quarterlyTable.find("thead th").each((_, el) => headers.push($(el).text().trim()));
+   463→   463→
+   464→   464→    const rows = quarterlyTable.find("tbody tr");
+   465→   465→    let salesRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   466→   466→    let profitRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   467→   467→    let opmRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   468→   468→
+   469→   469→    rows.each((_, el) => {
+   470→   470→      const firstCell = $(el).find("td").first().text().trim().toLowerCase();
+   471→   471→      if (firstCell.includes("sales") || firstCell.includes("revenue")) salesRow = $(el);
+   472→   472→      if (firstCell.includes("net profit") || firstCell.includes("profit for")) profitRow = $(el);
+   473→   473→      if (firstCell.includes("opm") || firstCell.includes("operating")) opmRow = $(el);
+   474→   474→    });
+   475→   475→
+   476→   476→    for (let i = 1; i < headers.length; i++) {
+   477→   477→      detail.quarters.push({
+   478→   478→        label: headers[i],
+   479→   479→        sales: salesRow ? salesRow.find("td").eq(i).text().trim() : "-",
+   480→   480→        netProfit: profitRow ? profitRow.find("td").eq(i).text().trim() : "-",
+   481→   481→        opm: opmRow ? opmRow.find("td").eq(i).text().trim() : "-",
+   482→   482→      });
+   483→   483→    }
+   484→   484→  }
+   485→   485→
+   486→   486→  // Annual results
+   487→   487→  const annualTable = $("table#annual-results-table, #annual table");
+   488→   488→  if (annualTable.length) {
+   489→   489→    const annHeaders: string[] = [];
+   490→   490→    annualTable.find("thead th").each((_, el) => annHeaders.push($(el).text().trim()));
+   491→   491→
+   492→   492→    const annRows = annualTable.find("tbody tr");
+   493→   493→    let annSalesRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   494→   494→    let annProfitRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   495→   495→
+   496→   496→    annRows.each((_, el) => {
+   497→   497→      const firstCell = $(el).find("td").first().text().trim().toLowerCase();
+   498→   498→      if (firstCell.includes("sales") || firstCell.includes("revenue")) annSalesRow = $(el);
+   499→   499→      if (firstCell.includes("net profit") || firstCell.includes("profit for")) annProfitRow = $(el);
+   500→   500→    });
+   501→   501→
+   502→   502→    if (annSalesRow || annProfitRow) {
+   503→   503→      const annualResults: StockDetail["annualResults"] = [];
+   504→   504→      for (let i = 1; i < annHeaders.length; i++) {
+   505→   505→        annualResults.push({
+   506→   506→          label: annHeaders[i],
+   507→   507→          sales: annSalesRow ? annSalesRow.find("td").eq(i).text().trim() : "-",
+   508→   508→          netProfit: annProfitRow ? annProfitRow.find("td").eq(i).text().trim() : "-",
+   509→   509→          opm: "-",
+   510→   510→        });
+   511→   511→      }
+   512→   512→      if (annualResults.length > 0) detail.annualResults = annualResults;
+   513→   513→    }
+   514→   514→  }
+   515→   515→
+   516→   516→  // Balance Sheet
+   517→   517→  const bsTable = $("#balance-sheet table");
+   518→   518→  if (bsTable.length) {
+   519→   519→    const bsHeaders: string[] = [];
+   520→   520→    bsTable.find("thead th").each((_, el) => bsHeaders.push($(el).text().trim()));
+   521→   521→
+   522→   522→    const bsRows = bsTable.find("tbody tr");
+   523→   523→    const bsData: Record<string, cheerio.Cheerio<cheerio.Element>> = {};
+   524→   524→
+   525→   525→    bsRows.each((_, el) => {
+   526→   526→      const firstCell = $(el).find("td").first().text().trim().toLowerCase();
+   527→   527→      if (["reserves", "borrowing", "other liabilities", "total liabilities", "fixed assets", "cwip", "total assets"].some(k => firstCell.includes(k))) {
+   528→   528→        bsData[firstCell] = $(el);
+   529→   529→      }
+   530→   530→    });
+   531→   531→
+   532→   532→    const balanceSheet: StockDetail["balanceSheet"] = [];
+   533→   533→    for (let i = 1; i < bsHeaders.length; i++) {
+   534→   534→      const getCell = (key: string) => bsData[key] ? bsData[key].find("td").eq(i).text().trim() : "-";
+   535→   535→      balanceSheet.push({
+   536→   536→        label: bsHeaders[i],
+   537→   537→        reserves: getCell("reserves"),
+   538→   538→        borrowing: getCell("borrowing"),
+   539→   539→        otherLiab: getCell("other liabilities"),
+   540→   540→        totalLiab: getCell("total liabilities"),
+   541→   541→        fixedAssets: getCell("fixed assets"),
+   542→   542→        cwip: getCell("cwip"),
+   543→   543→        totalAssets: getCell("total assets"),
+   544→   544→      });
+   545→   545→    }
+   546→   546→    if (balanceSheet.length > 0) detail.balanceSheet = balanceSheet;
+   547→   547→  }
+   548→   548→
+   549→   549→  // Cash Flow
+   550→   550→  const cfTable = $("#cash-flow table");
+   551→   551→  if (cfTable.length) {
+   552→   552→    const cfHeaders: string[] = [];
+   553→   553→    cfTable.find("thead th").each((_, el) => cfHeaders.push($(el).text().trim()));
+   554→   554→
+   555→   555→    const cfRows = cfTable.find("tbody tr");
+   556→   556→    let cfOperRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   557→   557→    let cfInvestRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   558→   558→    let cfFinanceRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   559→   559→
+   560→   560→    cfRows.each((_, el) => {
+   561→   561→      const firstCell = $(el).find("td").first().text().trim().toLowerCase();
+   562→   562→      if (firstCell.includes("operating") || firstCell.includes("cash from")) cfOperRow = $(el);
+   563→   563→      if (firstCell.includes("investing")) cfInvestRow = $(el);
+   564→   564→      if (firstCell.includes("financing")) cfFinanceRow = $(el);
+   565→   565→    });
+   566→   566→
+   567→   567→    if (cfOperRow || cfInvestRow || cfFinanceRow) {
+   568→   568→      const cashFlow: StockDetail["cashFlow"] = [];
+   569→   569→      for (let i = 1; i < cfHeaders.length; i++) {
+   570→   570→        cashFlow.push({
+   571→   571→          label: cfHeaders[i],
+   572→   572→          operatingCF: cfOperRow ? cfOperRow.find("td").eq(i).text().trim() : "-",
+   573→   573→          investingCF: cfInvestRow ? cfInvestRow.find("td").eq(i).text().trim() : "-",
+   574→   574→          financingCF: cfFinanceRow ? cfFinanceRow.find("td").eq(i).text().trim() : "-",
+   575→   575→        });
+   576→   576→      }
+   577→   577→      if (cashFlow.length > 0) detail.cashFlow = cashFlow;
+   578→   578→    }
+   579→   579→  }
+   580→   580→
+   581→   581→  // Shareholding
+   582→   582→  const shSection = $("#shareholding");
+   583→   583→  if (shSection.length) {
+   584→   584→    const shTable = shSection.find("table.data-table");
+   585→   585→    if (shTable.length) {
+   586→   586→      const shHeaders: string[] = [];
+   587→   587→      shTable.find("thead th").each((_, el) => shHeaders.push($(el).text().trim()));
+   588→   588→
+   589→   589→      const values: { label: string; value: string }[] = [];
+   590→   590→      const seenLabels = new Set<string>();
+   591→   591→      shTable.find("tbody tr").each((_, rowEl) => {
+   592→   592→        const cells = $(rowEl).find("td");
+   593→   593→        if (cells.length < 2) return;
+   594→   594→        const label = $(cells[0]).text().trim().replace(/\s*[\+\\+]\s*$/, "").trim();
+   595→   595→        if (!label || label.length < 2 || seenLabels.has(label)) return;
+   596→   596→        seenLabels.add(label);
+   597→   597→
+   598→   598→        let latestValue = "";
+   599→   599→        for (let i = cells.length - 1; i >= 1; i--) {
+   600→   600→          const val = $(cells[i]).text().trim();
+   601→   601→          if (val) { latestValue = val; break; }
+   602→   602→        }
+   603→   603→        if (latestValue) values.push({ label, value: latestValue });
+   604→   604→      });
+   605→   605→
+   606→   606→      if (values.length > 0) {
+   607→   607→        const latestPeriod = shHeaders[shHeaders.length - 1] || "Latest";
+   608→   608→        detail.shareholding = [{ category: latestPeriod, values }];
+   609→   609→      }
+   610→   610→    }
+   611→   611→
+   612→   612→    if (!detail.shareholding || detail.shareholding.length === 0) {
+   613→   613→      const shItems: { label: string; value: string }[] = [];
+   614→   614→      shSection.find("li.flex.flex-space-between").each((_, el) => {
+   615→   615→        const label = $(el).find(".name").text().trim();
+   616→   616→        const value = $(el).find(".value .number").first().text().trim();
+   617→   617→        if (label && value) shItems.push({ label, value });
+   618→   618→      });
+   619→   619→      if (shItems.length > 0) detail.shareholding = [{ category: "Shareholding", values: shItems }];
+   620→   620→    }
+   621→   621→  }
+   622→   622→
+   623→   623→  // Indices / Benchmarks
+   624→   624→  const indices: string[] = [];
+   625→   625→  $("#peers #benchmarks a.tag").each((_, el) => {
+   626→   626→    const name = $(el).text().trim();
+   627→   627→    if (name && !$(el).hasClass("hidden")) indices.push(name);
+   628→   628→  });
+   629→   629→  if (indices.length > 0) detail.indices = indices;
+   630→   630→
+   631→   631→  // Peers
+   632→   632→  const indexKeywords = [
+   633→   633→    "nifty", "bse", "sensex", "dollex", "cnx", "nft", "lix",
+   634→   634→    "index", "benchmark", "equal weight", "low volatility",
+   635→   635→    "value 20", "liquid 15", "esg", "largecap", "midcap",
+   636→   636→    "commodities", "infrastructure", "energy", "mobility",
+   637→   637→  ];
+   638→   638→
+   639→   639→  let sectorUrl = "";
+   640→   640→  const sectorLink = $("#peers a[title='Sector']");
+   641→   641→  if (sectorLink.length) {
+   642→   642→    const href = sectorLink.attr("href") || "";
+   643→   643→    if (href.startsWith("/market/")) sectorUrl = href;
+   644→   644→  }
+   645→   645→
+   646→   646→  $("#peers a[href^='/company/']").each((_, el) => {
+   647→   647→    const $el = $(el);
+   648→   648→    const peerName = $el.text().trim();
+   649→   649→    const classes = $el.attr("class") || "";
+   650→   650→    const href = $el.attr("href") || "";
+   651→   651→    const tickerMatch = href.match(/\/company\/([A-Z0-9]+)\//);
+   652→   652→    const peerTicker = tickerMatch ? tickerMatch[1] : "";
+   653→   653→
+   654→   654→    if (classes.includes("tag")) return;
+   655→   655→    const lower = peerName.toLowerCase();
+   656→   656→    if (indexKeywords.some((kw) => lower.includes(kw))) return;
+   657→   657→
+   658→   658→    if (peerName && peerName.length > 2 && !peerName.includes("Discretionary") && !peerName.includes("Services") && !peerName.includes("Consumer") && peerName !== "Edit Columns") {
+   659→   659→      detail.peers.push({ name: peerName, ticker: peerTicker || peerName.replace(/[^A-Z0-9]/gi, "").toUpperCase() });
+   660→   660→    }
+   661→   661→  });
+   662→   662→
+   663→   663→  if (detail.peers.length === 0 && sectorUrl) {
+   664→   664→    try {
+   665→   665→      detail.peers = await fetchSectorPeers(sectorUrl, ticker);
+   666→   666→    } catch {
+   667→   667→      // Peers are optional
+   668→   668→    }
+   669→   669→  }
+   670→   670→
+   671→   671→  return detail;
+   672→   672→}
+   673→   673→
+   674→   674→async function fetchSectorPeers(sectorPath: string, currentTicker: string): Promise<{ name: string; ticker: string }[]> {
+   675→   675→  const url = `https://www.screener.in${sectorPath}`;
+   676→   676→  const res = await fetch(url, {
+   677→   677→    headers: { "User-Agent": USER_AGENT },
+   678→   678→    signal: AbortSignal.timeout(15000),
+   679→   679→  });
+   680→   680→
+   681→   681→  if (!res.ok) return [];
+   682→   682→
+   683→   683→  const html = await res.text();
+   684→   684→  const $ = cheerio.load(html);
+   685→   685→
+   686→   686→  const peers: { name: string; ticker: string }[] = [];
+   687→   687→  const seen = new Set<string>();
+   688→   688→
+   689→   689→  $("table.data-table a[href^='/company/']").each((_, el) => {
+   690→   690→    const $el = $(el);
+   691→   691→    const name = $el.text().trim();
+   692→   692→    const href = $el.attr("href") || "";
+   693→   693→    const tickerMatch = href.match(/\/company\/([A-Z0-9]+)\//);
+   694→   694→
+   695→   695→    if (name && name.length > 2 && tickerMatch) {
+   696→   696→      const peerTicker = tickerMatch[1];
+   697→   697→      if (/^\d+$/.test(peerTicker)) return;
+   698→   698→      if (peerTicker === currentTicker.toUpperCase()) return;
+   699→   699→      if (["NIFTY", "CNX100", "CNX500", "CNX200INDE", "CNXCOMMODI"].includes(peerTicker)) return;
+   700→   700→      if (!seen.has(peerTicker)) {
+   701→   701→        seen.add(peerTicker);
+   702→   702→        peers.push({ name, ticker: peerTicker });
+   703→   703→      }
+   704→   704→    }
+   705→   705→  });
+   706→   706→
+   707→   707→  return peers.slice(0, 15);
+   708→   708→}
