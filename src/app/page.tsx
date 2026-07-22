@@ -364,7 +364,7 @@ export default function Home() {
       setStocks(data.stocks);
       setLastUpdated(data.lastUpdated);
       if (data.tradingDate) setTradingDate(data.tradingDate);
-      setStats({ total: data.totalOnChartink, filtered: data.filteredCount });
+      setStats({ total: data.stocks.length, filtered: data.stocks.length });
       if (data.usingFallbackDate) {
         setUsingFallback(true);
         setFallbackDate(data.usingFallbackDate);

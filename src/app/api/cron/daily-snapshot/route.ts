@@ -28,6 +28,7 @@ export async function GET(request: Request) {
   }
 
   // Trigger the volume-shockers API internally
+  // Extend timeout since the Yahoo Finance scan takes ~5s for 168 stocks
   try {
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
@@ -35,6 +36,7 @@ export async function GET(request: Request) {
 
     const res = await fetch(`${baseUrl}/api/volume-shockers`, {
       cache: "no-store",
+      signal: AbortSignal.timeout(60_000), // 60s timeout for Yahoo scan
     });
     const data = await res.json();
 
@@ -42,10 +44,11 @@ export async function GET(request: Request) {
       ok: res.ok,
       tradingDate: data.tradingDate,
       stockCount: data.stocks?.length ?? 0,
+      error: data.error || undefined,
     });
   } catch (error) {
     return NextResponse.json(
-      { ok: false, error: "Failed to trigger snapshot" },
+      { ok: false, error: "Failed to trigger snapshot", detail: String(error) },
       { status: 500 }
     );
   }

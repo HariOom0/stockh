@@ -2,13 +2,24 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Check if DATABASE_URL looks like a valid PostgreSQL connection string.
+ * A dummy value like "file:/..." would pass a simple truthy check but
+ * crash Prisma on initialization.
+ */
+function hasValidDbUrl(): boolean {
+  const url = process.env.DATABASE_URL;
+  if (!url) return false;
+  return url.startsWith("postgresql://") || url.startsWith("postgres://");
+}
+
 // GET /api/stock-history          → list all snapshot dates
 // GET /api/stock-history?date=2026-07-08 → get stocks for a specific date
 export async function GET(request: Request) {
-  // Gracefully handle missing DATABASE_URL
-  if (!process.env.DATABASE_URL) {
+  // Gracefully handle missing/invalid DATABASE_URL
+  if (!hasValidDbUrl()) {
     return NextResponse.json(
-      { error: "Database not configured. Set DATABASE_URL environment variable.", snapshots: [] },
+      { error: "Database not configured. Set a valid DATABASE_URL (postgresql://...) environment variable.", snapshots: [] },
       { status: 503 }
     );
   }

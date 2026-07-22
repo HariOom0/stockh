@@ -3,7 +3,7 @@ import { fetchVolumeShockers } from "@/lib/scraper";
 import { getTradingDate } from "@/lib/trading-calendar";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30; // Vercel: extend timeout for slow Chartink scraping
+export const maxDuration = 30;
 
 // In-memory cache
 let cachedData: {
@@ -24,13 +24,20 @@ type VolumeShockerData = {
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 /**
- * Safely load Prisma DB client. Returns null if DATABASE_URL is not set.
+ * Check if DATABASE_URL looks like a valid PostgreSQL connection string.
+ * A dummy value like "file:/..." would pass a truthy check but crash Prisma.
+ */
+function hasValidDbUrl(): boolean {
+  const url = process.env.DATABASE_URL;
+  if (!url) return false;
+  return url.startsWith("postgresql://") || url.startsWith("postgres://");
+}
+
+/**
+ * Safely load Prisma DB client. Returns null if DB URL is not configured.
  */
 async function getDb() {
-  if (!process.env.DATABASE_URL) {
-    console.warn("[VolumeShockers] DATABASE_URL not set — DB features disabled");
-    return null;
-  }
+  if (!hasValidDbUrl()) return null;
   try {
     const { db } = await import("@/lib/db");
     return db;
@@ -41,8 +48,7 @@ async function getDb() {
 }
 
 /**
- * Build a lightweight fingerprint from a stock list so we can detect
- * whether Chartink returned the exact same data as the last saved snapshot.
+ * Build a lightweight fingerprint from a stock list to detect duplicate data.
  */
 function fingerprint(stocks: { ticker: string; close: number }[]): string {
   return stocks.map((s) => `${s.ticker}:${s.close}`).join("|");
@@ -52,7 +58,7 @@ function fingerprint(stocks: { ticker: string; close: number }[]): string {
  * Save a snapshot to the DB (fire-and-forget). Silently fails if DB is unavailable.
  */
 function saveSnapshotIfNew(stocks: VolumeShockerData[], tradingDate: string) {
-  if (!process.env.DATABASE_URL) return; // Skip if no DB configured
+  if (!hasValidDbUrl()) return;
 
   const snapshotPayload = stocks.map((s) => ({
     name: s.name,
@@ -88,7 +94,7 @@ export async function GET() {
   const tradingDate = getTradingDate();
   const now = Date.now();
 
-  // ── 1. Return in-memory cached data if still fresh ──────────────────
+  // 1. Return in-memory cached data if still fresh
   if (cachedData && now - cachedData.timestamp < CACHE_TTL && cachedData.tradingDate === tradingDate) {
     return NextResponse.json({
       stocks: cachedData.stocks,
@@ -98,7 +104,7 @@ export async function GET() {
     });
   }
 
-  // ── 2. Check DB for today's data (skip if DATABASE_URL not set) ────
+  // 2. Check DB for today's data (skip if DB not configured)
   try {
     const db = await getDb();
     if (db) {
@@ -121,17 +127,12 @@ export async function GET() {
     console.error("[VolumeShockers] DB read failed (non-fatal):", dbError);
   }
 
-  // ── 3. Scrape fresh data from Chartink ─────────────────────────────
+  // 3. Fetch fresh data via Yahoo Finance
   try {
     const allStocks = await fetchVolumeShockers();
-    // Filter: positive change AND volume gain > 180%
-    const filtered = allStocks.filter(
-      (s) => s.isPositive && s.volGainPct >= 180
-    );
-    filtered.sort((a, b) => b.volGainPct - a.volGainPct);
 
-    if (filtered.length > 0) {
-      // ── 4. Duplicate-data guard (non-trading-day safety net) ────────
+    if (allStocks.length > 0) {
+      // 4. Duplicate-data guard (non-trading-day safety net)
       try {
         const db = await getDb();
         if (db) {
@@ -142,7 +143,7 @@ export async function GET() {
 
           if (lastSnapshot) {
             const lastStocks: VolumeShockerData[] = JSON.parse(lastSnapshot.stocksJson);
-            if (fingerprint(filtered) === fingerprint(lastStocks)) {
+            if (fingerprint(allStocks) === fingerprint(lastStocks)) {
               console.log(
                 `[VolumeShockers] Data unchanged vs ${lastSnapshot.date} — likely non-trading day.`
               );
@@ -157,19 +158,17 @@ export async function GET() {
           }
         }
       } catch {
-        // Duplicate guard is optional — skip if DB fails
+        // Duplicate guard is optional
       }
 
-      // ── 5. New trading-day data — save to DB & return ──────────────
-      cachedData = { stocks: filtered, timestamp: now, tradingDate };
-      saveSnapshotIfNew(filtered, tradingDate);
+      // 5. New data — cache, save to DB & return
+      cachedData = { stocks: allStocks, timestamp: now, tradingDate };
+      saveSnapshotIfNew(allStocks, tradingDate);
 
       return NextResponse.json({
-        stocks: filtered,
+        stocks: allStocks,
         cached: false,
         lastUpdated: now,
-        totalOnChartink: allStocks.length,
-        filteredCount: filtered.length,
         tradingDate,
       });
     }
@@ -177,7 +176,7 @@ export async function GET() {
     console.error("[VolumeShockers] Scraping failed:", scrapeError);
   }
 
-  // ── 6. Fallback: return most recent data from DB ───────────────────
+  // 6. Fallback: return most recent data from DB
   try {
     const db = await getDb();
     if (db) {
@@ -202,7 +201,7 @@ export async function GET() {
     console.error("[VolumeShockers] DB fallback also failed:", dbError);
   }
 
-  // ── 7. Nothing at all — return empty ────────────────────────────────
+  // 7. Nothing at all — return empty with helpful message
   return NextResponse.json(
     {
       error: "No data available yet. Stock data is fetched every trading day after market hours (7:15 PM IST). If the market is open, data will appear here after close.",
