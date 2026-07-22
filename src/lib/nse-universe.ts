@@ -1,15 +1,11 @@
-import * as cheerio from "cheerio";
-
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
 // ─── NSE Stock Universe ──────────────────────────────────────────────
 // Comprehensive list: Nifty 50/100/200 + F&O + popular mid/small caps.
 // This wide universe ensures we catch the same volume shockers
 // that Chartink's scan finds across the entire cash segment.
 // Chartink scan: ( {cash} ( daily volume > daily sma( volume,20 ) * 5 ) )
-const NSE_STOCKS: { ticker: string; name: string }[] = [
-  // Nifty 50
+
+export const NSE_STOCKS: { ticker: string; name: string }[] = [
+  // ── Nifty 50 ──
   { ticker: "RELIANCE", name: "Reliance Industries" },
   { ticker: "TCS", name: "Tata Consultancy Services" },
   { ticker: "HDFCBANK", name: "HDFC Bank" },
@@ -64,7 +60,7 @@ const NSE_STOCKS: { ticker: string; name: string }[] = [
   { ticker: "TRENT", name: "Trent" },
   { ticker: "VEDL", name: "Vedanta" },
   { ticker: "ZOMATO", name: "Zomato" },
-  // Nifty Next 50 + popular midcaps
+  // ── Nifty Next 50 + popular midcaps ──
   { ticker: "ADANIPORTS", name: "Adani Ports" },
   { ticker: "AMBUJACEM", name: "Ambuja Cements" },
   { ticker: "APOLLOHOSP", name: "Apollo Hospitals" },
@@ -127,7 +123,7 @@ const NSE_STOCKS: { ticker: string; name: string }[] = [
   { ticker: "WHIRLPOOL", name: "Whirlpool" },
   { ticker: "YESBANK", name: "Yes Bank" },
   { ticker: "ZEEL", name: "Zee Entertainment" },
-  // F&O + small/mid caps (volume spike candidates)
+  // ── F&O + small/mid caps (volume spike candidates) ──
   { ticker: "3MINDIA", name: "3M India" },
   { ticker: "AARTIDRUG", name: "Aarti Drugs" },
   { ticker: "ABB", name: "ABB India" },
@@ -185,8 +181,7 @@ const NSE_STOCKS: { ticker: string; name: string }[] = [
   { ticker: "INDIGO", name: "IndiGo Airlines" },
   { ticker: "INDUSTOWER", name: "Indus Towers" },
   { ticker: "INTELLECT", name: "Intellect Design" },
-  { ticker: "JAMNAGARARM", name: "Jamnagar Arms" },
-  { ticker: "JBMA", name: "JBM Auto" },
+  { ticker: "JBM", name: "JBM Auto" },
   { ticker: "JINDALSAW", name: "Jindal Saw" },
   { ticker: "JSWINFRA", name: "JSW Infra" },
   { ticker: "JUBLFOOD", name: "Jubilant Foodworks" },
@@ -194,27 +189,16 @@ const NSE_STOCKS: { ticker: string; name: string }[] = [
   { ticker: "JUSTDIAL", name: "Just Dial" },
   { ticker: "KNRCON", name: "KNR Construction" },
   { ticker: "L&TFH", name: "L&T Finance" },
-  { ticker: "LALPATHLAB", name: "Lal PathLabs" },
   { ticker: "LINDEINDIA", name: "Linde India" },
-  { ticker: "LOTUSEYE", name: "Lotus Eye" },
   { ticker: "MANAPPURAM", name: "Manappuram Finance" },
-  { ticker: "MANGALAM", name: "Mangalam Drugs" },
-  { ticker: "MASTEK", name: "Mastek" },
   { ticker: "MCX", name: "MCX India" },
   { ticker: "MGL", name: "Mahanagar Gas" },
-  { ticker: "MMTC", name: "MMTC" },
-  { ticker: "MOTILALOFS", name: "Motilal Oswal" },
   { ticker: "MPHASIS", name: "Mphasis" },
   { ticker: "NATIONALUM", name: "National Aluminium" },
   { ticker: "NAVINFLUOR", name: "Navin Fluorine" },
-  { ticker: "NELCAST", name: "Nelcast" },
   { ticker: "NETWORK18", name: "Network18 Media" },
   { ticker: "NIACL", name: "New India Assurance" },
-  { ticker: "NIITTECH", name: "NIIT Technologies" },
-  { ticker: "NOCIL", name: "NOCIL" },
-  { ticker: "NRBBEARING", name: "NRB Bearings" },
   { ticker: "NURECA", name: "Nureca Ltd" },
-  { ticker: "OBEROIRLTY", name: "Oberoi Realty" },
   { ticker: "OLECTRA", name: "Olectra Greentech" },
   { ticker: "PAGEIND", name: "Page Industries" },
   { ticker: "PGHL", name: "P&G Health" },
@@ -224,4 +208,6 @@ const NSE_STOCKS: { ticker: string; name: string }[] = [
   { ticker: "POONAWALLA", name: "Poonawalla Fincorp" },
   { ticker: "PRAJINDS", name: "Praj Industries" },
   { ticker: "PREMIERENE", name: "Premier Energies" },
+  { ticker: "PSPPRIME", name: "PSP Projects" },
+  { ticker: "RAJESHEXPO", name: "Rajesh Exports" },
   { ticker: 
