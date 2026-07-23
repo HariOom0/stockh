@@ -1,0 +1,377 @@
+/home/z/my-project/tool-results/read_1783456959318_eecc8798a96d.txt:   476→                        onClick={() => toggleSort("n")}
+/home/z/my-project/tool-results/read_1783456959318_eecc8798a96d.txt:   479→                          Vol Gain <SortIcon field="n" />
+/home/z/my-project/tool-results/read_1783456959318_eecc8798a96d.txt:   522→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783456959318_eecc8798a96d.txt:   589→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783456959318_eecc8798a96d.txt:   729→                        Vol: {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457891845_c06add12a124.txt:   625→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783457891845_c06add12a124.txt:   626→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783457891845_c06add12a124.txt:   654→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457891845_c06add12a124.txt:   693→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457891845_c06add12a124.txt:   818→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457891845_c06add12a124.txt:   947→                        Vol: {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784750443206_a6a653524cf6.txt:   194→  n: number;
+/home/z/my-project/tool-results/read_1784750443206_a6a653524cf6.txt:   302→      const n = (volMultiple - 1) * 100;
+/home/z/my-project/tool-results/read_1784750443206_a6a653524cf6.txt:   309→        n: Math.round(n * 10) / 10,
+/home/z/my-project/tool-results/read_1784750443206_a6a653524cf6.txt:   316→  results.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:    59→  n: number;
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:   261→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:   531→      n: 0,
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:   549→      n: 0,
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:   624→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:   626→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:   676→          n: s.n as number,
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:  1038→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:  1039→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:  1067→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:  1106→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:  1231→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:  1530→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:  1563→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:  1725→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1784748809420_4788f3d66db7.txt:  1729→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540036293_61e02f127489.txt:  1690→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783540036293_61e02f127489.txt:  1694→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540024647_737a539a0797.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540024647_737a539a0797.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540024647_737a539a0797.txt:  1690→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783540024647_737a539a0797.txt:  1694→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:    59→  n: number;
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:   261→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:   500→      n: 0,
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:   518→      n: 0,
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:   593→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:   595→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:   645→          n: s.n as number,
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:  1003→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:  1004→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:  1032→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:  1071→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:  1690→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783539856579_1abde55b1756.txt:  1694→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540013309_d3a519f2e545.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540013309_d3a519f2e545.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540013309_d3a519f2e545.txt:  1690→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783540013309_d3a519f2e545.txt:  1694→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539988553_3759534ce522.txt:  1071→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539988553_3759534ce522.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539988553_3759534ce522.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539988553_3759534ce522.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540032008_6a88dfc26727.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540032008_6a88dfc26727.txt:  1690→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783540032008_6a88dfc26727.txt:  1694→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539996158_c8b9dbafce55.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539996158_c8b9dbafce55.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539996158_c8b9dbafce55.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:    60→  n: number;
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:   260→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:   498→      n: 0,
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:   516→      n: 0,
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:   591→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:   593→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:   643→          n: s.n as number,
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:  1012→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:  1013→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:  1041→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:  1080→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:  1205→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:  1504→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:  1537→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:  1699→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783514192246_4fea16e97099.txt:  1703→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784750780206_a6a653524cf6.txt:   194→  n: number;
+/home/z/my-project/tool-results/read_1784750780206_a6a653524cf6.txt:   302→      const n = (volMultiple - 1) * 100;
+/home/z/my-project/tool-results/read_1784750780206_a6a653524cf6.txt:   309→        n: Math.round(n * 10) / 10,
+/home/z/my-project/tool-results/read_1784750780206_a6a653524cf6.txt:   316→  results.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1783539966977_2d0221fe16d1.txt:  1003→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783539966977_2d0221fe16d1.txt:  1004→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783539966977_2d0221fe16d1.txt:  1032→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539966977_2d0221fe16d1.txt:  1071→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539966977_2d0221fe16d1.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539958207_33513489b496.txt:  1003→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783539958207_33513489b496.txt:  1004→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783539958207_33513489b496.txt:  1032→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539958207_33513489b496.txt:  1071→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539958207_33513489b496.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540028368_e4dd34876e81.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540028368_e4dd34876e81.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540028368_e4dd34876e81.txt:  1690→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783540028368_e4dd34876e81.txt:  1694→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540009260_f7a792ee1bcb.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540009260_f7a792ee1bcb.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540009260_f7a792ee1bcb.txt:  1690→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783540009260_f7a792ee1bcb.txt:  1694→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:    59→  n: number;
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:   261→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:   531→      n: 0,
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:   549→      n: 0,
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:   624→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:   626→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:   676→          n: s.n as number,
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:  1038→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:  1039→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:  1067→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:  1106→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:  1231→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:  1530→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:  1563→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:  1725→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1784732910288_3e48e0116847.txt:  1729→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539981350_e1ac85b83bf1.txt:  1003→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783539981350_e1ac85b83bf1.txt:  1004→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783539981350_e1ac85b83bf1.txt:  1032→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539981350_e1ac85b83bf1.txt:  1071→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539981350_e1ac85b83bf1.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457888329_9bc6a2d79e8a.txt:    66→    66→   625→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783457888329_9bc6a2d79e8a.txt:    67→    67→   626→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783457888329_9bc6a2d79e8a.txt:    95→    95→   654→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457888329_9bc6a2d79e8a.txt:   134→   134→   693→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457888329_9bc6a2d79e8a.txt:   259→   259→   818→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457888329_9bc6a2d79e8a.txt:   388→   388→   947→                        Vol: {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784732863110_a4bf273285e5.txt:   194→  n: number;
+/home/z/my-project/tool-results/read_1784732863110_a4bf273285e5.txt:   291→    const n = ((latestVol / prevVol) - 1) * 100;
+/home/z/my-project/tool-results/read_1784732863110_a4bf273285e5.txt:   294→    if (changePct > 0 && n >= 100) {
+/home/z/my-project/tool-results/read_1784732863110_a4bf273285e5.txt:   301→        n: Math.round(n * 10) / 10,
+/home/z/my-project/tool-results/read_1784732863110_a4bf273285e5.txt:   308→  results.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1783540004151_c03de8c94b20.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540004151_c03de8c94b20.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540004151_c03de8c94b20.txt:  1690→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783540004151_c03de8c94b20.txt:  1694→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:    55→  n: number;
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:   253→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:   450→      n: 0,
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:   468→      n: 0,
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:   543→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:   545→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:   817→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:   818→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:   846→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:   885→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:  1010→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:  1372→                    {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783461011133_2448ee16ffef.txt:  1376→                          Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:    60→  n: number;
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:   260→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:   498→      n: 0,
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:   516→      n: 0,
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:   591→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:   593→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:   643→          n: s.n as number,
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:  1012→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:  1013→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:  1041→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:  1080→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:  1205→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:  1504→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:  1537→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:  1699→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783514666371_482db9c6c1e0.txt:  1703→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539930126_6631c04a912d.txt:  1003→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783539930126_6631c04a912d.txt:  1004→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783539930126_6631c04a912d.txt:  1032→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539930126_6631c04a912d.txt:  1071→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540039882_247ec7dad643.txt:  1690→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783540039882_247ec7dad643.txt:  1694→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540000858_4f1c84f6d7e1.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540000858_4f1c84f6d7e1.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540000858_4f1c84f6d7e1.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457884715_9c87f2c0e495.txt:    66→   625→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783457884715_9c87f2c0e495.txt:    67→   626→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783457884715_9c87f2c0e495.txt:    95→   654→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457884715_9c87f2c0e495.txt:   134→   693→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457884715_9c87f2c0e495.txt:   259→   818→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457884715_9c87f2c0e495.txt:   388→   947→                        Vol: {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783456903824_0bb1a880fae8.txt:    46→  n: number;
+/home/z/my-project/tool-results/read_1783456903824_0bb1a880fae8.txt:   106→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1783456903824_0bb1a880fae8.txt:   476→                        onClick={() => toggleSort("n")}
+/home/z/my-project/tool-results/read_1783456903824_0bb1a880fae8.txt:   479→                          Vol Gain <SortIcon field="n" />
+/home/z/my-project/tool-results/read_1783456903824_0bb1a880fae8.txt:   522→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783456903824_0bb1a880fae8.txt:   589→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783456903824_0bb1a880fae8.txt:   729→                        Vol: {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784732869162_21656c1488dd.txt:   194→   194→  n: number;
+/home/z/my-project/tool-results/read_1784732869162_21656c1488dd.txt:   291→   291→    const n = ((latestVol / prevVol) - 1) * 100;
+/home/z/my-project/tool-results/read_1784732869162_21656c1488dd.txt:   294→   294→    if (changePct > 0 && n >= 100) {
+/home/z/my-project/tool-results/read_1784732869162_21656c1488dd.txt:   301→   301→        n: Math.round(n * 10) / 10,
+/home/z/my-project/tool-results/read_1784732869162_21656c1488dd.txt:   308→   308→  results.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1784747618128_a4bf273285e5.txt:   194→  n: number;
+/home/z/my-project/tool-results/read_1784747618128_a4bf273285e5.txt:   291→    const n = ((latestVol / prevVol) - 1) * 100;
+/home/z/my-project/tool-results/read_1784747618128_a4bf273285e5.txt:   294→    if (changePct > 0 && n >= 100) {
+/home/z/my-project/tool-results/read_1784747618128_a4bf273285e5.txt:   301→        n: Math.round(n * 10) / 10,
+/home/z/my-project/tool-results/read_1784747618128_a4bf273285e5.txt:   308→  results.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1784751341072_41f33a2b61f5.txt:   194→   194→  n: number;
+/home/z/my-project/tool-results/read_1784751341072_41f33a2b61f5.txt:   302→   302→      const n = (volMultiple - 1) * 100;
+/home/z/my-project/tool-results/read_1784751341072_41f33a2b61f5.txt:   309→   309→        n: Math.round(n * 10) / 10,
+/home/z/my-project/tool-results/read_1784751341072_41f33a2b61f5.txt:   316→   316→  results.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1784748897386_a6a653524cf6.txt:   194→  n: number;
+/home/z/my-project/tool-results/read_1784748897386_a6a653524cf6.txt:   302→      const n = (volMultiple - 1) * 100;
+/home/z/my-project/tool-results/read_1784748897386_a6a653524cf6.txt:   309→        n: Math.round(n * 10) / 10,
+/home/z/my-project/tool-results/read_1784748897386_a6a653524cf6.txt:   316→  results.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:    59→  n: number;
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:   261→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:   531→      n: 0,
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:   549→      n: 0,
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:   624→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:   626→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:   676→          n: s.n as number,
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:  1038→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:  1039→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:  1067→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:  1106→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:  1231→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:  1530→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:  1563→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:  1725→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1784672025745_3e48e0116847.txt:  1729→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539962094_ddd5293a74f7.txt:  1003→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783539962094_ddd5293a74f7.txt:  1004→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783539962094_ddd5293a74f7.txt:  1032→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539962094_ddd5293a74f7.txt:  1071→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539962094_ddd5293a74f7.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539953684_618a3aa8b8dc.txt:  1003→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783539953684_618a3aa8b8dc.txt:  1004→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783539953684_618a3aa8b8dc.txt:  1032→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539953684_618a3aa8b8dc.txt:  1071→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539953684_618a3aa8b8dc.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540020479_cb9d816eb0a7.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540020479_cb9d816eb0a7.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540020479_cb9d816eb0a7.txt:  1690→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783540020479_cb9d816eb0a7.txt:  1694→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457856034_c30abe468bc5.txt:    50→  n: number;
+/home/z/my-project/tool-results/read_1783457856034_c30abe468bc5.txt:   163→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1783457856034_c30abe468bc5.txt:   366→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1783457856034_c30abe468bc5.txt:   368→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1783457856034_c30abe468bc5.txt:   625→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783457856034_c30abe468bc5.txt:   626→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783457856034_c30abe468bc5.txt:   654→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457856034_c30abe468bc5.txt:   693→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457856034_c30abe468bc5.txt:   818→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457856034_c30abe468bc5.txt:   947→                        Vol: {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457867459_224a622e4c74.txt:    50→    50→    50→  n: number;
+/home/z/my-project/tool-results/read_1783457867459_224a622e4c74.txt:   163→   163→   163→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1783457867459_224a622e4c74.txt:   366→   366→   366→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1783457867459_224a622e4c74.txt:   368→   368→   368→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1783539984870_31e46d51a945.txt:  1032→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539984870_31e46d51a945.txt:  1071→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539984870_31e46d51a945.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539984870_31e46d51a945.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457862031_ef0d5055f4ad.txt:    50→    50→  n: number;
+/home/z/my-project/tool-results/read_1783457862031_ef0d5055f4ad.txt:   163→   163→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1783457862031_ef0d5055f4ad.txt:   366→   366→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1783457862031_ef0d5055f4ad.txt:   368→   368→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1783457862031_ef0d5055f4ad.txt:   625→   625→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783457862031_ef0d5055f4ad.txt:   626→   626→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783457862031_ef0d5055f4ad.txt:   654→   654→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457862031_ef0d5055f4ad.txt:   693→   693→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457862031_ef0d5055f4ad.txt:   818→   818→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457862031_ef0d5055f4ad.txt:   947→   947→                        Vol: {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783459841831_a32f24549f08.txt:    55→  n: number;
+/home/z/my-project/tool-results/read_1783459841831_a32f24549f08.txt:   201→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1783459841831_a32f24549f08.txt:   398→      n: 0,
+/home/z/my-project/tool-results/read_1783459841831_a32f24549f08.txt:   471→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1783459841831_a32f24549f08.txt:   473→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1783459841831_a32f24549f08.txt:   745→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783459841831_a32f24549f08.txt:   746→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783459841831_a32f24549f08.txt:   774→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783459841831_a32f24549f08.txt:   813→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783459841831_a32f24549f08.txt:   938→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783459841831_a32f24549f08.txt:  1244→                          Vol: {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457894961_b0621bb54c3a.txt:    26→   625→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783457894961_b0621bb54c3a.txt:    27→   626→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783457894961_b0621bb54c3a.txt:    55→   654→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457894961_b0621bb54c3a.txt:    94→   693→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457894961_b0621bb54c3a.txt:   219→   818→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457894961_b0621bb54c3a.txt:   348→   947→                        Vol: {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457881380_bac748bcd25c.txt:   625→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783457881380_bac748bcd25c.txt:   626→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783457881380_bac748bcd25c.txt:   654→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457881380_bac748bcd25c.txt:   693→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457881380_bac748bcd25c.txt:   818→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783457881380_bac748bcd25c.txt:   947→                        Vol: {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:    59→  n: number;
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:   261→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:   531→      n: 0,
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:   549→      n: 0,
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:   624→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:   626→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:   676→          n: s.n as number,
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:  1038→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:  1039→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:  1067→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:  1106→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:  1231→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:  1530→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:  1563→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:  1725→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1784749963226_4788f3d66db7.txt:  1729→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:    59→  n: number;
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:   266→  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:   505→      n: 0,
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:   523→      n: 0,
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:   598→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:   600→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:   650→          n: s.n as number,
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:  1059→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:  1060→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:  1088→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:  1127→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:  1252→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:  1551→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:  1584→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:  1746→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783538888070_ec318008f77c.txt:  1750→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:   532→      n: 0,
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:   550→      n: 0,
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:   625→    // Sort stocks within each group by n descending
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:   627→      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:   682→          n: s.n as number,
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:  1044→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:  1045→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:  1073→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:  1112→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:  1237→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:  1549→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:  1582→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:  1744→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1784808622782_08d28aa8df77.txt:  1748→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539970168_7b75ac4a7f52.txt:  1003→                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/tool-results/read_1783539970168_7b75ac4a7f52.txt:  1004→                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/tool-results/read_1783539970168_7b75ac4a7f52.txt:  1032→                            {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539970168_7b75ac4a7f52.txt:  1071→                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539970168_7b75ac4a7f52.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540016503_c3b2ed348ed2.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540016503_c3b2ed348ed2.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783540016503_c3b2ed348ed2.txt:  1690→                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/tool-results/read_1783540016503_c3b2ed348ed2.txt:  1694→                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539992496_23b2d368a114.txt:  1196→                                        {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539992496_23b2d368a114.txt:  1495→                                    {stock.n.toFixed(0)}%
+/home/z/my-project/tool-results/read_1783539992496_23b2d368a114.txt:  1528→                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/src/app/page.tsx:  n: number;
+/home/z/my-project/src/app/page.tsx:  const [sortBy, setSortBy] = useState<"n" | "change" | "close" | "name">("n");
+/home/z/my-project/src/app/page.tsx:      n: 0,
+/home/z/my-project/src/app/page.tsx:      n: 0,
+/home/z/my-project/src/app/page.tsx:    // Sort stocks within each group by n descending
+/home/z/my-project/src/app/page.tsx:      group.stocks.sort((a, b) => b.n - a.n);
+/home/z/my-project/src/app/page.tsx:          n: s.n as number,
+/home/z/my-project/src/app/page.tsx:                      <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("n")}>
+/home/z/my-project/src/app/page.tsx:                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="n" /></span>
+/home/z/my-project/src/app/page.tsx:                            {stock.n.toFixed(0)}%
+/home/z/my-project/src/app/page.tsx:                            Vol: {stock.n.toFixed(0)}%
+/home/z/my-project/src/app/page.tsx:                                        {stock.n.toFixed(0)}%
+/home/z/my-project/src/app/page.tsx:                                    {stock.n.toFixed(0)}%
+/home/z/my-project/src/app/page.tsx:                                  Vol {stock.n.toFixed(0)}%
+/home/z/my-project/src/app/page.tsx:                      {!isSearchedStock && selectedStock.n > 0 && (
+/home/z/my-project/src/app/page.tsx:                            Vol {selectedStock.n.toFixed(0)}%
+/home/z/my-project/src/app/api/volume-shockers/route.ts:  n: number;
+/home/z/my-project/src/app/api/volume-shockers/route.ts:    n: s.n,
+/home/z/my-project/src/lib/scraper.ts:  n: number;
+/home/z/my-project/src/lib/scraper.ts:// Yahoo Finance — 20-day Volume Average (for n calculation)
+/home/z/my-project/src/lib/scraper.ts:  // Step 2: Get 20-day volume averages from Yahoo Finance (for n)
+/home/z/my-project/src/lib/scraper.ts:  // Step 3: Merge data — use Chartink for close/change, Yahoo for n only
+/home/z/my-project/src/lib/scraper.ts:    let n: number;
+/home/z/my-project/src/lib/scraper.ts:      n = Math.round(((yahoo.todayVolume / yahoo.avgVol20d) - 1) * 1000) / 10;
+/home/z/my-project/src/lib/scraper.ts:      n = 500;
+/home/z/my-project/src/lib/scraper.ts:      n,
+/home/z/my-project/src/lib/scraper.ts:  // Sort by n (highest first)
+/home/z/my-project/src/lib/scraper.ts:  results.sort((a, b) => b.n - a.n);
