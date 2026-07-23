@@ -3,11 +3,9 @@ import * as cheerio from "cheerio";
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 
-// ─── Chartink Configuration ───────────────────────────────────────────
-const CHARTINK_SCAN_CLAUSE =
-  "( {cash} ( daily volume > daily sma( volume,20 ) * 5 ) )";
-const CHARTINK_URL = "https://chartink.com/screener/process";
-const CHARTINK_PAGE = "https://chartink.com/screener/volume-shockers";
+// ─── Chartink EOD Scanner URL (the page the user wants to match) ─────
+const CHARTINK_EOD_URL =
+  "https://chartink.com/eodscanner/Volume-Shockers.html";
 
 // ═══════════════════════════════════════════════════════════════════════
 // Volume Shocker Types
@@ -23,28 +21,22 @@ export interface VolumeShockerStock {
   isPositive: boolean;
 }
 
-interface ChartinkRow {
-  sr: number;
-  nsecode: string;
-  name: string;
-  bsecode: string | null;
-  close: number;
-  per_chg: number;
-  volume: number;
-}
-
 // ═══════════════════════════════════════════════════════════════════════
-// Chartink Scraper — Puppeteer (bypasses Cloudflare)
+// Chartink EOD Scraper — Puppeteer (bypasses Cloudflare)
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Fetch volume shockers from Chartink using a headless browser.
- * Cloudflare blocks plain fetch/XHR from server — so we launch a real
- * browser, let it pass the CF challenge, then execute the API call
- * from *inside* the page context (page.evaluate).
+ * Scrape the Chartink EOD Volume Shockers page using a headless browser.
+ * The EOD page has all 100 stocks in a static HTML table (#stocklisttable)
+ * with columns: Sr., Stock name, Close, Change, Vol Gain %.
+ *
+ * This is MORE reliable than calling /screener/process because:
+ * 1. No XSRF token / CSRF handling needed
+ * 2. Vol Gain % is already calculated (no Yahoo Finance needed)
+ * 3. Returns 100 stocks (matches what the user sees on Chartink)
  */
-async function fetchChartinkViaPuppeteer(): Promise<ChartinkRow[]> {
-  // Dynamic imports — @sparticuz/chromium exports via .default, NOT named
+async function fetchChartinkEODViaPuppeteer(): Promise<VolumeShockerStock[]> {
+  // Dynamic imports — @sparticuz/chromium exports via .default
   const chromiumMod = await import("@sparticuz/chromium");
   const chromium = chromiumMod.default ?? chromiumMod;
   const puppeteerMod = await import("puppeteer-core");
@@ -67,233 +59,95 @@ async function fetchChartinkViaPuppeteer(): Promise<ChartinkRow[]> {
     const page = await browser.newPage();
     await page.setUserAgent(USER_AGENT);
 
-    // Step 1 — Navigate to the screener page & wait for CF challenge
-    console.log("[Chartink] Navigating to screener page...");
-    await page.goto(CHARTINK_PAGE, {
+    // Navigate to the EOD scanner page
+    console.log("[Chartink] Navigating to EOD scanner page...");
+    await page.goto(CHARTINK_EOD_URL, {
       waitUntil: "networkidle2",
-      timeout: 35_000,
+      timeout: 40_000,
     });
 
-    // Wait until Cloudflare "checking your browser" is gone
+    // Wait for Cloudflare challenge to complete
     console.log("[Chartink] Waiting for Cloudflare challenge...");
     await page.waitForFunction(
       () => {
         const txt = document.body?.innerText ?? "";
-        return txt.length > 200 && !txt.includes("Checking your browser");
+        return (
+          txt.length > 200 && !txt.includes("Checking your browser")
+        );
       },
       { timeout: 25_000 }
     );
 
-    // Small settle — let any post-CF JS finish
-    await new Promise((r) => setTimeout(r, 1500));
+    // Wait for the stock table to appear in DOM
+    console.log("[Chartink] Waiting for stock table...");
+    await page.waitForSelector("#stocklisttable", { timeout: 15_000 });
 
-    // Step 2 — Read the XSRF-TOKEN cookie from the browser, then call
-    // screener/process from INSIDE the page context.  The XSRF token is
-    // required by Laravel (HTTP 419 if missing / mismatched).
-    console.log("[Chartink] Fetching stock data via in-browser XHR...");
-    const result = await page.evaluate(
-      async (apiUrl: string, scanClause: string) => {
-        // Extract XSRF token from browser cookies
-        const cookieStr = document.cookie;
-        const xsrfMatch = cookieStr.match(/XSRF-TOKEN=([^;]+)/);
-        const xsrfToken = xsrfMatch
-          ? decodeURIComponent(xsrfMatch[1])
-          : "";
+    // Small settle for any remaining rendering
+    await new Promise((r) => setTimeout(r, 1000));
 
-        const headers: Record<string, string> = {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-Requested-With": "XMLHttpRequest",
-          Accept: "application/json",
-        };
-        if (xsrfToken) headers["X-XSRF-TOKEN"] = xsrfToken;
+    // Parse the table entirely inside the browser
+    console.log("[Chartink] Parsing stock table...");
+    const stocks = await page.evaluate(() => {
+      const table = document.getElementById("stocklisttable");
+      if (!table) return [];
 
-        try {
-          const res = await fetch(apiUrl, {
-            method: "POST",
-            headers,
-            credentials: "include",
-            body: `scan_clause=${encodeURIComponent(scanClause)}&start=0&length=200`,
+      const rows = table.querySelectorAll("tbody tr");
+      const results: {
+        sr: number;
+        name: string;
+        ticker: string;
+        close: number;
+        change: number;
+        volGainPct: number;
+        isPositive: boolean;
+      }[] = [];
+
+      rows.forEach((row) => {
+        const cells = row.querySelectorAll("td");
+        if (cells.length < 6) return;
+
+        // Extract NSE ticker from the link href: /stocks/PRAENG.html
+        const link = cells[1]?.querySelector("a[href*='/stocks/']");
+        const href = link?.getAttribute("href") || "";
+        const tickerMatch = href.match(/\/stocks\/([A-Z0-9]+)\.html/);
+        if (!tickerMatch) return;
+
+        const ticker = tickerMatch[1];
+        const name = link?.textContent?.trim() || "";
+        const close = parseFloat(cells[3]?.textContent?.trim() || "0");
+        const changeText = cells[4]?.textContent?.trim() || "";
+        const changeMatch = changeText.match(/([+-]?[\d.]+)%/);
+        const change = changeMatch ? parseFloat(changeMatch[1]) : 0;
+        const volGainText = cells[5]?.textContent?.trim() || "";
+        const volGainMatch = volGainText.match(/([\d.]+)%/);
+        const volGainPct = volGainMatch ? parseFloat(volGainMatch[1]) : 0;
+
+        if (ticker && name && close > 0) {
+          results.push({
+            sr: 0,
+            name: name
+              .replace(/\s*(Ltd|Limited)\.?\s*$/i, "")
+              .trim(),
+            ticker,
+            close,
+            change,
+            volGainPct,
+            isPositive: change > 0,
           });
-          if (!res.ok)
-            return {
-              error: `HTTP ${res.status} ${res.statusText}`,
-            };
-          return await res.json();
-        } catch (e: any) {
-          return { error: e.message || String(e) };
         }
-      },
-      CHARTINK_URL,
-      CHARTINK_SCAN_CLAUSE
-    );
+      });
 
-    if (result.error) {
-      throw new Error(`In-browser fetch: ${result.error}`);
-    }
+      return results;
+    });
 
-    const data: ChartinkRow[] = result.data ?? [];
-    console.log(
-      `[Chartink] Got ${data.length} stocks (recordsTotal: ${result.recordsTotal})`
-    );
-    return data;
+    // Assign serial numbers
+    stocks.forEach((s, i) => (s.sr = i + 1));
+
+    console.log(`[Chartink] Parsed ${stocks.length} stocks from EOD page`);
+    return stocks;
   } finally {
     await browser.close().catch(() => {});
   }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Chartink Scraper — Direct fetch fallback
-// ═══════════════════════════════════════════════════════════════════════
-
-/**
- * Direct HTTP approach (works locally where Cloudflare may not block,
- * or as a fallback on Vercel if Puppeteer fails).
- */
-async function fetchChartinkViaFetch(): Promise<ChartinkRow[]> {
-  const pageRes = await fetch(CHARTINK_PAGE, {
-    headers: { "User-Agent": USER_AGENT },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!pageRes.ok) throw new Error(`Page fetch: ${pageRes.status}`);
-
-  const setCookies = pageRes.headers.getSetCookie?.() ?? [];
-  let rawXsrf = "";
-  let rawCiSession = "";
-  for (const h of setCookies) {
-    const m1 = h.match(/XSRF-TOKEN=(.+?);/);
-    if (m1) rawXsrf = m1[1];
-    const m2 = h.match(/ci_session=(.+?);/);
-    if (m2) rawCiSession = m2[1];
-  }
-  if (!rawXsrf || !rawCiSession) {
-    throw new Error("Failed to extract XSRF-TOKEN / ci_session cookies");
-  }
-
-  const decodedXsrf = decodeURIComponent(rawXsrf);
-  const postRes = await fetch(CHARTINK_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Cookie: `ci_session=${rawCiSession}; XSRF-TOKEN=${rawXsrf}`,
-      "X-XSRF-TOKEN": decodedXsrf,
-      "X-Requested-With": "XMLHttpRequest",
-      Accept: "application/json",
-      Referer: CHARTINK_PAGE,
-      "User-Agent": USER_AGENT,
-    },
-    body: `scan_clause=${encodeURIComponent(CHARTINK_SCAN_CLAUSE)}&start=0&length=200`,
-    signal: AbortSignal.timeout(15_000),
-  });
-
-  if (!postRes.ok) throw new Error(`API call: ${postRes.status}`);
-  const json = await postRes.json();
-  const data: ChartinkRow[] = json.data ?? [];
-  console.log(
-    `[Chartink] Direct fetch got ${data.length} stocks (recordsTotal: ${json.recordsTotal})`
-  );
-  return data;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Combined Chartink fetch — Puppeteer first, fetch fallback
-// ═══════════════════════════════════════════════════════════════════════
-
-async function fetchChartinkStocks(): Promise<ChartinkRow[]> {
-  // Strategy 1: Puppeteer (bypasses Cloudflare reliably)
-  try {
-    return await fetchChartinkViaPuppeteer();
-  } catch (err: any) {
-    console.warn(`[Chartink] Puppeteer failed: ${err.message}`);
-  }
-
-  // Strategy 2: Direct fetch (may work locally / when CF is lenient)
-  try {
-    return await fetchChartinkViaFetch();
-  } catch (err: any) {
-    console.warn(`[Chartink] Direct fetch also failed: ${err.message}`);
-  }
-
-  throw new Error("All Chartink fetch strategies failed");
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Yahoo Finance — 20-day Volume Average (for volGainPct)
-// ═══════════════════════════════════════════════════════════════════════
-
-interface YahooChartResult {
-  avgVol20d: number;
-  todayVolume: number;
-}
-
-async function fetchYahooVolAvg(
-  ticker: string
-): Promise<YahooChartResult | null> {
-  try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}.NS?range=1mo&interval=1d`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT },
-      signal: AbortSignal.timeout(5_000),
-    });
-    if (!res.ok) return null;
-
-    const json = await res.json();
-    const result = json?.chart?.result?.[0];
-    if (!result) return null;
-    const quote = result.indicators?.quote?.[0];
-    if (!quote) return null;
-
-    const volumes: number[] = (quote.volume ?? []).filter(
-      (v: number | null) => v !== null && v > 0
-    );
-    if (volumes.length < 5) return null;
-
-    const todayVolume = volumes[volumes.length - 1];
-    const prevVols = volumes.slice(-21, -1);
-    const avgVol20d =
-      prevVols.length > 0
-        ? prevVols.reduce((a, b) => a + b, 0) / prevVols.length
-        : todayVolume;
-
-    return { avgVol20d, todayVolume };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Fetch volume averages with concurrency, wrapped in a hard timeout.
- * If the whole operation takes too long, return whatever we have.
- */
-async function fetchVolumeAverages(
-  tickers: string[],
-  concurrency = 10,
-  overallMs = 20_000
-): Promise<Map<string, YahooChartResult>> {
-  const results = new Map<string, YahooChartResult>();
-  let index = 0;
-
-  async function worker() {
-    while (index < tickers.length) {
-      const i = index++;
-      if (i >= tickers.length) break;
-      const ticker = tickers[i];
-      const data = await fetchYahooVolAvg(ticker);
-      if (data) results.set(ticker, data);
-    }
-  }
-
-  const workers = Array.from(
-    { length: Math.min(concurrency, tickers.length) },
-    () => worker()
-  );
-
-  // Race all workers against the hard timeout
-  await Promise.race([
-    Promise.all(workers),
-    new Promise<void>((resolve) => setTimeout(resolve, overallMs)),
-  ]);
-
-  return results;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -301,55 +155,19 @@ async function fetchVolumeAverages(
 // ═══════════════════════════════════════════════════════════════════════
 
 export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
-  // Step 1: Get stock list from Chartink (Puppeteer → fetch fallback)
-  const chartinkData = await fetchChartinkStocks();
-  if (chartinkData.length === 0) return [];
-
-  // Step 2: Optionally enrich with Yahoo volume averages
-  const tickers = chartinkData.map((s) => s.nsecode);
-  console.log(
-    `[Scraper] Enriching ${tickers.length} stocks with volume averages (20 s budget)...`
-  );
-  const volAvgs = await fetchVolumeAverages(tickers, 10, 20_000);
-  console.log(
-    `[Scraper] Got volume averages for ${volAvgs.size}/${tickers.length} stocks`
-  );
-
-  // Step 3: Merge data
-  const results: VolumeShockerStock[] = chartinkData.map((row, idx) => {
-    const yahoo = volAvgs.get(row.nsecode);
-    let volGainPct: number;
-
-    if (yahoo && yahoo.avgVol20d > 0) {
-      volGainPct =
-        Math.round(((yahoo.todayVolume / yahoo.avgVol20d) - 1) * 1000) / 10;
-    } else {
-      // The scan guarantees volume > 5x 20-day SMA → at least 400% gain.
-      // We use a safe floor estimate.
-      volGainPct = 500;
+ try {
+    const stocks = await fetchChartinkEODViaPuppeteer();
+    if (stocks.length > 0) {
+      console.log(
+        `[Scraper] Returning ${stocks.length} volume shockers from Chartink EOD`
+      );
+      return stocks;
     }
+  } catch (err: any) {
+    console.error(`[Scraper] Chartink EOD scrape failed: ${err.message}`);
+  }
 
-    const name = row.name.replace(/\s*(Ltd|Limited)\.?\s*$/i, "").trim();
-
-    return {
-      sr: idx + 1,
-      name,
-      ticker: row.nsecode,
-      close: row.close,
-      change: Math.round(row.per_chg * 100) / 100,
-      volGainPct,
-      isPositive: row.per_chg > 0,
-    };
-  });
-
-  // Sort by volGainPct descending
-  results.sort((a, b) => b.volGainPct - a.volGainPct);
-  results.forEach((r, i) => (r.sr = i + 1));
-
-  console.log(
-    `[Scraper] Returning ${results.length} volume shockers from Chartink`
-  );
-  return results;
+  return [];
 }
 
 // ═══════════════════════════════════════════════════════════════════════
