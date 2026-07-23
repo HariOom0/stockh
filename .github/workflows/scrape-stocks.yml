@@ -1,0 +1,129 @@
+name: Scrape Chartink Volume Shockers
+
+on:
+  schedule:
+    # Run at 7:30 PM IST (14:00 UTC) every Mon-Fri
+    - cron: '0 14 * * 1-5'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install curl_cffi beautifulsoup4
+
+      - name: Scrape Chartink EOD data
+        env:
+          CHARTINK_URL: 'https://chartink.com/eodscanner/Volume-Shockers.html'
+        run: |
+          python3 << 'PYEOF'
+          import json, re, sys
+          from datetime import datetime
+          try:
+              from curl_cffi import requests
+              from bs4 import BeautifulSoup
+          except ImportError:
+              import subprocess
+              subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'curl_cffi', 'beautifulsoup4', '-q'])
+              from curl_cffi import requests
+              from bs4 import BeautifulSoup
+
+          url = 'https://chartink.com/eodscanner/Volume-Shockers.html'
+          print(f'Scraping {url}...')
+          resp = requests.get(url, impersonate='chrome', timeout=30)
+
+          if 'stocklisttable' not in resp.text:
+              print('ERROR: No stock table found (Cloudflare block?)')
+              sys.exit(1)
+
+          soup = BeautifulSoup(resp.text, 'html.parser')
+          rows = soup.select('#stocklisttable tbody tr')
+          stocks = []
+
+          for row in rows[1:]:  # skip header
+              cells = row.select('td')
+              if len(cells) < 6: continue
+              link = cells[1].find('a', href=True)
+              if not link: continue
+              href = link.get('href', '')
+              m = re.search(r'/stocks/([A-Z0-9]+)\.html', href)
+              if not m: continue
+
+              ticker = m.group(1)
+              name = link.get_text(strip=True)
+              name = re.sub(r'\s*(Ltd|Limited)\.?\s*$', '', name, flags=re.IGNORECASE).strip()
+
+              close_text = cells[3].get_text(strip=True)
+              change_text = cells[4].get_text(strip=True)
+              vol_text = cells[5].get_text(strip=True)
+
+              try: close = float(close_text)
+              except: close = 0
+
+              change_m = re.search(r'([+-]?[\d.]+)%', change_text)
+              vol_m = re.search(r'([\d.]+)%', vol_text)
+
+              change = float(change_m.group(1)) if change_m else 0
+              vol_gain = float(vol_m.group(1)) if vol_m else 0
+
+              if ticker and name and close > 0:
+                  stocks.append({
+                      'ticker': ticker,
+                      'name': name,
+                      'close': close,
+                      'change': change,
+                      'volGainPct': vol_gain,
+                  })
+
+          # Add metadata
+          data = {
+              'lastUpdated': datetime.now().isoformat(),
+              'tradingDate': datetime.now().strftime('%Y-%m-%d'),
+              'stockCount': len(stocks),
+              'stocks': stocks
+          }
+
+          with open('public/data/stocks.json', 'w') as f:
+              json.dump(data, f, indent=2)
+
+          print(f'Successfully scraped {len(stocks)} stocks')
+          if stocks:
+              print(f'First: {stocks[0]["ticker"]} ({stocks[0]["name"]})')
+              print(f'Last: {stocks[-1]["ticker"]} ({stocks[-1]["name"]})')
+          PYEOF
+
+      - name: Check if data changed
+        id: check_changes
+        run: |
+          if git diff --quiet public/data/stocks.json; then
+            echo 'changed=false' >> $GITHUB_OUTPUT
+            echo 'No changes detected - data is the same as before'
+          else
+            echo 'changed=true' >> $GITHUB_OUTPUT
+            echo 'Data changed - will commit'
+          fi
+
+      - name: Commit and push if changed
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add public/data/stocks.json
+          git commit -m "data: update volume shockers $(date +%Y-%m-%d)"
+          git push
+
+      - name: Skip push notification
+        if: steps.check_changes.outputs.changed != 'true'
+        run: echo 'Skipped - no data changes'
