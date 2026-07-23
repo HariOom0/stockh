@@ -1,0 +1,797 @@
+     1→import * as cheerio from "cheerio";
+     2→
+     3→const USER_AGENT =
+     4→  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+     5→
+     6→// ─── Chartink Configuration ───────────────────────────────────────────
+     7→const CHARTINK_SCAN_CLAUSE =
+     8→  "( {cash} ( daily volume > daily sma( volume,20 ) * 5 ) )";
+     9→const CHARTINK_URL = "https://chartink.com/screener/process";
+    10→const CHARTINK_PAGE = "https://chartink.com/screener/volume-shockers";
+    11→
+    12→// ═══════════════════════════════════════════════════════════════════════
+    13→// Volume Shocker Types
+    14→// ═══════════════════════════════════════════════════════════════════════
+    15→
+    16→export interface VolumeShockerStock {
+    17→  sr: number;
+    18→  name: string;
+    19→  ticker: string;
+    20→  close: number;
+    21→  change: number;
+    22→  volGainPct: number;
+    23→  isPositive: boolean;
+    24→}
+    25→
+    26→interface ChartinkRow {
+    27→  sr: number;
+    28→  nsecode: string;
+    29→  name: string;
+    30→  bsecode: string | null;
+    31→  close: number;
+    32→  per_chg: number;
+    33→  volume: number;
+    34→}
+    35→
+    36→// ═══════════════════════════════════════════════════════════════════════
+    37→// Chartink Scraper — Puppeteer (bypasses Cloudflare)
+    38→// ═══════════════════════════════════════════════════════════════════════
+    39→
+    40→/**
+    41→ * Fetch volume shockers from Chartink using a headless browser.
+    42→ * Cloudflare blocks plain fetch/XHR from server — so we launch a real
+    43→ * browser, let it pass the CF challenge, then execute the API call
+    44→ * from *inside* the page context (page.evaluate).
+    45→ */
+    46→async function fetchChartinkViaPuppeteer(): Promise<ChartinkRow[]> {
+    47→  // Dynamic imports — keeps bundling clean
+    48→  const chromium = await import("@sparticuz/chromium");
+    49→  const puppeteer = await import("puppeteer-core");
+    50→
+    51→  console.log("[Chartink] Launching headless Chromium...");
+    52→
+    53→  const browser = await puppeteer.default.launch({
+    54→    executablePath: await chromium.executablePath(),
+    55→    headless: chromium.headless,
+    56→    args: [
+    57→      ...chromium.args,
+    58→      "--no-sandbox",
+    59→      "--disable-setuid-sandbox",
+    60→    ],
+    61→    defaultViewport: chromium.defaultViewport,
+    62→  });
+    63→
+    64→  try {
+    65→    const page = await browser.newPage();
+    66→    await page.setUserAgent(USER_AGENT);
+    67→
+    68→    // Step 1 — Navigate to the screener page & wait for CF challenge
+    69→    console.log("[Chartink] Navigating to screener page...");
+    70→    await page.goto(CHARTINK_PAGE, {
+    71→      waitUntil: "networkidle2",
+    72→      timeout: 35_000,
+    73→    });
+    74→
+    75→    // Wait until Cloudflare "checking your browser" is gone
+    76→    console.log("[Chartink] Waiting for Cloudflare challenge...");
+    77→    await page.waitForFunction(
+    78→      () => {
+    79→        const txt = document.body?.innerText ?? "";
+    80→        return txt.length > 200 && !txt.includes("Checking your browser");
+    81→      },
+    82→      { timeout: 25_000 }
+    83→    );
+    84→
+    85→    // Small settle — let any post-CF JS finish
+    86→    await new Promise((r) => setTimeout(r, 1500));
+    87→
+    88→    // Step 2 — Call the screener/process API from INSIDE the browser.
+    89→    // Because the browser already passed Cloudflare, this request
+    90→    // carries valid CF cookies and is treated as legitimate.
+    91→    console.log("[Chartink] Fetching stock data via in-browser XHR...");
+    92→    const result = await page.evaluate(
+    93→      async (apiUrl: string, scanClause: string) => {
+    94→        try {
+    95→          const res = await fetch(apiUrl, {
+    96→            method: "POST",
+    97→            headers: {
+    98→              "Content-Type": "application/x-www-form-urlencoded",
+    99→              "X-Requested-With": "XMLHttpRequest",
+   100→              Accept: "application/json",
+   101→            },
+   102→            credentials: "include",
+   103→            body: `scan_clause=${encodeURIComponent(scanClause)}&start=0&length=200`,
+   104→          });
+   105→          if (!res.ok) return { error: `HTTP ${res.status}` };
+   106→          return await res.json();
+   107→        } catch (e: any) {
+   108→          return { error: e.message || String(e) };
+   109→        }
+   110→      },
+   111→      CHARTINK_URL,
+   112→      CHARTINK_SCAN_CLAUSE
+   113→    );
+   114→
+   115→    if (result.error) {
+   116→      throw new Error(`In-browser fetch: ${result.error}`);
+   117→    }
+   118→
+   119→    const data: ChartinkRow[] = result.data ?? [];
+   120→    console.log(
+   121→      `[Chartink] Got ${data.length} stocks (recordsTotal: ${result.recordsTotal})`
+   122→    );
+   123→    return data;
+   124→  } finally {
+   125→    await browser.close().catch(() => {});
+   126→  }
+   127→}
+   128→
+   129→// ═══════════════════════════════════════════════════════════════════════
+   130→// Chartink Scraper — Direct fetch fallback
+   131→// ═══════════════════════════════════════════════════════════════════════
+   132→
+   133→/**
+   134→ * Direct HTTP approach (works locally where Cloudflare may not block,
+   135→ * or as a fallback on Vercel if Puppeteer fails).
+   136→ */
+   137→async function fetchChartinkViaFetch(): Promise<ChartinkRow[]> {
+   138→  const pageRes = await fetch(CHARTINK_PAGE, {
+   139→    headers: { "User-Agent": USER_AGENT },
+   140→    signal: AbortSignal.timeout(15_000),
+   141→  });
+   142→  if (!pageRes.ok) throw new Error(`Page fetch: ${pageRes.status}`);
+   143→
+   144→  const setCookies = pageRes.headers.getSetCookie?.() ?? [];
+   145→  let rawXsrf = "";
+   146→  let rawCiSession = "";
+   147→  for (const h of setCookies) {
+   148→    const m1 = h.match(/XSRF-TOKEN=(.+?);/);
+   149→    if (m1) rawXsrf = m1[1];
+   150→    const m2 = h.match(/ci_session=(.+?);/);
+   151→    if (m2) rawCiSession = m2[1];
+   152→  }
+   153→  if (!rawXsrf || !rawCiSession) {
+   154→    throw new Error("Failed to extract XSRF-TOKEN / ci_session cookies");
+   155→  }
+   156→
+   157→  const decodedXsrf = decodeURIComponent(rawXsrf);
+   158→  const postRes = await fetch(CHARTINK_URL, {
+   159→    method: "POST",
+   160→    headers: {
+   161→      "Content-Type": "application/x-www-form-urlencoded",
+   162→      Cookie: `ci_session=${rawCiSession}; XSRF-TOKEN=${rawXsrf}`,
+   163→      "X-XSRF-TOKEN": decodedXsrf,
+   164→      "X-Requested-With": "XMLHttpRequest",
+   165→      Accept: "application/json",
+   166→      Referer: CHARTINK_PAGE,
+   167→      "User-Agent": USER_AGENT,
+   168→    },
+   169→    body: `scan_clause=${encodeURIComponent(CHARTINK_SCAN_CLAUSE)}&start=0&length=200`,
+   170→    signal: AbortSignal.timeout(15_000),
+   171→  });
+   172→
+   173→  if (!postRes.ok) throw new Error(`API call: ${postRes.status}`);
+   174→  const json = await postRes.json();
+   175→  const data: ChartinkRow[] = json.data ?? [];
+   176→  console.log(
+   177→    `[Chartink] Direct fetch got ${data.length} stocks (recordsTotal: ${json.recordsTotal})`
+   178→  );
+   179→  return data;
+   180→}
+   181→
+   182→// ═══════════════════════════════════════════════════════════════════════
+   183→// Combined Chartink fetch — Puppeteer first, fetch fallback
+   184→// ═══════════════════════════════════════════════════════════════════════
+   185→
+   186→async function fetchChartinkStocks(): Promise<ChartinkRow[]> {
+   187→  // Strategy 1: Puppeteer (bypasses Cloudflare reliably)
+   188→  try {
+   189→    return await fetchChartinkViaPuppeteer();
+   190→  } catch (err: any) {
+   191→    console.warn(`[Chartink] Puppeteer failed: ${err.message}`);
+   192→  }
+   193→
+   194→  // Strategy 2: Direct fetch (may work locally / when CF is lenient)
+   195→  try {
+   196→    return await fetchChartinkViaFetch();
+   197→  } catch (err: any) {
+   198→    console.warn(`[Chartink] Direct fetch also failed: ${err.message}`);
+   199→  }
+   200→
+   201→  throw new Error("All Chartink fetch strategies failed");
+   202→}
+   203→
+   204→// ═══════════════════════════════════════════════════════════════════════
+   205→// Yahoo Finance — 20-day Volume Average (for volGainPct)
+   206→// ═══════════════════════════════════════════════════════════════════════
+   207→
+   208→interface YahooChartResult {
+   209→  avgVol20d: number;
+   210→  todayVolume: number;
+   211→}
+   212→
+   213→async function fetchYahooVolAvg(
+   214→  ticker: string
+   215→): Promise<YahooChartResult | null> {
+   216→  try {
+   217→    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}.NS?range=1mo&interval=1d`;
+   218→    const res = await fetch(url, {
+   219→      headers: { "User-Agent": USER_AGENT },
+   220→      signal: AbortSignal.timeout(5_000),
+   221→    });
+   222→    if (!res.ok) return null;
+   223→
+   224→    const json = await res.json();
+   225→    const result = json?.chart?.result?.[0];
+   226→    if (!result) return null;
+   227→    const quote = result.indicators?.quote?.[0];
+   228→    if (!quote) return null;
+   229→
+   230→    const volumes: number[] = (quote.volume ?? []).filter(
+   231→      (v: number | null) => v !== null && v > 0
+   232→    );
+   233→    if (volumes.length < 5) return null;
+   234→
+   235→    const todayVolume = volumes[volumes.length - 1];
+   236→    const prevVols = volumes.slice(-21, -1);
+   237→    const avgVol20d =
+   238→      prevVols.length > 0
+   239→        ? prevVols.reduce((a, b) => a + b, 0) / prevVols.length
+   240→        : todayVolume;
+   241→
+   242→    return { avgVol20d, todayVolume };
+   243→  } catch {
+   244→    return null;
+   245→  }
+   246→}
+   247→
+   248→/**
+   249→ * Fetch volume averages with concurrency, wrapped in a hard timeout.
+   250→ * If the whole operation takes too long, return whatever we have.
+   251→ */
+   252→async function fetchVolumeAverages(
+   253→  tickers: string[],
+   254→  concurrency = 10,
+   255→  overallMs = 20_000
+   256→): Promise<Map<string, YahooChartResult>> {
+   257→  const results = new Map<string, YahooChartResult>();
+   258→  let index = 0;
+   259→
+   260→  async function worker() {
+   261→    while (index < tickers.length) {
+   262→      const i = index++;
+   263→      if (i >= tickers.length) break;
+   264→      const ticker = tickers[i];
+   265→      const data = await fetchYahooVolAvg(ticker);
+   266→      if (data) results.set(ticker, data);
+   267→    }
+   268→  }
+   269→
+   270→  const workers = Array.from(
+   271→    { length: Math.min(concurrency, tickers.length) },
+   272→    () => worker()
+   273→  );
+   274→
+   275→  // Race all workers against the hard timeout
+   276→  await Promise.race([
+   277→    Promise.all(workers),
+   278→    new Promise<void>((resolve) => setTimeout(resolve, overallMs)),
+   279→  ]);
+   280→
+   281→  return results;
+   282→}
+   283→
+   284→// ═══════════════════════════════════════════════════════════════════════
+   285→// Main: fetchVolumeShockers
+   286→// ═══════════════════════════════════════════════════════════════════════
+   287→
+   288→export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
+   289→  // Step 1: Get stock list from Chartink (Puppeteer → fetch fallback)
+   290→  const chartinkData = await fetchChartinkStocks();
+   291→  if (chartinkData.length === 0) return [];
+   292→
+   293→  // Step 2: Optionally enrich with Yahoo volume averages
+   294→  const tickers = chartinkData.map((s) => s.nsecode);
+   295→  console.log(
+   296→    `[Scraper] Enriching ${tickers.length} stocks with volume averages (20 s budget)...`
+   297→  );
+   298→  const volAvgs = await fetchVolumeAverages(tickers, 10, 20_000);
+   299→  console.log(
+   300→    `[Scraper] Got volume averages for ${volAvgs.size}/${tickers.length} stocks`
+   301→  );
+   302→
+   303→  // Step 3: Merge data
+   304→  const results: VolumeShockerStock[] = chartinkData.map((row, idx) => {
+   305→    const yahoo = volAvgs.get(row.nsecode);
+   306→    let volGainPct: number;
+   307→
+   308→    if (yahoo && yahoo.avgVol20d > 0) {
+   309→      volGainPct =
+   310→        Math.round(((yahoo.todayVolume / yahoo.avgVol20d) - 1) * 1000) / 10;
+   311→    } else {
+   312→      // The scan guarantees volume > 5x 20-day SMA → at least 400% gain.
+   313→      // We use a safe floor estimate.
+   314→      volGainPct = 500;
+   315→    }
+   316→
+   317→    const name = row.name.replace(/\s*(Ltd|Limited)\.?\s*$/i, "").trim();
+   318→
+   319→    return {
+   320→      sr: idx + 1,
+   321→      name,
+   322→      ticker: row.nsecode,
+   323→      close: row.close,
+   324→      change: Math.round(row.per_chg * 100) / 100,
+   325→      volGainPct,
+   326→      isPositive: row.per_chg > 0,
+   327→    };
+   328→  });
+   329→
+   330→  // Sort by volGainPct descending
+   331→  results.sort((a, b) => b.volGainPct - a.volGainPct);
+   332→  results.forEach((r, i) => (r.sr = i + 1));
+   333→
+   334→  console.log(
+   335→    `[Scraper] Returning ${results.length} volume shockers from Chartink`
+   336→  );
+   337→  return results;
+   338→}
+   339→
+   340→// ═══════════════════════════════════════════════════════════════════════
+   341→// Stock Detail Scraper (Screener.in) — unchanged
+   342→// ═══════════════════════════════════════════════════════════════════════
+   343→
+   344→export interface StockDetail {
+   345→  name: string;
+   346→  ticker: string;
+   347→  bseCode?: string;
+   348→  nseCode?: string;
+   349→  sector?: string;
+   350→  industry?: string;
+   351→  about?: string;
+   352→  indices?: string[];
+   353→  metrics: Record<string, string>;
+   354→  quarters: {
+   355→    label: string;
+   356→    sales: string;
+   357→    netProfit: string;
+   358→    opm: string;
+   359→  }[];
+   360→  peers: { name: string; ticker: string }[];
+   361→  pros?: string[];
+   362→  cons?: string[];
+   363→  balanceSheet?: {
+   364→    label: string;
+   365→    reserves: string;
+   366→    borrowing: string;
+   367→    otherLiab: string;
+   368→    totalLiab: string;
+   369→    fixedAssets: string;
+   370→    cwip: string;
+   371→    totalAssets: string;
+   372→  }[];
+   373→  shareholding?: {
+   374→    category: string;
+   375→    values: { label: string; value: string }[];
+   376→  }[];
+   377→  annualResults?: {
+   378→    label: string;
+   379→    sales: string;
+   380→    netProfit: string;
+   381→    opm: string;
+   382→  }[];
+   383→  cashFlow?: {
+   384→    label: string;
+   385→    operatingCF: string;
+   386→    investingCF: string;
+   387→    financingCF: string;
+   388→  }[];
+   389→}
+   390→
+   391→export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
+   392→  const url = `https://www.screener.in/company/${ticker}/`;
+   393→  const res = await fetch(url, {
+   394→    headers: { "User-Agent": USER_AGENT },
+   395→    signal: AbortSignal.timeout(30000),
+   396→  });
+   397→
+   398→  if (!res.ok)
+   399→    throw new Error(
+   400→      `Failed to fetch screener for ${ticker}: ${res.status}`
+   401→    );
+   402→
+   403→  const html = await res.text();
+   404→  const $ = cheerio.load(html);
+   405→
+   406→  const detail: StockDetail = {
+   407→    name: "",
+   408→    ticker,
+   409→    metrics: {},
+   410→    quarters: [],
+   411→    peers: [],
+   412→  };
+   413→
+   414→  // Company name
+   415→  detail.name = $("h1.h2").first().text().trim().replace(/\s+/g, " ");
+   416→
+   417→  // BSE / NSE codes
+   418→  const companyInfoText = $(".company-info-strip").text() || "";
+   419→  const bseMatch = companyInfoText.match(/BSE:\s*(\d+)/);
+   420→  const nseMatch = companyInfoText.match(/NSE:\s*(\w+)/);
+   421→  if (bseMatch) detail.bseCode = bseMatch[1];
+   422→  if (nseMatch) detail.nseCode = nseMatch[1];
+   423→
+   424→  // Sector & Industry
+   425→  const peersSection = $("#peers");
+   426→  if (peersSection.length) {
+   427→    const links = peersSection.find("a[title]");
+   428→    links.each((_, el) => {
+   429→      const title = $(el).attr("title") || "";
+   430→      const text = $(el).text().trim();
+   431→      if (title === "Sector" && text) detail.sector = text;
+   432→      if (title === "Industry" && text) detail.industry = text;
+   433→    });
+   434→  }
+   435→
+   436→  // About
+   437→  detail.about = $(".about p").first().text().trim().replace(/\s+/g, " ");
+   438→
+   439→  // Key metrics
+   440→  const ratioRows = $("#top-ratios li.flex.flex-space-between");
+   441→  ratioRows.each((_, el) => {
+   442→    const labelEl = $(el).find(".name");
+   443→    const valueEl = $(el).find(".value .number");
+   444→    const label = labelEl.text().trim();
+   445→    const value = valueEl.first().text().trim();
+   446→    if (label && value) detail.metrics[label] = value;
+   447→  });
+   448→
+   449→  // Pros & Cons
+   450→  const prosList: string[] = [];
+   451→  const consList: string[] = [];
+   452→  $("div.pros ul li").each((_, el) => {
+   453→    const text = $(el).text().trim();
+   454→    if (text) prosList.push(text);
+   455→  });
+   456→  $("div.cons ul li").each((_, el) => {
+   457→    const text = $(el).text().trim();
+   458→    if (text) consList.push(text);
+   459→  });
+   460→  if (prosList.length > 0) detail.pros = prosList;
+   461→  if (consList.length > 0) detail.cons = consList;
+   462→
+   463→  // Quarterly results
+   464→  const quarterlyTable = $("#quarters table");
+   465→  if (quarterlyTable.length) {
+   466→    const headers: string[] = [];
+   467→    quarterlyTable
+   468→      .find("thead th")
+   469→      .each((_, el) => headers.push($(el).text().trim()));
+   470→
+   471→    const rows = quarterlyTable.find("tbody tr");
+   472→    let salesRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   473→    let profitRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   474→    let opmRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   475→
+   476→    rows.each((_, el) => {
+   477→      const firstCell = $(el).find("td").first().text().trim().toLowerCase();
+   478→      if (firstCell.includes("sales") || firstCell.includes("revenue"))
+   479→        salesRow = $(el);
+   480→      if (firstCell.includes("net profit") || firstCell.includes("profit for"))
+   481→        profitRow = $(el);
+   482→      if (firstCell.includes("opm") || firstCell.includes("operating"))
+   483→        opmRow = $(el);
+   484→    });
+   485→
+   486→    for (let i = 1; i < headers.length; i++) {
+   487→      detail.quarters.push({
+   488→        label: headers[i],
+   489→        sales: salesRow ? salesRow.find("td").eq(i).text().trim() : "-",
+   490→        netProfit: profitRow
+   491→          ? profitRow.find("td").eq(i).text().trim()
+   492→          : "-",
+   493→        opm: opmRow ? opmRow.find("td").eq(i).text().trim() : "-",
+   494→      });
+   495→    }
+   496→  }
+   497→
+   498→  // Annual results
+   499→  const annualTable = $("table#annual-results-table, #annual table");
+   500→  if (annualTable.length) {
+   501→    const annHeaders: string[] = [];
+   502→    annualTable
+   503→      .find("thead th")
+   504→      .each((_, el) => annHeaders.push($(el).text().trim()));
+   505→
+   506→    const annRows = annualTable.find("tbody tr");
+   507→    let annSalesRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   508→    let annProfitRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   509→
+   510→    annRows.each((_, el) => {
+   511→      const firstCell = $(el).find("td").first().text().trim().toLowerCase();
+   512→      if (firstCell.includes("sales") || firstCell.includes("revenue"))
+   513→        annSalesRow = $(el);
+   514→      if (firstCell.includes("net profit") || firstCell.includes("profit for"))
+   515→        annProfitRow = $(el);
+   516→    });
+   517→
+   518→    if (annSalesRow || annProfitRow) {
+   519→      const annualResults: StockDetail["annualResults"] = [];
+   520→      for (let i = 1; i < annHeaders.length; i++) {
+   521→        annualResults.push({
+   522→          label: annHeaders[i],
+   523→          sales: annSalesRow
+   524→            ? annSalesRow.find("td").eq(i).text().trim()
+   525→            : "-",
+   526→          netProfit: annProfitRow
+   527→            ? annProfitRow.find("td").eq(i).text().trim()
+   528→            : "-",
+   529→          opm: "-",
+   530→        });
+   531→      }
+   532→      if (annualResults.length > 0) detail.annualResults = annualResults;
+   533→    }
+   534→  }
+   535→
+   536→  // Balance Sheet
+   537→  const bsTable = $("#balance-sheet table");
+   538→  if (bsTable.length) {
+   539→    const bsHeaders: string[] = [];
+   540→    bsTable
+   541→      .find("thead th")
+   542→      .each((_, el) => bsHeaders.push($(el).text().trim()));
+   543→
+   544→    const bsRows = bsTable.find("tbody tr");
+   545→    const bsData: Record<string, cheerio.Cheerio<cheerio.Element>> = {};
+   546→
+   547→    bsRows.each((_, el) => {
+   548→      const firstCell = $(el).find("td").first().text().trim().toLowerCase();
+   549→      if (
+   550→        [
+   551→          "reserves",
+   552→          "borrowing",
+   553→          "other liabilities",
+   554→          "total liabilities",
+   555→          "fixed assets",
+   556→          "cwip",
+   557→          "total assets",
+   558→        ].some((k) => firstCell.includes(k))
+   559→      ) {
+   560→        bsData[firstCell] = $(el);
+   561→      }
+   562→    });
+   563→
+   564→    const balanceSheet: StockDetail["balanceSheet"] = [];
+   565→    for (let i = 1; i < bsHeaders.length; i++) {
+   566→      const getCell = (key: string) =>
+   567→        bsData[key] ? bsData[key].find("td").eq(i).text().trim() : "-";
+   568→      balanceSheet.push({
+   569→        label: bsHeaders[i],
+   570→        reserves: getCell("reserves"),
+   571→        borrowing: getCell("borrowing"),
+   572→        otherLiab: getCell("other liabilities"),
+   573→        totalLiab: getCell("total liabilities"),
+   574→        fixedAssets: getCell("fixed assets"),
+   575→        cwip: getCell("cwip"),
+   576→        totalAssets: getCell("total assets"),
+   577→      });
+   578→    }
+   579→    if (balanceSheet.length > 0) detail.balanceSheet = balanceSheet;
+   580→  }
+   581→
+   582→  // Cash Flow
+   583→  const cfTable = $("#cash-flow table");
+   584→  if (cfTable.length) {
+   585→    const cfHeaders: string[] = [];
+   586→    cfTable
+   587→      .find("thead th")
+   588→      .each((_, el) => cfHeaders.push($(el).text().trim()));
+   589→
+   590→    const cfRows = cfTable.find("tbody tr");
+   591→    let cfOperRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   592→    let cfInvestRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   593→    let cfFinanceRow: cheerio.Cheerio<cheerio.Element> | null = null;
+   594→
+   595→    cfRows.each((_, el) => {
+   596→      const firstCell = $(el).find("td").first().text().trim().toLowerCase();
+   597→      if (firstCell.includes("operating") || firstCell.includes("cash from"))
+   598→        cfOperRow = $(el);
+   599→      if (firstCell.includes("investing")) cfInvestRow = $(el);
+   600→      if (firstCell.includes("financing")) cfFinanceRow = $(el);
+   601→    });
+   602→
+   603→    if (cfOperRow || cfInvestRow || cfFinanceRow) {
+   604→      const cashFlow: StockDetail["cashFlow"] = [];
+   605→      for (let i = 1; i < cfHeaders.length; i++) {
+   606→        cashFlow.push({
+   607→          label: cfHeaders[i],
+   608→          operatingCF: cfOperRow
+   609→            ? cfOperRow.find("td").eq(i).text().trim()
+   610→            : "-",
+   611→          investingCF: cfInvestRow
+   612→            ? cfInvestRow.find("td").eq(i).text().trim()
+   613→            : "-",
+   614→          financingCF: cfFinanceRow
+   615→            ? cfFinanceRow.find("td").eq(i).text().trim()
+   616→            : "-",
+   617→        });
+   618→      }
+   619→      if (cashFlow.length > 0) detail.cashFlow = cashFlow;
+   620→    }
+   621→  }
+   622→
+   623→  // Shareholding
+   624→  const shSection = $("#shareholding");
+   625→  if (shSection.length) {
+   626→    const shTable = shSection.find("table.data-table");
+   627→    if (shTable.length) {
+   628→      const shHeaders: string[] = [];
+   629→      shTable
+   630→        .find("thead th")
+   631→        .each((_, el) => shHeaders.push($(el).text().trim()));
+   632→
+   633→      const values: { label: string; value: string }[] = [];
+   634→      const seenLabels = new Set<string>();
+   635→      shTable.find("tbody tr").each((_, rowEl) => {
+   636→        const cells = $(rowEl).find("td");
+   637→        if (cells.length < 2) return;
+   638→        const label = $(cells[0])
+   639→          .text()
+   640→          .trim()
+   641→          .replace(/\s*[\+\\+]\s*$/, "")
+   642→          .trim();
+   643→        if (!label || label.length < 2 || seenLabels.has(label)) return;
+   644→        seenLabels.add(label);
+   645→
+   646→        let latestValue = "";
+   647→        for (let i = cells.length - 1; i >= 1; i--) {
+   648→          const val = $(cells[i]).text().trim();
+   649→          if (val) {
+   650→            latestValue = val;
+   651→            break;
+   652→          }
+   653→        }
+   654→        if (latestValue) values.push({ label, value: latestValue });
+   655→      });
+   656→
+   657→      if (values.length > 0) {
+   658→        const latestPeriod = shHeaders[shHeaders.length - 1] || "Latest";
+   659→        detail.shareholding = [{ category: latestPeriod, values }];
+   660→      }
+   661→    }
+   662→
+   663→    if (!detail.shareholding || detail.shareholding.length === 0) {
+   664→      const shItems: { label: string; value: string }[] = [];
+   665→      shSection.find("li.flex.flex-space-between").each((_, el) => {
+   666→        const label = $(el).find(".name").text().trim();
+   667→        const value = $(el).find(".value .number").first().text().trim();
+   668→        if (label && value) shItems.push({ label, value });
+   669→      });
+   670→      if (shItems.length > 0)
+   671→        detail.shareholding = [{ category: "Shareholding", values: shItems }];
+   672→    }
+   673→  }
+   674→
+   675→  // Indices / Benchmarks
+   676→  const indices: string[] = [];
+   677→  $("#peers #benchmarks a.tag").each((_, el) => {
+   678→    const name = $(el).text().trim();
+   679→    if (name && !$(el).hasClass("hidden")) indices.push(name);
+   680→  });
+   681→  if (indices.length > 0) detail.indices = indices;
+   682→
+   683→  // Peers
+   684→  const indexKeywords = [
+   685→    "nifty",
+   686→    "bse",
+   687→    "sensex",
+   688→    "dollex",
+   689→    "cnx",
+   690→    "nft",
+   691→    "lix",
+   692→    "index",
+   693→    "benchmark",
+   694→    "equal weight",
+   695→    "low volatility",
+   696→    "value 20",
+   697→    "liquid 15",
+   698→    "esg",
+   699→    "largecap",
+   700→    "midcap",
+   701→    "commodities",
+   702→    "infrastructure",
+   703→    "energy",
+   704→    "mobility",
+   705→  ];
+   706→
+   707→  let sectorUrl = "";
+   708→  const sectorLink = $("#peers a[title='Sector']");
+   709→  if (sectorLink.length) {
+   710→    const href = sectorLink.attr("href") || "";
+   711→    if (href.startsWith("/market/")) sectorUrl = href;
+   712→  }
+   713→
+   714→  $("#peers a[href^='/company/']").each((_, el) => {
+   715→    const $el = $(el);
+   716→    const peerName = $el.text().trim();
+   717→    const classes = $el.attr("class") || "";
+   718→    const href = $el.attr("href") || "";
+   719→    const tickerMatch = href.match(/\/company\/([A-Z0-9]+)\//);
+   720→    const peerTicker = tickerMatch ? tickerMatch[1] : "";
+   721→
+   722→    if (classes.includes("tag")) return;
+   723→    const lower = peerName.toLowerCase();
+   724→    if (indexKeywords.some((kw) => lower.includes(kw))) return;
+   725→
+   726→    if (
+   727→      peerName &&
+   728→      peerName.length > 2 &&
+   729→      !peerName.includes("Discretionary") &&
+   730→      !peerName.includes("Services") &&
+   731→      !peerName.includes("Consumer") &&
+   732→      peerName !== "Edit Columns"
+   733→    ) {
+   734→      detail.peers.push({
+   735→        name: peerName,
+   736→        ticker:
+   737→          peerTicker ||
+   738→          peerName.replace(/[^A-Z0-9]/gi, "").toUpperCase(),
+   739→      });
+   740→    }
+   741→  });
+   742→
+   743→  if (detail.peers.length === 0 && sectorUrl) {
+   744→    try {
+   745→      detail.peers = await fetchSectorPeers(sectorUrl, ticker);
+   746→    } catch {
+   747→      // Peers are optional
+   748→    }
+   749→  }
+   750→
+   751→  return detail;
+   752→}
+   753→
+   754→async function fetchSectorPeers(
+   755→  sectorPath: string,
+   756→  currentTicker: string
+   757→): Promise<{ name: string; ticker: string }[]> {
+   758→  const url = `https://www.screener.in${sectorPath}`;
+   759→  const res = await fetch(url, {
+   760→    headers: { "User-Agent": USER_AGENT },
+   761→    signal: AbortSignal.timeout(15000),
+   762→  });
+   763→
+   764→  if (!res.ok) return [];
+   765→
+   766→  const html = await res.text();
+   767→  const $ = cheerio.load(html);
+   768→
+   769→  const peers: { name: string; ticker: string }[] = [];
+   770→  const seen = new Set<string>();
+   771→
+   772→  $("table.data-table a[href^='/company/']").each((_, el) => {
+   773→    const $el = $(el);
+   774→    const name = $el.text().trim();
+   775→    const href = $el.attr("href") || "";
+   776→    const tickerMatch = href.match(/\/company\/([A-Z0-9]+)\//);
+   777→
+   778→    if (name && name.length > 2 && tickerMatch) {
+   779→      const peerTicker = tickerMatch[1];
+   780→      if (/^\d+$/.test(peerTicker)) return;
+   781→      if (peerTicker === currentTicker.toUpperCase()) return;
+   782→      if (
+   783→        ["NIFTY", "CNX100", "CNX500", "CNX200INDE", "CNXCOMMODI"].includes(
+   784→          peerTicker
+   785→        )
+   786→      )
+   787→        return;
+   788→      if (!seen.has(peerTicker)) {
+   789→        seen.add(peerTicker);
+   790→        peers.push({ name, ticker: peerTicker });
+   791→      }
+   792→    }
+   793→  });
+   794→
+   795→  return peers.slice(0, 15);
+   796→}
+   797→
