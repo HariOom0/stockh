@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { execSync } from "child_process";
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
@@ -6,6 +7,9 @@ const USER_AGENT =
 // ─── Chartink EOD Scanner URL (the page the user wants to match) ─────
 const CHARTINK_EOD_URL =
   "https://chartink.com/eodscanner/Volume-Shockers.html";
+
+// ─── Path to the Python scraper script ─────
+const PYTHON_SCRAPER_PATH = "/opt/render/project/src/scripts/scrape_chartink.py";
 
 // ═══════════════════════════════════════════════════════════════════════
 // Volume Shocker Types
@@ -22,151 +26,230 @@ export interface VolumeShockerStock {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Chartink EOD Scraper — Puppeteer (bypasses Cloudflare)
+// Method 1: Python subprocess with curl_cffi (bypasses Cloudflare TLS)
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
- * Scrape the Chartink EOD Volume Shockers page using a headless browser.
- * The EOD page has all 100 stocks in a static HTML table (#stocklisttable)
- * with columns: Sr., Stock name, Close, Change, Vol Gain %.
+ * Scrape the Chartink EOD Volume Shockers page using a Python subprocess
+ * with curl_cffi which mimics Chrome's TLS fingerprint to bypass Cloudflare.
  *
- * This is MORE reliable than calling /screener/process because:
- * 1. No XSRF token / CSRF handling needed
- * 2. Vol Gain % is already calculated (no Yahoo Finance needed)
- * 3. Returns 100 stocks (matches what the user sees on Chartink)
+ * Why Python? Node.js doesn't have a reliable TLS-impersonation library.
+ * curl_cffi (Python) uses the same approach as curl-impersonate to perfectly
+ * mimic Chrome's TLS handshake, JA3, and HTTP/2 fingerprints.
+ *
+ * Fallback: If the pre-compiled Python binary isn't available, falls back
+ * to direct Node.js fetch (may be blocked by Cloudflare).
  */
-async function fetchChartinkEODViaPuppeteer(): Promise<VolumeShockerStock[]> {
-  // Dynamic imports — @sparticuz/chromium exports via .default
-  const chromiumMod = await import("@sparticuz/chromium");
-  const chromium = chromiumMod.default ?? chromiumMod;
-  const puppeteerMod = await import("puppeteer-core");
-  const puppeteer = puppeteerMod.default ?? puppeteerMod;
+async function fetchViaPythonSubprocess(): Promise<VolumeShockerStock[]> {
+  console.log("[Chartink] Attempting Python curl_cffi scraper...");
 
-  console.log("[Chartink] Launching headless Chromium...");
+  // Try the pre-compiled binary first, then system python3
+  const pythonPaths = [
+    "/opt/render/project/src/scripts/scrape_chartink.elf",
+    PYTHON_SCRAPER_PATH,
+  ];
 
-  const browser = await puppeteer.launch({
-    executablePath: await chromium.executablePath(),
-    headless: chromium.headless,
-    args: [
-      ...chromium.args,
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-    ],
-    defaultViewport: chromium.defaultViewport,
-  });
+  let result: string | null = null;
 
-  try {
-    const page = await browser.newPage();
-    await page.setUserAgent(USER_AGENT);
+  for (const pyPath of pythonPaths) {
+    try {
+      let cmd: string;
+      if (pyPath.endsWith(".elf")) {
+        // Pre-compiled standalone binary — run directly
+        cmd = `"${pyPath}" "${CHARTINK_EOD_URL}"`;
+      } else {
+        // Python script — run with system python3
+        cmd = `python3 "${pyPath}" "${CHARTINK_EOD_URL}"`;
+      }
 
-    // Navigate to the EOD scanner page
-    console.log("[Chartink] Navigating to EOD scanner page...");
-    await page.goto(CHARTINK_EOD_URL, {
-      waitUntil: "networkidle2",
-      timeout: 40_000,
-    });
-
-    // Wait for Cloudflare challenge to complete
-    console.log("[Chartink] Waiting for Cloudflare challenge...");
-    await page.waitForFunction(
-      () => {
-        const txt = document.body?.innerText ?? "";
-        return (
-          txt.length > 200 && !txt.includes("Checking your browser")
-        );
-      },
-      { timeout: 25_000 }
-    );
-
-    // Wait for the stock table to appear in DOM
-    console.log("[Chartink] Waiting for stock table...");
-    await page.waitForSelector("#stocklisttable", { timeout: 15_000 });
-
-    // Small settle for any remaining rendering
-    await new Promise((r) => setTimeout(r, 1000));
-
-    // Parse the table entirely inside the browser
-    console.log("[Chartink] Parsing stock table...");
-    const stocks = await page.evaluate(() => {
-      const table = document.getElementById("stocklisttable");
-      if (!table) return [];
-
-      const rows = table.querySelectorAll("tbody tr");
-      const results: {
-        sr: number;
-        name: string;
-        ticker: string;
-        close: number;
-        change: number;
-        volGainPct: number;
-        isPositive: boolean;
-      }[] = [];
-
-      rows.forEach((row) => {
-        const cells = row.querySelectorAll("td");
-        if (cells.length < 6) return;
-
-        // Extract NSE ticker from the link href: /stocks/PRAENG.html
-        const link = cells[1]?.querySelector("a[href*='/stocks/']");
-        const href = link?.getAttribute("href") || "";
-        const tickerMatch = href.match(/\/stocks\/([A-Z0-9]+)\.html/);
-        if (!tickerMatch) return;
-
-        const ticker = tickerMatch[1];
-        const name = link?.textContent?.trim() || "";
-        const close = parseFloat(cells[3]?.textContent?.trim() || "0");
-        const changeText = cells[4]?.textContent?.trim() || "";
-        const changeMatch = changeText.match(/([+-]?[\d.]+)%/);
-        const change = changeMatch ? parseFloat(changeMatch[1]) : 0;
-        const volGainText = cells[5]?.textContent?.trim() || "";
-        const volGainMatch = volGainText.match(/([\d.]+)%/);
-        const volGainPct = volGainMatch ? parseFloat(volGainMatch[1]) : 0;
-
-        if (ticker && name && close > 0) {
-          results.push({
-            sr: 0,
-            name: name
-              .replace(/\s*(Ltd|Limited)\.?\s*$/i, "")
-              .trim(),
-            ticker,
-            close,
-            change,
-            volGainPct,
-            isPositive: change > 0,
-          });
-        }
+      console.log(`[Chartink] Trying: ${cmd}`);
+      result = execSync(cmd, {
+        encoding: "utf8",
+        timeout: 45_000,
+        maxBuffer: 5 * 1024 * 1024,
       });
 
-      return results;
-    });
+      if (result) break;
+    } catch (err: any) {
+      console.warn(
+        `[Chartink] Python path ${pyPath} failed: ${err.message?.substring(0, 200)}`
+      );
+    }
+  }
 
-    // Assign serial numbers
-    stocks.forEach((s, i) => (s.sr = i + 1));
+  if (!result) {
+    console.warn("[Chartink] All Python scraper paths failed");
+    return [];
+  }
 
-    console.log(`[Chartink] Parsed ${stocks.length} stocks from EOD page`);
+  // Parse JSON output
+  try {
+    const data = JSON.parse(result.trim());
+    if (!Array.isArray(data)) {
+      console.warn("[Chartink] Python scraper returned non-array:", typeof data);
+      return [];
+    }
+
+    const stocks: VolumeShockerStock[] = data
+      .filter(
+        (s: any) => s.ticker && s.name && s.close && s.close > 0
+      )
+      .map((s: any, i: number) => ({
+        sr: i + 1,
+        name: String(s.name || ""),
+        ticker: String(s.ticker || ""),
+        close: Number(s.close) || 0,
+        change: Number(s.change) || 0,
+        volGainPct: Number(s.volGainPct) || 0,
+        isPositive: (Number(s.change) || 0) > 0,
+      }));
+
+    console.log(`[Chartink] Python scraper returned ${stocks.length} stocks`);
     return stocks;
-  } finally {
-    await browser.close().catch(() => {});
+  } catch (parseErr: any) {
+    console.error(`[Chartink] Failed to parse Python output: ${parseErr.message}`);
+    return [];
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Main: fetchVolumeShockers
+// Method 2: Direct Node.js fetch with browser headers (Cloudflare may block)
+// ═══════════════════════════════════════════════════════════════════════
+
+async function fetchViaNodeFetch(): Promise<VolumeShockerStock[]> {
+  console.log("[Chartink] Attempting direct Node.js fetch...");
+
+  try {
+    const resp = await fetch(CHARTINK_EOD_URL, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Sec-Ch-Ua":
+          '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!resp.ok) {
+      console.warn(`[Chartink] Fetch returned ${resp.status}`);
+      return [];
+    }
+
+    const html = await resp.text();
+
+    if (!html.includes("stocklisttable")) {
+      console.warn(
+        "[Chartink] Fetch succeeded but no stock table (Cloudflare challenge)"
+      );
+      return [];
+    }
+
+    return parseChartinkHTML(html);
+  } catch (err: any) {
+    console.warn(`[Chartink] Node.js fetch failed: ${err.message}`);
+    return [];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// HTML Parser (shared by all methods)
+// ═══════════════════════════════════════════════════════════════════════
+
+function parseChartinkHTML(html: string): VolumeShockerStock[] {
+  const $ = cheerio.load(html);
+  const stocks: VolumeShockerStock[] = [];
+
+  $("#stocklisttable tbody tr").each((_, row) => {
+    const cells = $(row).find("td");
+    if (cells.length < 6) return;
+
+    const link = cells.eq(1).find("a[href*='/stocks/']");
+    if (link.length === 0) return;
+
+    const href = link.attr("href") || "";
+    const tickerMatch = href.match(/\/stocks\/([A-Z0-9]+)\.html/);
+    if (!tickerMatch) return;
+
+    const ticker = tickerMatch[1];
+    const name = (link.text().trim() || "").replace(
+      /\s*(Ltd|Limited)\.?\s*$/i,
+      ""
+    );
+
+    const closeText = cells.eq(3).text().trim();
+    const changeText = cells.eq(4).text().trim();
+    const volText = cells.eq(5).text().trim();
+
+    const close = parseFloat(closeText) || 0;
+    // Change format: [16.9%] or [-5.2%]
+    const changeMatch = changeText.match(/([+-]?[\d.]+)%/);
+    const change = changeMatch ? parseFloat(changeMatch[1]) : 0;
+    // Vol Gain format: 367.75%
+    const volMatch = volText.match(/([\d.]+)%/);
+    const volGainPct = volMatch ? parseFloat(volMatch[1]) : 0;
+
+    if (ticker && name && close > 0) {
+      stocks.push({
+        sr: 0,
+        name,
+        ticker,
+        close,
+        change,
+        volGainPct,
+        isPositive: change > 0,
+      });
+    }
+  });
+
+  // Assign serial numbers
+  stocks.forEach((s, i) => (s.sr = i + 1));
+
+  return stocks;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Main: fetchVolumeShockers — tries multiple methods
 // ═══════════════════════════════════════════════════════════════════════
 
 export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
- try {
-    const stocks = await fetchChartinkEODViaPuppeteer();
+  // Method 1: Python curl_cffi (most reliable for Cloudflare bypass)
+  try {
+    const stocks = await fetchViaPythonSubprocess();
     if (stocks.length > 0) {
       console.log(
-        `[Scraper] Returning ${stocks.length} volume shockers from Chartink EOD`
+        `[Scraper] Returning ${stocks.length} stocks from Python curl_cffi`
       );
       return stocks;
     }
   } catch (err: any) {
-    console.error(`[Scraper] Chartink EOD scrape failed: ${err.message}`);
+    console.error(`[Scraper] Python method failed: ${err.message}`);
   }
 
+  // Method 2: Direct Node.js fetch (may be blocked by Cloudflare)
+  try {
+    const stocks = await fetchViaNodeFetch();
+    if (stocks.length > 0) {
+      console.log(
+        `[Scraper] Returning ${stocks.length} stocks from Node.js fetch`
+      );
+      return stocks;
+    }
+  } catch (err: any) {
+    console.error(`[Scraper] Node.js fetch failed: ${err.message}`);
+  }
+
+  console.warn("[Scraper] All scraping methods failed");
   return [];
 }
 
