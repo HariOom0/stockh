@@ -1,93 +1,27 @@
-# StockPulse Worklog
+# StockH Project Work Log
 
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Build StockPulse - Indian stock volume shockers website
+Task: Fix stock data mismatch - stocks on stockh.vercel.app not matching chartink.com/eodscanner/Volume-Shockers.html
 
 Work Log:
-- Initialized fullstack dev environment (Next.js 16 + TypeScript + Tailwind CSS 4 + shadcn/ui)
-- Analyzed chartink.com HTML structure to understand table format (8 columns: Sr, Stock name, Watchlist, Close, Change, Vol Gain %, CandleStick, PnF)
-- Analyzed screener.in HTML structure for company data (metrics, quarterly results, sector/industry, peers)
-- Built `/src/lib/scraper.ts` - Cheerio-based scraper for both chartink.com and screener.in
-- Built `/api/volume-shockers` - Scrapes chartink, filters positive stocks with vol > 180%, caches 30min
-- Built `/api/stock-detail` - Scrapes screener.in for company name, sector, industry, about, key ratios, quarterly results, peers. Caches 1hr per ticker
-- Built `/api/sector-insights` - 13-sector rotation analysis with Bullish/Bearish/Neutral/Rotating trends, descriptions, confidence levels. Caches 4hr
-- Built main page (`/src/app/page.tsx`) with: dark finance theme, sticky header, stock table (desktop) + cards (mobile), search, sort by any column, slide-in detail panel with sector outlook matching, quarterly results table, peer companies, links to screener.in
-- Fixed bug: cheerio `.text()` strips HTML tags so `color='green'` was invisible - switched to `.html()` check
-- Fixed bug: screener.in sector/industry not found in top strip - moved to peers section `a[title]` selector
-- Fixed bug: peers showing category names instead of companies - filtered by `/company/` href pattern
-- Fixed bug: desktop Sectors button only fetched data but didn't toggle panel visibility
-- Verified all features with Agent Browser: stock list (11 stocks), search filtering, stock detail panel, sector insights panel, mobile responsive cards, mobile detail panel
+- Investigated live site: stockh.vercel.app shows "No data available" (503 error)
+- Previous scraper used Puppeteer + @sparticuz/chromium to scrape Chartink EOD page
+- Puppeteer was failing on Vercel (serverless environment limitations, Cloudflare challenges)
+- Visited Chartink EOD page to verify table structure: 8 columns (Sr, Stock name, [watchlist], Close, Change, Vol Gain %, CandleStick, PnF)
+- Tested Python curl_cffi library: successfully bypasses Cloudflare TLS fingerprinting
+- Tested Node.js direct fetch: blocked by Cloudflare (403)
+- Rewrote scraper.ts to use Python subprocess with curl_cffi as primary method
+- Added Node.js fetch as fallback
+- Removed @sparticuz/chromium and puppeteer-core dependencies
+- Updated next.config.ts to remove serverExternalPackages for puppeteer
+- Build passes successfully
+- Pushed to GitHub for Vercel deployment
 
 Stage Summary:
-- Website fully functional at http://localhost:3000/
-- Data sourced from chartink.com (daily at 7PM IST) and screener.in
-- 11 volume shocker stocks found today (positive + vol > 180%)
-- All 3 API routes returning 200 with proper caching
-- Dark finance theme with green/amber accent colors
-- Responsive design (desktop table + mobile cards)
----
-Task ID: 1
-Agent: Main Agent
-Task: Add universal stock search feature - search any stock on screener.in and display comprehensive data
-
-Work Log:
-- Read and analyzed existing codebase (page.tsx, scraper.ts, API routes)
-- Created /api/stock-search/route.ts - searches screener.in's JSON API, extracts ticker from URL pattern, with fallback HTML scraping and 15min cache
-- Enhanced scraper.ts to extract comprehensive data: pros/cons (div.pros/cons ul li), balance sheet (#balance-sheet table), cash flow (#cash-flow table), shareholding pattern (#shareholding table.data-table with dedup), annual results (structure ready, data loaded dynamically)
-- Added "Search" tab to main page UI with debounced search (400ms), quick-pick buttons (RELIANCE, TCS, HDFCBANK, INFY, ITC, SBIN), animated results list
-- Each search result shows company name, ticker, with direct links to Screener.in and TradingView
-- Clicking a result opens the detail panel with full screener.in data
-- Modified detail panel to conditionally hide volume-shocker-specific data (price, change%, vol%) for searched stocks, showing "Screener.in Data" badge instead
-- Added extended data display sections in detail panel: Pros (green checkmarks), Cons (red X marks), Balance Sheet table, Cash Flow table, Shareholding Pattern, Annual Results
-- Fixed view tabs to always show (including Search tab even during initial loading)
-- Added Globe, CheckCircle, XCircle, Users, DollarSign icon imports
-
-Stage Summary:
-- New API: /api/stock-search - searches all NSE/BSE companies via screener.in
-- Enhanced scraper extracts: 9 metrics, 13 quarters, 58 peers, pros, cons, 12 periods of balance sheet, 12 periods of cash flow, shareholding pattern
-- Search tab accessible immediately without waiting for volume shockers to load
-- Comprehensive stock data now available for any Indian stock
-
----
-Task ID: 1
-Agent: Main Agent
-Task: Fix peer companies showing index names instead of actual stocks
-
-Work Log:
-- Investigated screener.in HTML structure for RELIANCE, TATAPOWER, TCS
-- Discovered ALL `/company/` links in `#peers` section are benchmark/index links (Nifty 50, BSE Sensex, etc.) with class "tag" inside `#benchmarks` paragraph
-- Found that actual peer companies are loaded via JavaScript (placeholder: "Loading peers table ...") - not available in static HTML
-- Fixed scraper.ts to: (1) exclude `.tag` class links (benchmarks), (2) filter by index keywords as safety net, (3) fetch real peer companies from the sector classification page as fallback
-- Added `fetchSectorPeers()` function that scrapes the screener.in sector page (extracted from `a[title="Sector"]` href) for actual companies
-- Tested with RELIANCE (got ONGC, BPCL, HPCL, GAIL, etc.), TCS (got Infosys, Wipro, HCL Tech, etc.), TATAPOWER (got Adani Power, NTPC, etc.)
-
-Stage Summary:
-- Peers now show real sector companies instead of index names
-- Sector page is fetched as fallback when static HTML has no peer links
-- Build verified clean
-- Other features (Search tab, Suggestions tab, TradingView button) confirmed already working from previous session
-
----
-Task ID: 2
-Agent: Main Agent
-Task: Redesign detail panel to match screener.in style + make peers clickable
-
-Work Log:
-- Studied screener.in's actual page layout: header with name/price/breadcrumbs, flex-space-between ratio list, data-table with fiscal year highlighting, about section, pros/cons
-- Redesigned detail panel with 3-zone layout: sticky header, scrollable content, sticky footer
-- Header: Company name + sector/industry breadcrumbs + BSE/NSE codes + price badge + sector outlook strip
-- Key Ratios: screener-style alternating row list (flex-space-between) instead of grid cards
-- Tables: Custom ScreenerTable/ScreenerRow components with fiscal year end column highlighting
-- Pros/Cons: Side by side layout like screener
-- Shareholding: Period header with colored row strips
-- Peer companies: Clickable rows with name + ticker, instant navigation (no search API needed)
-- Peers now return {name, ticker} objects from scraper for direct navigation
-- handlePeerClick directly sets selectedStock with peer's ticker — detail loads via existing useEffect
-- Sticky footer with Chart + Screener.in action buttons
-
-Stage Summary:
-- Detail panel now visually matches screener.in's clean, data-dense style
-- Clicking any peer company instantly navigates to that company's full detail in the same panel
-- Build verified clean, peers tested with TCS (returns INFY, HCLTECH, WIPRO, TECHM, etc.)
+- Root cause: Puppeteer unreliable on Vercel serverless (memory, timeout, Cloudflare challenge)
+- Fix: Python curl_cffi subprocess (Chrome TLS fingerprint bypass)
+- Vercel deployment pending - waiting for auto-deploy from GitHub push
+- Key files changed: src/lib/scraper.ts, next.config.ts, package.json
+- Python deps needed on Vercel: curl_cffi, beautifulsoup4
