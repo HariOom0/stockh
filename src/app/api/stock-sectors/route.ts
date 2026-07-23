@@ -72,10 +72,30 @@ async function fetchWithConcurrency(
 }
 
 export async function GET(req: NextRequest) {
-  const tickersParam = req.nextUrl.searchParams.get("tickers");
+  let tickersParam = req.nextUrl.searchParams.get("tickers");
+
+  // If no tickers provided, auto-use current volume shockers
+  if (!tickersParam) {
+    try {
+      const baseUrl = req.nextUrl.origin;
+      const shockRes = await fetch(`${baseUrl}/api/volume-shockers`, {
+        signal: AbortSignal.timeout(65_000), // match volume-shockers maxDuration
+      });
+      if (shockRes.ok) {
+        const shockData = await shockRes.json();
+        if (shockData.stocks && shockData.stocks.length > 0) {
+          tickersParam = shockData.stocks
+            .map((s: { ticker: string }) => s.ticker)
+            .join(",");
+        }
+      }
+    } catch {
+      // Fall through to error below
+    }
+  }
 
   if (!tickersParam) {
-    return NextResponse.json({ error: "Missing tickers parameter" }, { status: 400 });
+    return NextResponse.json({ error: "Missing tickers parameter and could not auto-detect from volume shockers" }, { status: 400 });
   }
 
   const tickers = tickersParam

@@ -4,5 +4,19 @@
       "path": "/api/cron/daily-snapshot",
       "schedule": "45 13 * * 1-5"
     }
-  ]
+  ],
+  "functions": {
+    "src/app/api/volume-shockers/route.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "src/app/api/cron/daily-snapshot/route.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    },
+    "src/app/api/stock-detail/route.ts": {
+      "memory": 512,
+      "maxDuration": 30
+    }
+  }
 }
