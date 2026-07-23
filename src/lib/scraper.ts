@@ -44,13 +44,15 @@ interface ChartinkRow {
  * from *inside* the page context (page.evaluate).
  */
 async function fetchChartinkViaPuppeteer(): Promise<ChartinkRow[]> {
-  // Dynamic imports — keeps bundling clean
-  const chromium = await import("@sparticuz/chromium");
-  const puppeteer = await import("puppeteer-core");
+  // Dynamic imports — @sparticuz/chromium exports via .default, NOT named
+  const chromiumMod = await import("@sparticuz/chromium");
+  const chromium = chromiumMod.default ?? chromiumMod;
+  const puppeteerMod = await import("puppeteer-core");
+  const puppeteer = puppeteerMod.default ?? puppeteerMod;
 
   console.log("[Chartink] Launching headless Chromium...");
 
-  const browser = await puppeteer.default.launch({
+  const browser = await puppeteer.launch({
     executablePath: await chromium.executablePath(),
     headless: chromium.headless,
     args: [
@@ -85,24 +87,37 @@ async function fetchChartinkViaPuppeteer(): Promise<ChartinkRow[]> {
     // Small settle — let any post-CF JS finish
     await new Promise((r) => setTimeout(r, 1500));
 
-    // Step 2 — Call the screener/process API from INSIDE the browser.
-    // Because the browser already passed Cloudflare, this request
-    // carries valid CF cookies and is treated as legitimate.
+    // Step 2 — Read the XSRF-TOKEN cookie from the browser, then call
+    // screener/process from INSIDE the page context.  The XSRF token is
+    // required by Laravel (HTTP 419 if missing / mismatched).
     console.log("[Chartink] Fetching stock data via in-browser XHR...");
     const result = await page.evaluate(
       async (apiUrl: string, scanClause: string) => {
+        // Extract XSRF token from browser cookies
+        const cookieStr = document.cookie;
+        const xsrfMatch = cookieStr.match(/XSRF-TOKEN=([^;]+)/);
+        const xsrfToken = xsrfMatch
+          ? decodeURIComponent(xsrfMatch[1])
+          : "";
+
+        const headers: Record<string, string> = {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-Requested-With": "XMLHttpRequest",
+          Accept: "application/json",
+        };
+        if (xsrfToken) headers["X-XSRF-TOKEN"] = xsrfToken;
+
         try {
           const res = await fetch(apiUrl, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              "X-Requested-With": "XMLHttpRequest",
-              Accept: "application/json",
-            },
+            headers,
             credentials: "include",
             body: `scan_clause=${encodeURIComponent(scanClause)}&start=0&length=200`,
           });
-          if (!res.ok) return { error: `HTTP ${res.status}` };
+          if (!res.ok)
+            return {
+              error: `HTTP ${res.status} ${res.statusText}`,
+            };
           return await res.json();
         } catch (e: any) {
           return { error: e.message || String(e) };
