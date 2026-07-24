@@ -1,13 +1,36 @@
 import { NextResponse } from "next/server";
 import { isMarketClosed, getTradingDate } from "@/lib/trading-calendar";
 
-// Vercel Cron: 7:15 PM IST daily (Mon-Fri)
-// Scrapes live data from Chartink, filters, and saves to DB.
-// Falls back to static file if scrape fails.
+export const dynamic = "force-dynamic";
+
+function isAfter730PMIST(): boolean {
+  const now = new Date();
+  const istHour = parseInt(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      hour12: false,
+    }).format(now),
+    10
+  );
+  const istMinute = parseInt(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      minute: "numeric",
+    }).format(now),
+    10
+  );
+  return istHour > 19 || (istHour === 19 && istMinute >= 30);
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!isAfter730PMIST()) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "Before 7:30 PM IST" });
   }
 
   const istDate = new Intl.DateTimeFormat("en-CA", {
@@ -25,16 +48,41 @@ export async function GET(request: Request) {
 
   const tradingDate = getTradingDate();
 
+  if (isMarketClosed(tradingDate)) {
+    return NextResponse.json({ ok: true, skipped: true, reason: `Trading date ${tradingDate} is not a trading day` });
+  }
+
   try {
-    // Call volume-shockers which tries live scrape → filter → save to DB
+    const { db } = await import("@/lib/db");
+    const existing = await db.dailyStockSnapshot.findUnique({ where: { date: tradingDate } });
+    if (existing) {
+      return NextResponse.json({ ok: true, skipped: true, reason: `Data already exists for ${tradingDate}` });
+    }
+  } catch {
+    // continue
+  }
+
+  try {
     const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
     const res = await fetch(`${baseUrl}/api/volume-shockers`, { cache: "no-store", signal: AbortSignal.timeout(30_000) });
     const data = await res.json();
 
+    if (!data.stocks?.length) {
+      return NextResponse.json({ ok: false, error: "No stocks returned from scraper" });
+    }
+
+    const { db } = await import("@/lib/db");
+    await db.dailyStockSnapshot.upsert({
+      where: { date: tradingDate },
+      update: { stockCount: data.stocks.length, stocksJson: JSON.stringify(data.stocks) },
+      create: { date: tradingDate, stockCount: data.stocks.length, stocksJson: JSON.stringify(data.stocks) },
+    });
+    console.log(`[Cron] Saved ${data.stocks.length} stocks for ${tradingDate}`);
+
     return NextResponse.json({
-      ok: !!data.stocks?.length,
+      ok: true,
       tradingDate,
-      stockCount: data.stocks?.length || 0,
+      stockCount: data.stocks.length,
       source: data.source || "unknown",
     });
   } catch (error) {
