@@ -34,6 +34,7 @@ import {
   TrendingDown,
   Sun,
   Moon,
+  Timer,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -126,7 +127,7 @@ interface SearchResult {
   ticker: string;
 }
 
-type ViewMode = "list" | "suggestions" | "search" | "history";
+type ViewMode = "list" | "suggestions" | "search" | "history" | "intraday";
 
 // ─── Trend Colors ─────────────────────────────────────────────────────
 function trendColor(trend: string) {
@@ -348,6 +349,51 @@ export default function Home() {
   const [searchError, setSearchError] = useState("");
   const [isSearchedStock, setIsSearchedStock] = useState(false);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ─── Intraday state ───────────────────────────────────────────
+  const [intraStocks, setIntraStocks] = useState<any[]>([]);
+  const [intraSectors, setIntraSectors] = useState<any[]>([]);
+  const [intraLoading, setIntraLoading] = useState(false);
+  const [intraError, setIntraError] = useState("");
+  const [intraMarketOpen, setIntraMarketOpen] = useState(false);
+  const [intraLastUpdate, setIntraLastUpdate] = useState<string>("");
+  const intraIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [nextRefresh, setNextRefresh] = useState(900);
+  const intraCountdownRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchIntraday = useCallback(async () => {
+    setIntraLoading(true);
+    setIntraError("");
+    try {
+      const res = await fetch("/api/intraday", { cache: "no-store" });
+      const data = await res.json();
+      if (data.stocks) setIntraStocks(data.stocks);
+      if (data.sectors) setIntraSectors(data.sectors);
+      if (data.marketOpen !== undefined) setIntraMarketOpen(data.marketOpen);
+      setIntraLastUpdate(data.now || new Date().toISOString());
+      setNextRefresh(900);
+    } catch {
+      setIntraError("Failed to fetch intraday data");
+    } finally {
+      setIntraLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (viewMode === "intraday") {
+      fetchIntraday();
+      // Auto-refresh every 15 min
+      intraIntervalRef.current = setInterval(fetchIntraday, 15 * 60 * 1000);
+      // Countdown
+      intraCountdownRef.current = setInterval(() => {
+        setNextRefresh((prev) => Math.max(0, prev - 1));
+      }, 1000);
+      return () => {
+        if (intraIntervalRef.current) clearInterval(intraIntervalRef.current);
+        if (intraCountdownRef.current) clearInterval(intraCountdownRef.current);
+      };
+    }
+  }, [viewMode, fetchIntraday]);
 
   // ─── Fetch Volume Shockers ───────────────────────────────────────
   const fetchStocks = useCallback(async () => {
@@ -664,6 +710,9 @@ export default function Home() {
     if (mode === "history") {
       fetchHistoryDates();
     }
+    if (mode === "intraday") {
+      fetchIntraday();
+    }
   };
 
   // ─── History functions ───────────────────────────────────────────
@@ -790,7 +839,7 @@ export default function Home() {
             </div>
           </div>
           {/* ─── VIEW TABS (separate row) ──────────────── */}
-          {(stocks.length > 0 || viewMode === "search" || viewMode === "history") && (
+          {(stocks.length > 0 || viewMode === "search" || viewMode === "history" || viewMode === "intraday") && (
             <div className="border-t border-border">
               <div className="max-w-7xl mx-auto w-full px-3 sm:px-6 py-2">
                 <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary w-fit overflow-x-auto scrollbar-none">
@@ -844,6 +893,19 @@ export default function Home() {
                   <span className="flex items-center gap-1.5">
                     <History className="w-3.5 h-3.5" />
                     History
+                  </span>
+                </button>
+                <button
+                  onClick={() => handleViewSwitch("intraday")}
+                  className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
+                    viewMode === "intraday"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5" />
+                    Intraday
                   </span>
                 </button>
               </div>
@@ -2077,6 +2139,178 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
+
+          {/* ─── INTRADAY VIEW ─────────────────────────────────── */}
+          {viewMode === "intraday" && (
+            <div className="space-y-6">
+              {/* Header row: Market status + refresh timer */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${intraMarketOpen ? "bg-emerald-500/15" : "bg-zinc-500/15"}`}>
+                    <Activity className={`w-7 h-7 ${intraMarketOpen ? "text-emerald-400" : "text-zinc-400"}`} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-semibold text-foreground">Live Intraday Volume</h2>
+                    <p className="text-xs text-muted-foreground">Top 10 stocks by volume from NSE</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge className={`border-0 font-semibold text-xs ${intraMarketOpen ? "bg-emerald-500/15 text-emerald-400" : "bg-zinc-500/15 text-zinc-400"}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${intraMarketOpen ? "bg-emerald-400 animate-pulse" : "bg-zinc-500"}`} />
+                    {intraMarketOpen ? "MARKET OPEN" : "MARKET CLOSED"}
+                  </Badge>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Timer className="w-3.5 h-3.5" />
+                    <span>{Math.floor(nextRefresh / 60)}:{String(nextRefresh % 60).padStart(2, "0")}</span>
+                  </div>
+                  <Button variant="ghost" size="icon" className="w-8 h-8" onClick={fetchIntraday} disabled={intraLoading}>
+                    <RefreshCw className={`w-4 h-4 ${intraLoading ? "animate-spin" : ""}`} />
+                  </Button>
+                </div>
+              </div>
+
+              {intraLoading && intraStocks.length === 0 ? (
+                <div className="flex flex-col items-center py-16 gap-4">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Fetching live data from NSE...</p>
+                </div>
+              ) : intraError && intraStocks.length === 0 ? (
+                <Card className="border-border">
+                  <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+                    <AlertTriangle className="w-7 h-7 text-amber-400" />
+                    <h3 className="text-sm font-semibold text-foreground">Data Unavailable</h3>
+                    <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+                      {intraError}. NSE may be blocking server requests. This works best during market hours (9:15 AM - 3:30 PM IST).
+                    </p>
+                    <Button variant="outline" size="sm" onClick={fetchIntraday}>
+                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Retry
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  {/* Top 10 Volume Stocks - Desktop Table */}
+                  <div className="hidden md:block rounded-xl border border-border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-secondary/80">
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground w-12">#</th>
+                          <th className="text-left px-4 py-3 font-medium text-muted-foreground">Stock</th>
+                          <th className="text-center px-4 py-3 font-medium text-muted-foreground w-16">Exch</th>
+                          <th className="text-right px-4 py-3 font-medium text-muted-foreground">LTP</th>
+                          <th className="text-right px-4 py-3 font-medium text-muted-foreground">Change</th>
+                          <th className="text-right px-4 py-3 font-medium text-muted-foreground">Volume</th>
+                          <th className="text-right px-4 py-3 font-medium text-muted-foreground">Value (Cr)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {intraStocks.map((s: any) => (
+                          <tr key={s.ticker} className="border-t border-border hover:bg-secondary/50 transition-colors">
+                            <td className="px-4 py-3 text-muted-foreground text-xs font-mono">{s.rank}</td>
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-foreground">{s.name}</div>
+                              <div className="text-xs text-muted-foreground">{s.ticker}</div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 font-mono">
+                                {s.exchange}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono">₹{s.ltp?.toLocaleString("en-IN") || "-"}</td>
+                            <td className="px-4 py-3 text-right">
+                              <span className={`font-mono font-medium ${(s.changePct || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                {(s.changePct || 0) >= 0 ? "+" : ""}{(s.changePct || 0).toFixed(2)}%
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-muted-foreground">
+                              {s.volume ? (s.volume / 100000).toFixed(1) + "L" : "-"}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-muted-foreground">
+                              {s.valueCr ? "₹" + (s.valueCr / 100).toFixed(0) + " Cr" : "-"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Top 10 - Mobile Cards */}
+                  <div className="md:hidden space-y-2">
+                    {intraStocks.map((s: any) => (
+                      <div key={s.ticker} className="flex items-center justify-between px-3 py-3 rounded-xl border border-border">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-xs font-mono text-muted-foreground w-5">{s.rank}</span>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-foreground truncate">{s.name}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground">{s.ticker}</span>
+                              <Badge variant="secondary" className="text-[9px] px-1 py-0 font-mono h-4">
+                                {s.exchange}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-mono text-foreground">₹{s.ltp?.toLocaleString("en-IN") || "-"}</div>
+                          <span className={`text-xs font-mono font-medium ${(s.changePct || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                            {(s.changePct || 0) >= 0 ? "+" : ""}{(s.changePct || 0).toFixed(2)}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Sector Volume */}
+                  {intraSectors.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-primary" />
+                        Sector Volume Distribution
+                      </h3>
+                      <div className="grid gap-2">
+                        {intraSectors.map((sec: any) => {
+                          const maxVol = Math.max(...intraSectors.map((s2: any) => parseFloat(s2.volumePct) || 0));
+                          const pct = parseFloat(sec.volumePct) || 0;
+                          const barW = maxVol > 0 ? (pct / maxVol) * 100 : 0;
+                          return (
+                            <div key={sec.sector} className="flex items-center gap-3">
+                              <div className="w-20 sm:w-28 text-xs text-muted-foreground truncate shrink-0" title={sec.sector}>
+                                {sec.sector}
+                              </div>
+                              <div className="flex-1 h-6 bg-secondary rounded-full overflow-hidden relative">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-500 ${pct > 0 ? "bg-gradient-to-r from-blue-500/60 to-cyan-400/60" : "bg-zinc-600/30"}`}
+                                  style={{ width: `${barW}%` }}
+                                />
+                                <div className="absolute inset-0 flex items-center justify-between px-3">
+                                  <span className="text-[10px] font-mono text-foreground/80">{pct}%</span>
+                                  <span className={`text-[10px] font-mono ${(sec.changePct || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                    {(sec.changePct || 0) >= 0 ? "+" : ""}{(sec.changePct || 0).toFixed(1)}%
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-[10px] text-muted-foreground/60 w-12 text-right shrink-0">
+                                {sec.advance || 0}/{sec.decline || 0}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground/50 mt-2">A/D = Advances / Declines</p>
+                    </div>
+                  )}
+
+                  {/* Last updated */}
+                  {intraLastUpdate && (
+                    <p className="text-[10px] text-muted-foreground/40 text-center">
+                      Last updated: {new Date(intraLastUpdate).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+                      {intraStocks.length === 0 && " · No live data available (NSE may be unreachable from server)"}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
         {/* ─── BACKDROP ───────────────────────────────────────────── */}
         <AnimatePresence>
