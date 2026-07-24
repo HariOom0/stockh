@@ -862,7 +862,7 @@ export default function Home() {
                 >
                   <span className="flex items-center gap-1.5">
                     <BarChart3 className="w-3.5 h-3.5" />
-                    Filtered Stocks
+                    Stocks
                   </span>
                 </button>
                 <button
@@ -921,7 +921,7 @@ export default function Home() {
                 {/* Mobile: More dropdown for History & Intraday */}
                 <div className="relative sm:hidden">
                   <button
-                    onClick={() => setMobileMoreOpen(!mobileMoreOpen)}
+                    onClick={(e) => { e.stopPropagation(); setMobileMoreOpen(!mobileMoreOpen); }}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 flex items-center gap-1 ${
                       (viewMode === "history" || viewMode === "intraday")
                         ? "bg-background text-foreground shadow-sm"
@@ -932,7 +932,7 @@ export default function Home() {
                     <ChevronDown className={`w-3 h-3 transition-transform ${mobileMoreOpen ? "rotate-180" : ""}`} />
                   </button>
                   {mobileMoreOpen && (
-                    <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-lg shadow-lg py-1 z-50 min-w-[140px]">
+                    <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-lg shadow-lg py-1 z-50 min-w-[140px]" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => { handleViewSwitch("history"); setMobileMoreOpen(false); }}
                         className={`w-full text-left px-3 py-2 text-sm font-medium flex items-center gap-2 transition-colors ${
