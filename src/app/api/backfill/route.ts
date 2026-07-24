@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
-import { readFileSync } from "fs";
-import { join } from "path";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/backfill
- * Body: { dates: ["2026-07-23", "2026-07-24"] }
+ * Body: { date: "2026-07-24", stocks: [...] }
  * 
- * Reads stocks.json from the corresponding git commit SHA for each date
- * and saves to the database. This is a one-time setup endpoint.
+ * Saves stock data for a specific date to the database.
+ * Called by GitHub Actions daily-scraper workflow.
  * 
- * Security: Only works if DATABASE_URL is valid and a BACKFILL_SECRET is set.
+ * Auth: CRON_SECRET header or query param required.
  */
 export async function POST(request: Request) {
   const dbUrl = process.env.DATABASE_URL;
