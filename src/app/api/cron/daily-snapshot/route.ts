@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { isMarketClosed } from "@/lib/trading-calendar";
+import { getTradingDate } from "@/lib/trading-calendar";
 
 // Vercel Cron: hits this endpoint daily at 7:15 PM IST (13:45 UTC)
 // Skips weekends and NSE holidays.
-// The actual work is done by the volume-shockers endpoint.
+// Fetches today's stocks and saves a snapshot to the database.
 export async function GET(request: Request) {
   // Verify this is a Vercel cron call (Authorization header set by Vercel)
   const authHeader = request.headers.get("authorization");
@@ -27,28 +28,62 @@ export async function GET(request: Request) {
     });
   }
 
-  // Trigger the volume-shockers API internally
-  // Extend timeout since the Yahoo Finance scan takes ~5s for 168 stocks
+  // Check if DATABASE_URL is a valid PostgreSQL connection string
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl || (!dbUrl.startsWith("postgresql://") && !dbUrl.startsWith("postgres://"))) {
+    return NextResponse.json({
+      ok: false,
+      error: "DATABASE_URL not configured or not a valid PostgreSQL URL",
+    }, { status: 503 });
+  }
+
   try {
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
       : "http://localhost:3000";
 
+    // Fetch today's stocks from the volume-shockers endpoint
     const res = await fetch(`${baseUrl}/api/volume-shockers`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(90_000), // 90s timeout for Chartink + Yahoo
+      signal: AbortSignal.timeout(90_000),
     });
     const data = await res.json();
 
+    if (!res.ok || !data.stocks || data.stocks.length === 0) {
+      return NextResponse.json({
+        ok: false,
+        error: "No stocks returned from volume-shockers",
+        detail: data.error,
+      }, { status: 502 });
+    }
+
+    // Save snapshot to database
+    const { db } = await import("@/lib/db");
+    const tradingDate = data.tradingDate || getTradingDate();
+
+    await db.dailyStockSnapshot.upsert({
+      where: { date: tradingDate },
+      update: {
+        stockCount: data.stocks.length,
+        stocksJson: JSON.stringify(data.stocks),
+      },
+      create: {
+        date: tradingDate,
+        stockCount: data.stocks.length,
+        stocksJson: JSON.stringify(data.stocks),
+      },
+    });
+
     return NextResponse.json({
-      ok: res.ok,
-      tradingDate: data.tradingDate,
-      stockCount: data.stocks?.length ?? 0,
-      error: data.error || undefined,
+      ok: true,
+      tradingDate,
+      stockCount: data.stocks.length,
+      saved: true,
     });
   } catch (error) {
+    console.error("[Cron] Daily snapshot failed:", error);
     return NextResponse.json(
-      { ok: false, error: "Failed to trigger snapshot", detail: String(error) },
+      { ok: false, error: "Failed to save snapshot", detail: String(error) },
       { status: 500 }
     );
   }
