@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { isMarketClosed } from "@/lib/trading-calendar";
-import { getTradingDate } from "@/lib/trading-calendar";
+import { isMarketClosed, getTradingDate } from "@/lib/trading-calendar";
+import { fetchVolumeShockers } from "@/lib/scraper";
 
 // Vercel Cron: hits this endpoint daily at 7:15 PM IST (13:45 UTC)
 // Skips weekends and NSE holidays.
-// Fetches today's stocks and saves a snapshot to the database.
+// Scrapes live data from Chartink and saves snapshot to database.
 export async function GET(request: Request) {
   // Verify this is a Vercel cron call (Authorization header set by Vercel)
   const authHeader = request.headers.get("authorization");
@@ -37,47 +37,40 @@ export async function GET(request: Request) {
     }, { status: 503 });
   }
 
+  const tradingDate = getTradingDate();
+
   try {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
+    // Scrape live data from Chartink
+    const stocks = await fetchVolumeShockers();
 
-    // Fetch today's stocks from the volume-shockers endpoint
-    const res = await fetch(`${baseUrl}/api/volume-shockers`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(90_000),
-    });
-    const data = await res.json();
-
-    if (!res.ok || !data.stocks || data.stocks.length === 0) {
+    if (stocks.length === 0) {
       return NextResponse.json({
         ok: false,
-        error: "No stocks returned from volume-shockers",
-        detail: data.error,
+        error: "Scraper returned 0 stocks (possibly blocked by Cloudflare)",
+        tradingDate,
       }, { status: 502 });
     }
 
     // Save snapshot to database
     const { db } = await import("@/lib/db");
-    const tradingDate = data.tradingDate || getTradingDate();
 
     await db.dailyStockSnapshot.upsert({
       where: { date: tradingDate },
       update: {
-        stockCount: data.stocks.length,
-        stocksJson: JSON.stringify(data.stocks),
+        stockCount: stocks.length,
+        stocksJson: JSON.stringify(stocks),
       },
       create: {
         date: tradingDate,
-        stockCount: data.stocks.length,
-        stocksJson: JSON.stringify(data.stocks),
+        stockCount: stocks.length,
+        stocksJson: JSON.stringify(stocks),
       },
     });
 
     return NextResponse.json({
       ok: true,
       tradingDate,
-      stockCount: data.stocks.length,
+      stockCount: stocks.length,
       saved: true,
     });
   } catch (error) {

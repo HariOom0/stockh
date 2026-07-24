@@ -23,6 +23,12 @@ type StockData = {
   isPositive: boolean;
 };
 
+function hasValidDbUrl(): boolean {
+  const url = process.env.DATABASE_URL;
+  if (!url) return false;
+  return url.startsWith("postgresql://") || url.startsWith("postgres://");
+}
+
 export async function GET() {
   const tradingDate = getTradingDate();
   const now = Date.now();
@@ -41,7 +47,43 @@ export async function GET() {
     });
   }
 
-  // 2. Read from static JSON file (updated by GitHub Action daily)
+  // 2. Try database first (most up-to-date if cron has run today)
+  if (hasValidDbUrl()) {
+    try {
+      const { db } = await import("@/lib/db");
+      const snapshot = await db.dailyStockSnapshot.findUnique({
+        where: { date: tradingDate },
+      });
+
+      if (snapshot) {
+        const stocks: StockData[] = JSON.parse(snapshot.stocksJson).map(
+          (s: any, i: number) => ({
+            sr: i + 1,
+            name: String(s.name || ""),
+            ticker: String(s.ticker || ""),
+            close: Number(s.close) || 0,
+            change: Number(s.change) || 0,
+            volGainPct: Number(s.volGainPct) || 0,
+            isPositive: (Number(s.change) || 0) > 0,
+          })
+        );
+
+        cachedData = { stocks, timestamp: now, tradingDate };
+
+        return NextResponse.json({
+          stocks,
+          cached: false,
+          lastUpdated: snapshot.createdAt.getTime(),
+          tradingDate,
+          source: "database",
+        });
+      }
+    } catch (err: any) {
+      console.warn("[VolumeShockers] Database lookup failed:", err.message);
+    }
+  }
+
+  // 3. Fall back to static JSON file
   try {
     const filePath = join(process.cwd(), "public", "data", "stocks.json");
     const raw = readFileSync(filePath, "utf-8");
@@ -77,11 +119,11 @@ export async function GET() {
     console.error("[VolumeShockers] Static file read failed:", err.message);
   }
 
-  // 3. Nothing available
+  // 4. Nothing available
   return NextResponse.json(
     {
       error:
-        "No data available yet. Stock data is updated every trading day after market hours (7:15 PM IST) via GitHub Action.",
+        "No data available yet. Stock data is updated every trading day after market hours via cron job.",
       stocks: [],
       cached: false,
       tradingDate,
