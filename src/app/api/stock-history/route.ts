@@ -13,8 +13,8 @@ function hasValidDbUrl(): boolean {
 let seeded = false;
 
 /**
- * One-time seed: if DB is empty, load data from seed-data.json.
- * This ensures history works immediately after first deploy.
+ * Seed any missing dates from seed-data.json.
+ * Runs on every first call (not just when DB is empty).
  */
 async function ensureSeeded() {
   if (seeded || !hasValidDbUrl()) return;
@@ -22,8 +22,6 @@ async function ensureSeeded() {
 
   try {
     const { db } = await import("@/lib/db");
-    const count = await db.dailyStockSnapshot.count();
-    if (count > 0) return;
 
     const seedPath = join(process.cwd(), "public", "data", "seed-data.json");
     const raw = readFileSync(seedPath, "utf-8");
@@ -31,6 +29,11 @@ async function ensureSeeded() {
 
     for (const [date, stocks] of Object.entries(seedData)) {
       if (!Array.isArray(stocks) || stocks.length === 0) continue;
+
+      // Check if this date already exists
+      const existing = await db.dailyStockSnapshot.findUnique({ where: { date } });
+      if (existing) continue;
+
       await db.dailyStockSnapshot.create({
         data: { date, stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
       });
@@ -38,44 +41,33 @@ async function ensureSeeded() {
     }
   } catch (err: any) {
     console.warn("[Seed] Failed:", err.message);
-    seeded = false; // Allow retry
+    seeded = false;
   }
 }
 
 // GET /api/stock-history          → list all snapshot dates
-// GET /api/stock-history?date=2026-07-08 → get stocks for a specific date
+// GET /api/stock-history?date=2026-07-24 → get stocks for a specific date
 export async function GET(request: Request) {
   if (!hasValidDbUrl()) {
-    return NextResponse.json(
-      { error: "Database not configured.", snapshots: [] },
-      { status: 503 }
-    );
+    return NextResponse.json({ error: "Database not configured.", snapshots: [] }, { status: 503 });
   }
 
   try {
     const { db } = await import("@/lib/db");
 
-    // Auto-seed on first call
+    // Seed any missing dates from seed-data.json
     await ensureSeeded();
 
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
 
     if (date) {
-      const snapshot = await db.dailyStockSnapshot.findUnique({
-        where: { date },
-      });
-
+      const snapshot = await db.dailyStockSnapshot.findUnique({ where: { date } });
       if (!snapshot) {
         return NextResponse.json({ error: "No data for this date" }, { status: 404 });
       }
-
       const stocks = JSON.parse(snapshot.stocksJson);
-      return NextResponse.json({
-        date: snapshot.date,
-        stockCount: snapshot.stockCount,
-        stocks,
-      });
+      return NextResponse.json({ date: snapshot.date, stockCount: snapshot.stockCount, stocks });
     }
 
     const snapshots = await db.dailyStockSnapshot.findMany({
