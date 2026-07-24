@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { getTradingDate } from "@/lib/trading-calendar";
+import { fetchVolumeShockers } from "@/lib/scraper";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,7 @@ let cachedData: {
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 type StockData = {
+  sr: number;
   name: string;
   ticker: string;
   close: number;
@@ -27,6 +29,28 @@ function hasValidDbUrl(): boolean {
   const url = process.env.DATABASE_URL;
   if (!url) return false;
   return url.startsWith("postgresql://") || url.startsWith("postgres://");
+}
+
+async function saveToDatabase(stocks: StockData[], date: string): Promise<void> {
+  if (!hasValidDbUrl()) return;
+  try {
+    const { db } = await import("@/lib/db");
+    await db.dailyStockSnapshot.upsert({
+      where: { date },
+      update: {
+        stockCount: stocks.length,
+        stocksJson: JSON.stringify(stocks),
+      },
+      create: {
+        date,
+        stockCount: stocks.length,
+        stocksJson: JSON.stringify(stocks),
+      },
+    });
+    console.log(`[VolumeShockers] Auto-saved ${stocks.length} stocks for ${date} to database`);
+  } catch (err: any) {
+    console.warn("[VolumeShockers] Auto-save to DB failed:", err.message);
+  }
 }
 
 export async function GET() {
@@ -83,7 +107,52 @@ export async function GET() {
     }
   }
 
-  // 3. Fall back to static JSON file
+  // 3. Try scraping live data first (freshest source)
+  try {
+    const scraped = await fetchVolumeShockers();
+    if (scraped.length > 0) {
+      const stocks: StockData[] = scraped.map((s, i) => ({
+        sr: i + 1,
+        name: s.name,
+        ticker: s.ticker,
+        close: s.close,
+        change: s.change,
+        volGainPct: s.volGainPct,
+        isPositive: s.isPositive,
+      }));
+
+      cachedData = { stocks, timestamp: now, tradingDate };
+
+      // Auto-save to database in background (don't block response)
+      saveToDatabase(stocks, tradingDate);
+
+      // Also update static file for fallback
+      try {
+        const filePath = join(process.cwd(), "public", "data", "stocks.json");
+        const payload = {
+          stocks: scraped.map(({ sr, ...rest }: any) => rest),
+          tradingDate,
+          lastUpdated: new Date().toISOString(),
+          source: "live_scrape",
+        };
+        writeFileSync(filePath, JSON.stringify(payload, null, 2));
+      } catch {
+        // Static file update is best-effort (Vercel is read-only anyway)
+      }
+
+      return NextResponse.json({
+        stocks,
+        cached: false,
+        lastUpdated: now,
+        tradingDate,
+        source: "live_scrape",
+      });
+    }
+  } catch (err: any) {
+    console.warn("[VolumeShockers] Live scrape failed:", err.message);
+  }
+
+  // 4. Fall back to static JSON file
   try {
     const filePath = join(process.cwd(), "public", "data", "stocks.json");
     const raw = readFileSync(filePath, "utf-8");
@@ -105,6 +174,11 @@ export async function GET() {
       // Cache in memory
       cachedData = { stocks, timestamp: now, tradingDate: sourceDate };
 
+      // Auto-save static file data to database too (for history)
+      if (sourceDate === tradingDate) {
+        saveToDatabase(stocks, tradingDate);
+      }
+
       return NextResponse.json({
         stocks,
         cached: true,
@@ -119,7 +193,7 @@ export async function GET() {
     console.error("[VolumeShockers] Static file read failed:", err.message);
   }
 
-  // 4. Nothing available
+  // 5. Nothing available
   return NextResponse.json(
     {
       error:
