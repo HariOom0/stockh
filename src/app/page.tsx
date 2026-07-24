@@ -397,7 +397,13 @@ export default function Home() {
     suggestionsFetchedRef.current = true;
     setSuggestionsLoading(true);
     try {
-      const tickers = stocks.map((s) => s.ticker).join(",");
+      // Use filteredStocks tickers (already vol > 190% + positive) to stay under 50 limit
+      const tickersToFetch = filteredStocks.map((s) => s.ticker);
+      if (tickersToFetch.length === 0) {
+        setSuggestionsLoading(false);
+        return;
+      }
+      const tickers = tickersToFetch.join(",");
       const res = await fetch(`/api/stock-sectors?tickers=${tickers}`);
       const data = await res.json();
       if (data.stocks) {
@@ -407,13 +413,18 @@ export default function Home() {
         }
         setSectorMap(map);
         setSuggestionsLoaded(true);
+      } else if (data.error) {
+        console.error("[Suggestions] API error:", data.error);
+        // Allow retry on error
+        suggestionsFetchedRef.current = false;
       }
     } catch {
-      // silently fail
+      // Allow retry on failure
+      suggestionsFetchedRef.current = false;
     } finally {
       setSuggestionsLoading(false);
     }
-  }, [stocks]);
+  }, [filteredStocks]);
 
   useEffect(() => {
     fetchStocks();
@@ -1276,6 +1287,23 @@ export default function Home() {
                     </div>
                   )}
                 </>
+              )}
+
+              {/* Fallback: sectors loaded but no groups matched */}
+              {!suggestionsLoading && sectorInsights.length > 0 && suggestionGroups.length === 0 && (
+                <Card className="border-border">
+                  <CardContent className="p-8 text-center">
+                    <Sparkles className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm font-medium mb-1">Loading sector data for stocks...</p>
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Fetching sector info from Screener.in for {filteredStocks.length} filtered stocks.
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => { suggestionsFetchedRef.current = false; fetchSuggestions(); }}>
+                      <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                      Retry
+                    </Button>
+                  </CardContent>
+                </Card>
               )}
             </div>
           )}
