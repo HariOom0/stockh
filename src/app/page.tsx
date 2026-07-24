@@ -360,6 +360,7 @@ export default function Home() {
   const intraIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [nextRefresh, setNextRefresh] = useState(900);
   const intraCountdownRef = useRef<NodeJS.Timeout | null>(null);
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   const fetchIntraday = useCallback(async () => {
     setIntraLoading(true);
@@ -394,6 +395,14 @@ export default function Home() {
       };
     }
   }, [viewMode, fetchIntraday]);
+
+  // Close mobile more menu when clicking outside
+  useEffect(() => {
+    if (!mobileMoreOpen) return;
+    const handleClick = () => setMobileMoreOpen(false);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [mobileMoreOpen]);
 
   // ─── Fetch Volume Shockers ───────────────────────────────────────
   const fetchStocks = useCallback(async () => {
@@ -882,9 +891,10 @@ export default function Home() {
                     Search
                   </span>
                 </button>
+                {/* Desktop: History & Intraday as separate tabs */}
                 <button
                   onClick={() => handleViewSwitch("history")}
-                  className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
+                  className={`hidden sm:flex px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
                     viewMode === "history"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -897,7 +907,7 @@ export default function Home() {
                 </button>
                 <button
                   onClick={() => handleViewSwitch("intraday")}
-                  className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
+                  className={`hidden sm:flex px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
                     viewMode === "intraday"
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
@@ -908,6 +918,42 @@ export default function Home() {
                     Intraday
                   </span>
                 </button>
+                {/* Mobile: More dropdown for History & Intraday */}
+                <div className="relative sm:hidden">
+                  <button
+                    onClick={() => setMobileMoreOpen(!mobileMoreOpen)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 flex items-center gap-1 ${
+                      (viewMode === "history" || viewMode === "intraday")
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    More
+                    <ChevronDown className={`w-3 h-3 transition-transform ${mobileMoreOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {mobileMoreOpen && (
+                    <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-lg shadow-lg py-1 z-50 min-w-[140px]">
+                      <button
+                        onClick={() => { handleViewSwitch("history"); setMobileMoreOpen(false); }}
+                        className={`w-full text-left px-3 py-2 text-sm font-medium flex items-center gap-2 transition-colors ${
+                          viewMode === "history" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        <History className="w-3.5 h-3.5" />
+                        History
+                      </button>
+                      <button
+                        onClick={() => { handleViewSwitch("intraday"); setMobileMoreOpen(false); }}
+                        className={`w-full text-left px-3 py-2 text-sm font-medium flex items-center gap-2 transition-colors ${
+                          viewMode === "intraday" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        <Activity className="w-3.5 h-3.5" />
+                        Intraday
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             </div>
