@@ -865,42 +865,6 @@ export default function Home() {
                     Stocks
                   </span>
                 </button>
-                {/* Mobile: More dropdown right after Stocks tab */}
-                <div className="relative sm:hidden">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setMobileMoreOpen(!mobileMoreOpen); }}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 flex items-center gap-1 ${
-                      (viewMode === "history" || viewMode === "intraday")
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    More
-                    <ChevronDown className={`w-3 h-3 transition-transform ${mobileMoreOpen ? "rotate-180" : ""}`} />
-                  </button>
-                  {mobileMoreOpen && (
-                    <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-lg shadow-lg py-1 z-50 min-w-[140px]" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => { handleViewSwitch("history"); setMobileMoreOpen(false); }}
-                        className={`w-full text-left px-3 py-2 text-sm font-medium flex items-center gap-2 transition-colors ${
-                          viewMode === "history" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                        }`}
-                      >
-                        <History className="w-3.5 h-3.5" />
-                        History
-                      </button>
-                      <button
-                        onClick={() => { handleViewSwitch("intraday"); setMobileMoreOpen(false); }}
-                        className={`w-full text-left px-3 py-2 text-sm font-medium flex items-center gap-2 transition-colors ${
-                          viewMode === "intraday" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                        }`}
-                      >
-                        <Activity className="w-3.5 h-3.5" />
-                        Intraday
-                      </button>
-                    </div>
-                  )}
-                </div>
                 <button
                   onClick={() => handleViewSwitch("suggestions")}
                   className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
@@ -954,6 +918,35 @@ export default function Home() {
                     Intraday
                   </span>
                 </button>
+                </div>
+                {/* Mobile: More button on separate line below tabs */}
+                <div className="sm:hidden relative mt-1 w-fit">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setMobileMoreOpen(!mobileMoreOpen); }}
+                    className="px-3 py-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  >
+                    More
+                    <ChevronDown className={`w-3 h-3 transition-transform ${mobileMoreOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {mobileMoreOpen && (
+                    <div className="absolute top-full left-0 mt-1 bg-popover border border-border rounded-lg shadow-lg py-1 z-50 min-w-[140px]" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => { handleViewSwitch("history"); setMobileMoreOpen(false); }}
+                        className={`w-full text-left px-3 py-2 text-sm font-medium flex items-center gap-2 ${viewMode === "history" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                      >
+                        <History className="w-3.5 h-3.5" />
+                        History
+                      </button>
+                      <button
+                        onClick={() => { handleViewSwitch("intraday"); setMobileMoreOpen(false); }}
+                        className={`w-full text-left px-3 py-2 text-sm font-medium flex items-center gap-2 ${viewMode === "intraday" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                      >
+                        <Activity className="w-3.5 h-3.5" />
+                        Intraday
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             </div>
