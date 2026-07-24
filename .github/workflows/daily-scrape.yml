@@ -2,6 +2,7 @@ name: Daily Stock Data Scrape
 
 on:
   schedule:
+    # 14:00 UTC = 7:30 PM IST — after market close + data settle time
     - cron: '0 14 * * 1-5'
   workflow_dispatch:
 
@@ -13,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      IST_DATE: ""
+      TRADING_DATE: ""
     steps:
       - uses: actions/checkout@v4
 
@@ -22,10 +23,70 @@ jobs:
           python-version: '3.12'
 
       - name: Install deps
-        run: pip install curl_cffi beautifulsoup4
+        run: pip install curl_cffi beautifulsoup4 requests
 
-      - name: Get IST date
-        run: echo "IST_DATE=$(TZ='Asia/Kolkata' date +%Y-%m-%d)" >> $GITHUB_ENV
+      - name: Calculate last trading date (skip weekends/holidays)
+        run: |
+          python3 << 'PYEOF'
+          from datetime import datetime, timedelta, timezone
+          import json
+
+          ist = timezone(timedelta(hours=5, minutes=30))
+          now = datetime.now(ist)
+
+          # NSE 2026 holidays (weekdays only)
+          holidays = set([
+            "2026-01-26", "2026-02-26", "2026-03-30", "2026-04-02",
+            "2026-04-14", "2026-05-01", "2026-06-05", "2026-08-27",
+            "2026-10-02", "2026-10-20", "2026-11-05", "2026-11-06",
+            "2026-12-25"
+          ])
+
+          # Also try to fetch live holidays from NSE
+          try:
+              import requests
+              s = requests.Session()
+              s.headers.update({"User-Agent": "Mozilla/5.0"})
+              s.get("https://www.nseindia.com", timeout=10)
+              resp = s.get("https://www.nseindia.com/api/holiday-master?type=trading", timeout=10)
+              if resp.ok:
+                  data = resp.json()
+                  for h in data.get("NSE", []):
+                      try:
+                          d = datetime.strptime(h["tradingDate"], "%b %d, %Y")
+                          holidays.add(d.strftime("%Y-%m-%d"))
+                      except:
+                          pass
+                  print(f"Loaded {len(data.get('NSE', []))} holidays from NSE API")
+          except Exception as e:
+              print(f"NSE API unavailable, using hardcoded holidays: {e}")
+
+          # Verify it's actually after 7:30 PM IST
+          ist_hour = now.hour
+          ist_minute = now.minute
+          if ist_hour < 19 or (ist_hour == 19 and ist_minute < 30):
+              print(f"WARNING: Current IST time {now.strftime('%H:%M')} is before 7:30 PM")
+              print("Will still proceed since cron is scheduled for 7:30 PM")
+
+          # Start from today's IST date, go backwards to find last trading day
+          candidate = now
+          for _ in range(10):  # max 10 days back
+              date_str = candidate.strftime("%Y-%m-%d")
+              weekday = candidate.weekday()  # 0=Mon, 6=Sun
+              if weekday < 5 and date_str not in holidays:
+                  break
+              candidate -= timedelta(days=1)
+
+          trading_date = candidate.strftime("%Y-%m-%d")
+          print(f"IST now: {now.strftime('%Y-%m-%d %H:%M')}")
+          print(f"Trading date: {trading_date}")
+
+          with open("/tmp/trading_date.txt", "w") as f:
+              f.write(trading_date)
+          PYEOF
+
+      - name: Set trading date
+        run: echo "TRADING_DATE=$(cat /tmp/trading_date.txt)" >> $GITHUB_ENV
 
       - name: Scrape Chartink
         run: python3 scripts/scrape_chartink.py > /tmp/stocks.json
@@ -37,12 +98,12 @@ jobs:
           with open('/tmp/stocks.json') as f:
               data = json.load(f)
           if isinstance(data, dict) and 'error' in data:
-              print('SCRRAPE_ERROR: ' + data['error'])
+              print('SCRAPE_ERROR: ' + data['error'])
               sys.exit(1)
           print(f'OK: {len(data)} stocks')
           "
 
-      - name: Save to DB
+      - name: Save to DB via backfill API
         run: |
           python3 << 'PYEOF'
           import json, urllib.request
@@ -50,7 +111,10 @@ jobs:
           with open('/tmp/stocks.json') as f:
               stocks = json.load(f)
 
-          payload = json.dumps({"date": "${{ env.IST_DATE }}", "stocks": stocks}).encode()
+          trading_date = "${{ env.TRADING_DATE }}"
+          print(f"Saving {len(stocks)} stocks for {trading_date}")
+
+          payload = json.dumps({"date": trading_date, "stocks": stocks}).encode()
           req = urllib.request.Request(
               "https://stockh.vercel.app/api/backfill",
               data=payload,
@@ -60,6 +124,8 @@ jobs:
           try:
               resp = urllib.request.urlopen(req, timeout=30)
               print(f"DB save: {resp.status} - {resp.read().decode()}")
+          except urllib.error.HTTPError as e:
+              print(f"DB save failed: {e.code} - {e.read().decode()}")
           except Exception as e:
               print(f"DB save failed: {e}")
           PYEOF
@@ -75,20 +141,21 @@ jobs:
 
           ist = timezone(timedelta(hours=5, minutes=30))
           now = datetime.now(ist).isoformat()
+          trading_date = "${{ env.TRADING_DATE }}"
 
           static = {
               "stocks": stocks,
-              "tradingDate": "${{ env.IST_DATE }}",
+              "tradingDate": trading_date,
               "lastUpdated": now,
               "source": "chartink_eod_scanner"
           }
 
           with open('public/data/stocks.json', 'w') as f:
               json.dump(static, f, indent=2)
-          print(f"Updated stocks.json: {len(stocks)} stocks")
+          print(f"Updated stocks.json: {len(stocks)} stocks for {trading_date}")
           PYEOF
 
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git add public/data/stocks.json
-          git diff --cached --quiet || (git commit -m "Daily scrape: ${{ env.IST_DATE }}" && git push)
+          git diff --cached --quiet || (git commit -m "Daily scrape: ${{ env.TRADING_DATE }}" && git push)
