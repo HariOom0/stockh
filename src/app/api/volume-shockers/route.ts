@@ -30,22 +30,6 @@ function applyFilter(stocks: StockData[]): StockData[] {
     .map((s, i) => ({ ...s, sr: i + 1 }));
 }
 
-async function saveToDatabase(stocks: StockData[], date: string): Promise<void> {
-  if (!hasValidDbUrl()) return;
-  try {
-    const { db } = await import("@/lib/db");
-    await db.dailyStockSnapshot.upsert({
-      where: { date },
-      update: { stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
-      create: { date, stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
-    });
-    console.log(`[DB] Saved ${stocks.length} stocks for ${date}`);
-  } catch (e: any) {
-    console.warn("[DB] Save failed:", e.message);
-  }
-}
-
-/** Scrape Chartink EOD page using Node.js fetch (5s timeout — fast fail if Cloudflare blocks) */
 async function scrapeChartink(): Promise<StockData[]> {
   try {
     const resp = await fetch("https://chartink.com/eodscanner/Volume-Shockers.html", {
@@ -59,7 +43,6 @@ async function scrapeChartink(): Promise<StockData[]> {
     if (!resp.ok) return [];
     const html = await resp.text();
     if (!html.includes("stocklisttable")) return [];
-
     const $ = cheerio.load(html);
     const stocks: StockData[] = [];
     $("#stocklisttable tbody tr").each((_, row) => {
@@ -94,12 +77,10 @@ export async function GET() {
   const tradingDate = getTradingDate();
   const now = Date.now();
 
-  // 1. In-memory cache
   if (cachedData && now - cachedData.timestamp < CACHE_TTL && cachedData.tradingDate === tradingDate) {
     return NextResponse.json({ stocks: cachedData.stocks, cached: true, lastUpdated: cachedData.timestamp, tradingDate });
   }
 
-  // 2. Database (today's already-saved data)
   if (hasValidDbUrl()) {
     try {
       const { db } = await import("@/lib/db");
@@ -114,17 +95,14 @@ export async function GET() {
     }
   }
 
-  // 3. Live scrape (8s timeout — won't slow down the site)
   const scraped = await scrapeChartink();
   if (scraped.length > 0) {
     const stocks = applyFilter(scraped);
     cachedData = { stocks, timestamp: now, tradingDate };
-    await saveToDatabase(stocks, tradingDate);
     return NextResponse.json({ stocks, cached: false, lastUpdated: now, tradingDate, source: "live" });
   }
 
-  // 4. Static JSON fallback
-   try {
+  try {
     const raw = readFileSync(join(process.cwd(), "public", "data", "stocks.json"), "utf-8");
     const data = JSON.parse(raw);
     if (data.stocks?.length > 0) {
@@ -136,7 +114,6 @@ export async function GET() {
       const stocks = applyFilter(allStocks);
       const sourceDate = data.tradingDate || tradingDate;
       cachedData = { stocks, timestamp: now, tradingDate: sourceDate };
-      if (sourceDate === tradingDate) await saveToDatabase(stocks, tradingDate);
       return NextResponse.json({ stocks, cached: true, lastUpdated: data.lastUpdated ? new Date(data.lastUpdated).getTime() : now, tradingDate: sourceDate, source: "static" });
     }
   } catch (err: any) {
