@@ -421,8 +421,13 @@ export default function Home() {
   }, [fetchStocks, fetchSectors]);
 
   // ─── Filter & Sort ───────────────────────────────────────────────
+  // Only show stocks with volume > 190% AND positive gain
   useEffect(() => {
     let result = [...stocks];
+
+    // Hard filter: volume above 190% AND positive gain
+    result = result.filter((s) => s.volGainPct > 190 && s.change > 0);
+
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -441,6 +446,7 @@ export default function Home() {
       return sortDir === "desc" ? -cmp : cmp;
     });
     setFilteredStocks(result);
+    setStats((prev) => ({ ...prev, filtered: result.length }));
   }, [stocks, search, sortBy, sortDir]);
 
   // ─── Fetch Stock Detail ──────────────────────────────────────────
@@ -691,6 +697,11 @@ export default function Home() {
     }
   };
 
+  // Filter history stocks same way: vol > 190% AND positive gain
+  const filteredHistoryStocks = useMemo(() => {
+    return historyStocks.filter((s) => s.volGainPct > 190 && s.change > 0);
+  }, [historyStocks]);
+
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr + "T00:00:00");
     return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
@@ -783,7 +794,7 @@ export default function Home() {
                 >
                   <span className="flex items-center gap-1.5">
                     <BarChart3 className="w-3.5 h-3.5" />
-                    All Stocks
+                    Filtered Stocks
                   </span>
                 </button>
                 <button
@@ -992,6 +1003,15 @@ export default function Home() {
           </div>
           )}
 
+          {/* ─── FILTER INDICATOR ──────────────────────────── */}
+          {!loading && !error && stocks.length > 0 && (viewMode === "list" || viewMode === "suggestions") && (
+            <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground">
+              <Filter className="w-3 h-3" />
+              <span>Showing <strong className="text-foreground">{filteredStocks.length}</strong> of {stocks.length} stocks</span>
+              <span className="text-muted-foreground/60">(Volume &gt; 190% + Positive Gain)</span>
+            </div>
+          )}
+
           {/* ─── LOADING ──────────────────────────────────────────── */}
           {loading && viewMode !== "search" && (
             <div className="space-y-3">
@@ -1070,7 +1090,7 @@ export default function Home() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono">
-                            {stock.volGainPct.toFixed(0)}%
+                            {stock.volGainPct.toFixed(1)}%
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -1084,7 +1104,7 @@ export default function Home() {
                 </table>
                 {filteredStocks.length === 0 && (
                   <div className="p-12 text-center text-muted-foreground">
-                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match your search."}
+                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match the filter (volume &gt; 190% and positive gain)."}
                   </div>
                 )}
               </div>
@@ -1109,7 +1129,7 @@ export default function Home() {
                         </div>
                         <div className="flex items-center justify-between mt-2">
                           <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-xs">
-                            Vol: {stock.volGainPct.toFixed(0)}%
+                            Vol: {stock.volGainPct.toFixed(1)}%
                           </Badge>
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Eye className="w-3 h-3" /> View Details
@@ -1234,7 +1254,7 @@ export default function Home() {
                                     <div className="flex items-center gap-2">
                                       <span className="text-xs text-emerald-400 font-medium">+{stock.change.toFixed(2)}%</span>
                                       <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono px-1.5">
-                                        {stock.volGainPct.toFixed(0)}%
+                                        {stock.volGainPct.toFixed(1)}%
                                       </Badge>
                                     </div>
                                   </div>
@@ -1502,7 +1522,7 @@ export default function Home() {
                     </Button>
                     <div>
                       <h2 className="text-sm font-semibold text-foreground">{formatDate(selectedHistoryDate)}</h2>
-                      <p className="text-xs text-muted-foreground">{historyStocks.length} volume shockers</p>
+                      <p className="text-xs text-muted-foreground">{filteredHistoryStocks.length} volume shockers (vol &gt; 190% &amp; positive)</p>
                     </div>
                   </div>
 
@@ -1511,7 +1531,7 @@ export default function Home() {
                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
                       <p className="text-sm text-muted-foreground">Loading historical data...</p>
                     </div>
-                  ) : historyStocks.length > 0 ? (
+                  ) : filteredHistoryStocks.length > 0 ? (
                     <>
                       {/* Desktop Table */}
                       <div className="hidden md:block rounded-xl border border-border overflow-hidden">
@@ -1527,7 +1547,7 @@ export default function Home() {
                             </tr>
                           </thead>
                           <tbody>
-                            {historyStocks.map((stock, idx) => (
+                            {filteredHistoryStocks.map((stock, idx) => (
                               <tr
                                 key={stock.ticker}
                                 className="border-t border-border hover:bg-secondary/50 cursor-pointer transition-colors group"
@@ -1546,7 +1566,7 @@ export default function Home() {
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                   <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono">
-                                    {stock.volGainPct.toFixed(0)}%
+                                    {stock.volGainPct.toFixed(1)}%
                                   </Badge>
                                 </td>
                                 <td className="px-4 py-3 text-center">
@@ -1562,7 +1582,7 @@ export default function Home() {
 
                       {/* Mobile Cards */}
                       <div className="md:hidden space-y-2">
-                        {historyStocks.map((stock) => (
+                        {filteredHistoryStocks.map((stock) => (
                           <Card key={stock.ticker} className="border-border hover:border-primary/30 transition-colors cursor-pointer" onClick={() => setSelectedStock(stock)}>
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between gap-2">
@@ -1579,7 +1599,7 @@ export default function Home() {
                               </div>
                               <div className="mt-2 flex items-center gap-2">
                                 <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono">
-                                  Vol {stock.volGainPct.toFixed(0)}%
+                                  Vol {stock.volGainPct.toFixed(1)}%
                                 </Badge>
                               </div>
                             </CardContent>
