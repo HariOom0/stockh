@@ -12,7 +12,6 @@ import {
   ExternalLink,
   BarChart3,
   Activity,
-  Filter,
   ChevronDown,
   ChevronUp,
   AlertTriangle,
@@ -1012,15 +1011,6 @@ export default function Home() {
               </button>
             )}
           </div>
-          )}
-
-          {/* ─── FILTER INDICATOR ──────────────────────────── */}
-          {!loading && !error && stocks.length > 0 && (viewMode === "list" || viewMode === "suggestions") && (
-            <div className="flex items-center gap-2 mb-4 text-xs text-muted-foreground">
-              <Filter className="w-3 h-3" />
-              <span>Showing <strong className="text-foreground">{filteredStocks.length}</strong> of {stocks.length} stocks</span>
-              <span className="text-muted-foreground/60">(Volume &gt; 190% + Positive Gain)</span>
-            </div>
           )}
 
           {/* ─── LOADING ──────────────────────────────────────────── */}
