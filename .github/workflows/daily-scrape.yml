@@ -1,0 +1,56 @@
+name: Daily Stock Data Scrape
+
+on:
+  schedule:
+    - cron: '0 14 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  scrape-and-save:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install curl_cffi beautifulsoup4
+
+      - name: Get IST date
+        id: date
+        run: echo "date=$(TZ='Asia/Kolkata' date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+
+      - name: Scrape Chartink
+        run: python3 scripts/scrape_chartink.py > /tmp/stocks.json
+
+      - name: Save to DB
+        run: |
+          DATE="${{ steps.date.outputs.date }}"
+          python3 -c "
+          import json
+          with open('/tmp/stocks.json') as f:
+              stocks = json.load(f)
+          with open('/tmp/payload.json','w') as f:
+              json.dump({'date':'$DATE','stocks':stocks}, f)
+          "
+          curl -s -X POST "https://stockh.vercel.app/api/backfill" \
+            -H "Content-Type: application/json" \
+            -d @/tmp/payload.json
+
+      - name: Update static file and push
+        run: |
+          DATE="${{ steps.date.outputs.date }}"
+          python3 -c "
+          import json
+          with open('/tmp/stocks.json') as f:
+              stocks = json.load(f)
+          with open('public/data/stocks.json','w') as f:
+              json.dump({'stocks':stocks,'tradingDate':'$DATE','lastUpdated':'$(TZ=Asia/Kolkata date -Iseconds)','source':'chartink_eod_scanner'},f,indent=2)
+          "
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add public/data/stocks.json
+          git diff --cached --quiet || git commit -m "Daily scrape: $DATE"
+          git push
