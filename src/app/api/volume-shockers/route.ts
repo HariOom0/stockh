@@ -36,18 +36,19 @@ function applyFilter(stocks: StockData[]): StockData[] {
     .map((s, i) => ({ ...s, sr: i + 1 }));
 }
 
-function saveToDatabase(stocks: StockData[], date: string): void {
+async function saveToDatabase(stocks: StockData[], date: string): Promise<void> {
   if (!hasValidDbUrl()) return;
-  import("@/lib/db").then(({ db }) =>
-    db.dailyStockSnapshot
-      .upsert({
-        where: { date },
-        update: { stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
-        create: { date, stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
-      })
-      .then(() => console.log(`[DB] Saved ${stocks.length} filtered stocks for ${date}`))
-      .catch((e: any) => console.warn("[DB] Save failed:", e.message))
-  );
+  try {
+    const { db } = await import("@/lib/db");
+    await db.dailyStockSnapshot.upsert({
+      where: { date },
+      update: { stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
+      create: { date, stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
+    });
+    console.log(`[DB] Saved ${stocks.length} filtered stocks for ${date}`);
+  } catch (e: any) {
+    console.warn("[DB] Save failed:", e.message);
+  }
 }
 
 export async function GET() {
@@ -97,7 +98,7 @@ export async function GET() {
       cachedData = { stocks, timestamp: now, tradingDate: sourceDate };
 
       if (sourceDate === tradingDate) {
-        saveToDatabase(stocks, tradingDate);
+        await saveToDatabase(stocks, tradingDate);
       }
 
       return NextResponse.json({

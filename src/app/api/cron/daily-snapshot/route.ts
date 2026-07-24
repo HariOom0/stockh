@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { isMarketClosed, getTradingDate } from "@/lib/trading-calendar";
 
-// Vercel Cron: hits this endpoint daily at 7:15 PM IST (13:45 UTC)
-// Skips weekends and NSE holidays.
-// Saves today's stock data to the database (from whatever source volume-shockers uses).
+// Vercel Cron: 7:15 PM IST daily (Mon-Fri)
+// Reads today's stock data from the static file, applies filters, saves to DB.
+// No scraping, no external calls — just saves what's already on the site.
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -18,10 +20,7 @@ export async function GET(request: Request) {
   }).format(new Date());
 
   if (isMarketClosed(istDate)) {
-    return NextResponse.json({
-      ok: true, skipped: true,
-      reason: `${istDate} is not a trading day`,
-    });
+    return NextResponse.json({ ok: true, skipped: true, reason: `${istDate} is not a trading day` });
   }
 
   const dbUrl = process.env.DATABASE_URL;
@@ -32,43 +31,44 @@ export async function GET(request: Request) {
   const tradingDate = getTradingDate();
 
   try {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
+    // Read the static file (same data the site shows)
+    const filePath = join(process.cwd(), "public", "data", "stocks.json");
+    const raw = readFileSync(filePath, "utf-8");
+    const data = JSON.parse(raw);
 
-    // Call volume-shockers which auto-saves to DB
-    const res = await fetch(`${baseUrl}/api/volume-shockers`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(60_000),
-    });
-    const data = await res.json();
-
-    if (!res.ok || !data.stocks || data.stocks.length === 0) {
-      return NextResponse.json({
-        ok: false, tradingDate,
-        error: "No stocks available",
-        detail: data.error,
-      }, { status: 502 });
+    if (!data.stocks || !Array.isArray(data.stocks) || data.stocks.length === 0) {
+      return NextResponse.json({ ok: false, error: "No stocks in static file" }, { status: 502 });
     }
 
-    // Double-check: explicitly save to DB if not already saved
+    // Apply the same filter the site uses: vol > 190% + positive gain
+    const filtered = data.stocks
+      .filter((s: any) => (Number(s.volGainPct) || 0) > 190 && (Number(s.change) || 0) > 0)
+      .map((s: any, i: number) => ({
+        sr: i + 1,
+        name: String(s.name || ""),
+        ticker: String(s.ticker || ""),
+        close: Number(s.close) || 0,
+        change: Number(s.change) || 0,
+        volGainPct: Number(s.volGainPct) || 0,
+        isPositive: true,
+      }));
+
+    // Save to database
     const { db } = await import("@/lib/db");
     await db.dailyStockSnapshot.upsert({
       where: { date: tradingDate },
-      update: { stockCount: data.stocks.length, stocksJson: JSON.stringify(data.stocks) },
-      create: { date: tradingDate, stockCount: data.stocks.length, stocksJson: JSON.stringify(data.stocks) },
+      update: { stockCount: filtered.length, stocksJson: JSON.stringify(filtered) },
+      create: { date: tradingDate, stockCount: filtered.length, stocksJson: JSON.stringify(filtered) },
     });
 
     return NextResponse.json({
-      ok: true, tradingDate,
-      stockCount: data.stocks.length,
-      saved: true,
+      ok: true,
+      tradingDate,
+      totalInFile: data.stocks.length,
+      savedAfterFilter: filtered.length,
     });
   } catch (error) {
-    console.error("[Cron] Daily snapshot failed:", error);
-    return NextResponse.json(
-      { ok: false, error: "Failed to save snapshot", detail: String(error) },
-      { status: 500 }
-    );
+    console.error("[Cron] Failed:", error);
+    return NextResponse.json({ ok: false, error: String(error) }, { status: 500 });
   }
 }
