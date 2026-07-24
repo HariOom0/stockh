@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync } from "fs";
 import { join } from "path";
 import { getTradingDate } from "@/lib/trading-calendar";
-import { fetchVolumeShockers } from "@/lib/scraper";
 
 export const dynamic = "force-dynamic";
 
@@ -31,28 +30,6 @@ function hasValidDbUrl(): boolean {
   return url.startsWith("postgresql://") || url.startsWith("postgres://");
 }
 
-async function saveToDatabase(stocks: StockData[], date: string): Promise<void> {
-  if (!hasValidDbUrl()) return;
-  try {
-    const { db } = await import("@/lib/db");
-    await db.dailyStockSnapshot.upsert({
-      where: { date },
-      update: {
-        stockCount: stocks.length,
-        stocksJson: JSON.stringify(stocks),
-      },
-      create: {
-        date,
-        stockCount: stocks.length,
-        stocksJson: JSON.stringify(stocks),
-      },
-    });
-    console.log(`[VolumeShockers] Auto-saved ${stocks.length} stocks for ${date} to database`);
-  } catch (err: any) {
-    console.warn("[VolumeShockers] Auto-save to DB failed:", err.message);
-  }
-}
-
 export async function GET() {
   const tradingDate = getTradingDate();
   const now = Date.now();
@@ -71,7 +48,7 @@ export async function GET() {
     });
   }
 
-  // 2. Try database first (most up-to-date if cron has run today)
+  // 2. Try database (fastest remote source)
   if (hasValidDbUrl()) {
     try {
       const { db } = await import("@/lib/db");
@@ -103,56 +80,11 @@ export async function GET() {
         });
       }
     } catch (err: any) {
-      console.warn("[VolumeShockers] Database lookup failed:", err.message);
+      console.warn("[VolumeShockers] DB lookup failed:", err.message);
     }
   }
 
-  // 3. Try scraping live data first (freshest source)
-  try {
-    const scraped = await fetchVolumeShockers();
-    if (scraped.length > 0) {
-      const stocks: StockData[] = scraped.map((s, i) => ({
-        sr: i + 1,
-        name: s.name,
-        ticker: s.ticker,
-        close: s.close,
-        change: s.change,
-        volGainPct: s.volGainPct,
-        isPositive: s.isPositive,
-      }));
-
-      cachedData = { stocks, timestamp: now, tradingDate };
-
-      // Auto-save to database in background (don't block response)
-      saveToDatabase(stocks, tradingDate);
-
-      // Also update static file for fallback
-      try {
-        const filePath = join(process.cwd(), "public", "data", "stocks.json");
-        const payload = {
-          stocks: scraped.map(({ sr, ...rest }: any) => rest),
-          tradingDate,
-          lastUpdated: new Date().toISOString(),
-          source: "live_scrape",
-        };
-        writeFileSync(filePath, JSON.stringify(payload, null, 2));
-      } catch {
-        // Static file update is best-effort (Vercel is read-only anyway)
-      }
-
-      return NextResponse.json({
-        stocks,
-        cached: false,
-        lastUpdated: now,
-        tradingDate,
-        source: "live_scrape",
-      });
-    }
-  } catch (err: any) {
-    console.warn("[VolumeShockers] Live scrape failed:", err.message);
-  }
-
-  // 4. Fall back to static JSON file
+  // 3. Static JSON file (instant, no network)
   try {
     const filePath = join(process.cwd(), "public", "data", "stocks.json");
     const raw = readFileSync(filePath, "utf-8");
@@ -170,21 +102,27 @@ export async function GET() {
       }));
 
       const sourceDate = data.tradingDate || tradingDate;
-
-      // Cache in memory
       cachedData = { stocks, timestamp: now, tradingDate: sourceDate };
 
-      // Auto-save static file data to database too (for history)
-      if (sourceDate === tradingDate) {
-        saveToDatabase(stocks, tradingDate);
+      // Auto-save today's static data to DB in background (for history)
+      if (sourceDate === tradingDate && hasValidDbUrl()) {
+        // Don't await — fire and forget, but don't let it block the response
+        import("@/lib/db").then(({ db }) =>
+          db.dailyStockSnapshot
+            .upsert({
+              where: { date: tradingDate },
+              update: { stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
+              create: { date: tradingDate, stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
+            })
+            .then(() => console.log(`[VolumeShockers] Auto-saved ${stocks.length} stocks for ${tradingDate}`))
+            .catch((e: any) => console.warn("[VolumeShockers] Auto-save failed:", e.message))
+        );
       }
 
       return NextResponse.json({
         stocks,
         cached: true,
-        lastUpdated: data.lastUpdated
-          ? new Date(data.lastUpdated).getTime()
-          : now,
+        lastUpdated: data.lastUpdated ? new Date(data.lastUpdated).getTime() : now,
         tradingDate: sourceDate,
         source: "static",
       });
@@ -193,11 +131,10 @@ export async function GET() {
     console.error("[VolumeShockers] Static file read failed:", err.message);
   }
 
-  // 5. Nothing available
+  // 4. Nothing available
   return NextResponse.json(
     {
-      error:
-        "No data available yet. Stock data is updated every trading day after market hours via cron job.",
+      error: "No data available yet.",
       stocks: [],
       cached: false,
       tradingDate,

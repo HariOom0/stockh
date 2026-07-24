@@ -1,36 +1,67 @@
 import { NextResponse } from "next/server";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Check if DATABASE_URL looks like a valid PostgreSQL connection string.
- * A dummy value like "file:/..." would pass a simple truthy check but
- * crash Prisma on initialization.
- */
 function hasValidDbUrl(): boolean {
   const url = process.env.DATABASE_URL;
   if (!url) return false;
   return url.startsWith("postgresql://") || url.startsWith("postgres://");
 }
 
+let seeded = false;
+
+/**
+ * One-time seed: if DB is empty, load data from seed-data.json.
+ * This ensures history works immediately after first deploy.
+ */
+async function ensureSeeded() {
+  if (seeded || !hasValidDbUrl()) return;
+  seeded = true;
+
+  try {
+    const { db } = await import("@/lib/db");
+    const count = await db.dailyStockSnapshot.count();
+    if (count > 0) return;
+
+    const seedPath = join(process.cwd(), "public", "data", "seed-data.json");
+    const raw = readFileSync(seedPath, "utf-8");
+    const seedData: Record<string, any[]> = JSON.parse(raw);
+
+    for (const [date, stocks] of Object.entries(seedData)) {
+      if (!Array.isArray(stocks) || stocks.length === 0) continue;
+      await db.dailyStockSnapshot.create({
+        data: { date, stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
+      });
+      console.log(`[Seed] ${date}: ${stocks.length} stocks`);
+    }
+  } catch (err: any) {
+    console.warn("[Seed] Failed:", err.message);
+    seeded = false; // Allow retry
+  }
+}
+
 // GET /api/stock-history          → list all snapshot dates
 // GET /api/stock-history?date=2026-07-08 → get stocks for a specific date
 export async function GET(request: Request) {
-  // Gracefully handle missing/invalid DATABASE_URL
   if (!hasValidDbUrl()) {
     return NextResponse.json(
-      { error: "Database not configured. Set a valid DATABASE_URL (postgresql://...) environment variable.", snapshots: [] },
+      { error: "Database not configured.", snapshots: [] },
       { status: 503 }
     );
   }
 
   try {
     const { db } = await import("@/lib/db");
+
+    // Auto-seed on first call
+    await ensureSeeded();
+
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
 
     if (date) {
-      // Return stocks for a specific date
       const snapshot = await db.dailyStockSnapshot.findUnique({
         where: { date },
       });
@@ -40,39 +71,21 @@ export async function GET(request: Request) {
       }
 
       const stocks = JSON.parse(snapshot.stocksJson);
-      return NextResponse.json(
-        {
-          date: snapshot.date,
-          stockCount: snapshot.stockCount,
-          stocks,
-        },
-        {
-          headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
-        }
-      );
+      return NextResponse.json({
+        date: snapshot.date,
+        stockCount: snapshot.stockCount,
+        stocks,
+      });
     }
 
-    // Return all snapshot dates (newest first)
     const snapshots = await db.dailyStockSnapshot.findMany({
       orderBy: { date: "desc" },
-      select: {
-        date: true,
-        stockCount: true,
-        createdAt: true,
-      },
+      select: { date: true, stockCount: true, createdAt: true },
     });
 
-    return NextResponse.json(
-      { snapshots },
-      {
-        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
-      }
-    );
+    return NextResponse.json({ snapshots });
   } catch (error) {
     console.error("Error fetching stock history:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch stock history" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch stock history" }, { status: 500 });
   }
 }
