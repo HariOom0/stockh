@@ -129,6 +129,55 @@ interface SearchResult {
 
 type ViewMode = "list" | "suggestions" | "search" | "history" | "intraday";
 
+// ─── IST-aligned 15-min refresh timer ────────────────────────────────
+// Returns seconds until the next 15-min boundary aligned to market open (9:15 AM IST).
+// During market: counts down to next :15, :30, :45, :00 on the clock.
+// Before market: counts down to 9:15 AM IST.
+// After market / weekend: returns 0 (no refresh).
+function getSecondsToNextRefreshIST(): number {
+  try {
+    const now = new Date();
+    const istParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kolkata",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+      hour12: false,
+      weekday: "short",
+    }).formatToParts(now);
+    const get = (t: string) =>
+      parseInt(istParts.find((p) => p.type === t)?.value || "0", 10);
+    const day = istParts.find((p) => p.type === "weekday")?.value || "";
+    const h = get("hour");
+    const m = get("minute");
+    const s = get("second");
+
+    if (day === "Sat" || day === "Sun") return 0;
+
+    const OPEN = 9 * 3600 + 15 * 60;  // 9:15 AM IST = 33750s
+    const CLOSE = 15 * 3600 + 30 * 60; // 3:30 PM IST = 55800s
+    const cur = h * 3600 + m * 60 + s;
+
+    if (cur < OPEN) return OPEN - cur;
+    if (cur >= CLOSE) return 0;
+
+    // During market hours: next 15-min boundary from market open
+    const sinceOpen = cur - OPEN;
+    const nextBoundary = Math.ceil(sinceOpen / 900) * 900;
+    const remaining = nextBoundary - sinceOpen;
+
+    // If we're right on a boundary (within 2s), skip to the next one
+    if (remaining <= 2) {
+      const nextNext = 900;
+      if (sinceOpen + nextNext > CLOSE - OPEN) return 0;
+      return nextNext;
+    }
+    return remaining;
+  } catch {
+    return 900;
+  }
+};
+
 // ─── Trend Colors ─────────────────────────────────────────────────────
 function trendColor(trend: string) {
   switch (trend) {
@@ -357,7 +406,7 @@ export default function Home() {
   const [intraError, setIntraError] = useState("");
   const [intraMarketOpen, setIntraMarketOpen] = useState(false);
   const [intraLastUpdate, setIntraLastUpdate] = useState<string>("");
-  const intraIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intraTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [nextRefresh, setNextRefresh] = useState(900);
   const intraCountdownRef = useRef<NodeJS.Timeout | null>(null);
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
@@ -372,13 +421,8 @@ export default function Home() {
       if (data.sectors) setIntraSectors(data.sectors);
       if (data.marketOpen !== undefined) setIntraMarketOpen(data.marketOpen);
       setIntraLastUpdate(data.now || new Date().toISOString());
-      // Calculate remaining time from server cache timestamp
-      if (data.cacheTimestamp) {
-        const elapsed = Math.floor((Date.now() - data.cacheTimestamp) / 1000);
-        setNextRefresh(Math.max(0, 900 - elapsed));
-      } else {
-        setNextRefresh(900);
-      }
+      // Sync timer to next 15-min IST boundary
+      setNextRefresh(getSecondsToNextRefreshIST());
     } catch {
       setIntraError("Failed to fetch intraday data");
     } finally {
@@ -387,19 +431,30 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (viewMode === "intraday") {
-      fetchIntraday();
-      // Auto-refresh every 15 min
-      intraIntervalRef.current = setInterval(fetchIntraday, 15 * 60 * 1000);
-      // Countdown
-      intraCountdownRef.current = setInterval(() => {
-        setNextRefresh((prev) => Math.max(0, prev - 1));
-      }, 1000);
-      return () => {
-        if (intraIntervalRef.current) clearInterval(intraIntervalRef.current);
-        if (intraCountdownRef.current) clearInterval(intraCountdownRef.current);
-      };
-    }
+    if (viewMode !== "intraday") return;
+
+    fetchIntraday();
+
+    // Schedule auto-refresh aligned to next 15-min IST boundary
+    const scheduleRefresh = () => {
+      const secs = getSecondsToNextRefreshIST();
+      if (secs <= 0) return; // market closed / weekend
+      intraTimeoutRef.current = setTimeout(() => {
+        fetchIntraday();
+        scheduleRefresh();
+      }, secs * 1000);
+    };
+    scheduleRefresh();
+
+    // Countdown: recalculate from IST clock every second (no drift)
+    intraCountdownRef.current = setInterval(() => {
+      setNextRefresh(getSecondsToNextRefreshIST());
+    }, 1000);
+
+    return () => {
+      if (intraTimeoutRef.current) clearTimeout(intraTimeoutRef.current);
+      if (intraCountdownRef.current) clearInterval(intraCountdownRef.current);
+    };
   }, [viewMode, fetchIntraday]);
 
   // Close mobile more menu when clicking outside
@@ -2203,10 +2258,12 @@ export default function Home() {
                     <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${intraMarketOpen ? "bg-emerald-400 animate-pulse" : "bg-zinc-500"}`} />
                     {intraMarketOpen ? "MARKET OPEN" : "MARKET CLOSED"}
                   </Badge>
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Timer className="w-3.5 h-3.5" />
-                    <span>{Math.floor(nextRefresh / 60)}:{String(nextRefresh % 60).padStart(2, "0")}</span>
-                  </div>
+                  {nextRefresh > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Timer className="w-3.5 h-3.5" />
+                      <span>{Math.floor(nextRefresh / 60)}:{String(nextRefresh % 60).padStart(2, "0")}</span>
+                    </div>
+                  )}
                   <Button variant="ghost" size="icon" className="w-8 h-8" onClick={fetchIntraday} disabled={intraLoading}>
                     <RefreshCw className={`w-4 h-4 ${intraLoading ? "animate-spin" : ""}`} />
                   </Button>
