@@ -409,6 +409,10 @@ export default function Home() {
   const intraTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [nextRefresh, setNextRefresh] = useState(900);
   const intraCountdownRef = useRef<NodeJS.Timeout | null>(null);
+  const intraLiveRef = useRef<NodeJS.Timeout | null>(null);
+  // Track which cells flashed so we can animate
+  const [flashCells, setFlashCells] = useState<Record<string, "up" | "down">>({});
+  const prevStocksRef = useRef<Record<string, { ltp: number; changePct: number; volume: number }>>({});
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   const fetchIntraday = useCallback(async () => {
@@ -417,7 +421,15 @@ export default function Home() {
     try {
       const res = await fetch("/api/intraday", { cache: "no-store" });
       const data = await res.json();
-      if (data.stocks) setIntraStocks(data.stocks);
+      if (data.stocks) {
+        setIntraStocks(data.stocks);
+        // Store current values for flash tracking
+        const snap: Record<string, { ltp: number; changePct: number; volume: number }> = {};
+        data.stocks.forEach((s: any) => {
+          snap[s.ticker] = { ltp: s.ltp, changePct: s.changePct, volume: s.volume };
+        });
+        prevStocksRef.current = snap;
+      }
       if (data.sectors) setIntraSectors(data.sectors);
       if (data.marketOpen !== undefined) setIntraMarketOpen(data.marketOpen);
       setIntraLastUpdate(data.now || new Date().toISOString());
@@ -430,6 +442,60 @@ export default function Home() {
     }
   }, []);
 
+  // ─── Live polling: update LTP, Change%, Volume every 10s ────────
+  const fetchLivePrices = useCallback(async () => {
+    if (intraStocks.length === 0) return;
+    const tickers = intraStocks.map((s: any) => s.ticker).join(",");
+    if (!tickers) return;
+    try {
+      const res = await fetch(`/api/intraday/live?tickers=${encodeURIComponent(tickers)}`, {
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (data.stocks && data.stocks.length > 0) {
+        setIntraStocks((prev) => {
+          const liveMap: Record<string, any> = {};
+          data.stocks.forEach((s: any) => { liveMap[s.ticker] = s; });
+          const next = prev.map((s: any) => {
+            const live = liveMap[s.ticker];
+            if (!live) return s;
+            // Detect changes for flash animation
+            const prev = prevStocksRef.current[s.ticker];
+            const flashes: Record<string, "up" | "down"> = {};
+            if (prev) {
+              if (live.ltp !== prev.ltp) flashes[`${s.ticker}-ltp`] = live.ltp > prev.ltp ? "up" : "down";
+              if (live.changePct !== prev.changePct) flashes[`${s.ticker}-chg`] = live.changePct > prev.changePct ? "up" : "down";
+              if (live.volume !== prev.volume) flashes[`${s.ticker}-vol`] = "up"; // volume only goes up
+            }
+            if (Object.keys(flashes).length > 0) {
+              setFlashCells((f) => ({ ...f, ...flashes }));
+              setTimeout(() => {
+                setFlashCells((f) => {
+                  const n = { ...f };
+                  Object.keys(flashes).forEach((k) => delete n[k]);
+                  return n;
+                });
+              }, 800);
+            }
+            // Update ref for next comparison
+            prevStocksRef.current[s.ticker] = {
+              ltp: live.ltp,
+              changePct: live.changePct,
+              volume: live.volume,
+            };
+            return { ...s, ltp: live.ltp, change: live.change, changePct: live.changePct, volume: live.volume, valueCr: live.valueCr };
+          });
+          return next;
+        });
+      }
+      if (data.sectors && data.sectors.length > 0) {
+        setIntraSectors(data.sectors);
+      }
+    } catch {
+      // silent fail for live polling
+    }
+  }, [intraStocks]);
+
   useEffect(() => {
     if (viewMode !== "intraday") return;
 
@@ -438,7 +504,7 @@ export default function Home() {
     // Schedule auto-refresh aligned to next 15-min IST boundary
     const scheduleRefresh = () => {
       const secs = getSecondsToNextRefreshIST();
-      if (secs <= 0) return; // market closed / weekend
+      if (secs <= 0) return;
       intraTimeoutRef.current = setTimeout(() => {
         fetchIntraday();
         scheduleRefresh();
@@ -451,11 +517,18 @@ export default function Home() {
       setNextRefresh(getSecondsToNextRefreshIST());
     }, 1000);
 
+    // Live price polling every 10 seconds during market hours
+    intraLiveRef.current = setInterval(() => {
+      const secs = getSecondsToNextRefreshIST();
+      if (secs > 0) fetchLivePrices();
+    }, 10_000);
+
     return () => {
       if (intraTimeoutRef.current) clearTimeout(intraTimeoutRef.current);
       if (intraCountdownRef.current) clearInterval(intraCountdownRef.current);
+      if (intraLiveRef.current) clearInterval(intraLiveRef.current);
     };
-  }, [viewMode, fetchIntraday]);
+  }, [viewMode, fetchIntraday, fetchLivePrices]);
 
   // Close mobile more menu when clicking outside
   useEffect(() => {
@@ -2242,15 +2315,23 @@ export default function Home() {
           {/* ─── INTRADAY VIEW ─────────────────────────────────── */}
           {viewMode === "intraday" && (
             <div className="space-y-6">
-              {/* Header row: Market status + refresh timer */}
+              {/* Header row: Market status + live indicator + timer */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${intraMarketOpen ? "bg-emerald-500/15" : "bg-zinc-500/15"}`}>
                     <Activity className={`w-7 h-7 ${intraMarketOpen ? "text-emerald-400" : "text-zinc-400"}`} />
                   </div>
                   <div>
-                    <h2 className="text-base font-semibold text-foreground">Live Intraday Volume</h2>
-                    <p className="text-xs text-muted-foreground">Top 10 stocks by volume from NSE</p>
+                    <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                      Live Intraday Volume
+                      {intraMarketOpen && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wider text-red-500 bg-red-500/10 border border-red-500/20 rounded-md px-1.5 py-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                          LIVE
+                        </span>
+                      )}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">Top 10 stocks by volume · Updates every 10s</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -2320,74 +2401,100 @@ export default function Home() {
                         </tr>
                       </thead>
                       <tbody>
-                        {intraStocks.map((s: any) => (
-                          <tr key={s.ticker} className="border-t border-border hover:bg-secondary/50 transition-colors">
-                            <td className="px-4 py-3 text-muted-foreground text-xs font-mono">{s.rank}</td>
-                            <td className="px-4 py-3">
-                              <div className="font-medium text-foreground">{s.name}</div>
-                              <div className="text-xs text-muted-foreground">{s.ticker}</div>
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 font-mono">
-                                {s.exchange}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono">₹{s.ltp?.toLocaleString("en-IN") || "-"}</td>
-                            <td className="px-4 py-3 text-right">
-                              <span className={`font-mono font-medium ${(s.changePct || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                {(s.changePct || 0) >= 0 ? "+" : ""}{(s.changePct || 0).toFixed(2)}%
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono text-muted-foreground">
-                              {s.volume ? (s.volume / 100000).toFixed(1) + "L" : "-"}
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono text-muted-foreground">
-                              {s.valueCr ? "₹" + (s.valueCr / 100).toFixed(0) + " Cr" : "-"}
-                            </td>
-                          </tr>
-                        ))}
+                        {intraStocks.map((s: any) => {
+                          const ltpFlash = flashCells[`${s.ticker}-ltp`];
+                          const chgFlash = flashCells[`${s.ticker}-chg`];
+                          const volFlash = flashCells[`${s.ticker}-vol`];
+                          return (
+                            <tr key={s.ticker} className="border-t border-border hover:bg-secondary/50 transition-colors">
+                              <td className="px-4 py-3 text-muted-foreground text-xs font-mono">{s.rank}</td>
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-foreground">{s.name}</div>
+                                <div className="text-xs text-muted-foreground">{s.ticker}</div>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 font-mono">
+                                  {s.exchange}
+                                </Badge>
+                              </td>
+                              <td className={`px-4 py-3 text-right font-mono transition-colors duration-300 ${ltpFlash === "up" ? "text-emerald-300" : ltpFlash === "down" ? "text-red-300" : ""}`}>₹{s.ltp?.toLocaleString("en-IN") || "-"}</td>
+                              <td className="px-4 py-3 text-right">
+                                <span className={`font-mono font-medium transition-colors duration-300 ${chgFlash === "up" ? "text-emerald-300" : chgFlash === "down" ? "text-red-300" : (s.changePct || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                  {(s.changePct || 0) >= 0 ? "+" : ""}{(s.changePct || 0).toFixed(2)}%
+                                </span>
+                              </td>
+                              <td className={`px-4 py-3 text-right font-mono transition-colors duration-300 ${volFlash === "up" ? "text-cyan-300" : "text-muted-foreground"}`}>
+                                {s.volume ? (s.volume / 100000).toFixed(1) + "L" : "-"}
+                              </td>
+                              <td className="px-4 py-3 text-right font-mono text-muted-foreground">
+                                {s.valueCr ? "₹" + (s.valueCr / 100).toFixed(0) + " Cr" : "-"}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
 
                   {/* Top 10 - Mobile Cards */}
                   <div className="md:hidden space-y-2">
-                    {intraStocks.map((s: any) => (
-                      <div key={s.ticker} className="flex items-center justify-between px-3 py-3 rounded-xl border border-border">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-xs font-mono text-muted-foreground w-5">{s.rank}</span>
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium text-foreground truncate">{s.name}</div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-muted-foreground">{s.ticker}</span>
-                              <Badge variant="secondary" className="text-[9px] px-1 py-0 font-mono h-4">
-                                {s.exchange}
-                              </Badge>
+                    {intraStocks.map((s: any) => {
+                      const ltpFlash = flashCells[`${s.ticker}-ltp`];
+                      const chgFlash = flashCells[`${s.ticker}-chg`];
+                      return (
+                        <div key={s.ticker} className="px-3 py-3 rounded-xl border border-border">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="text-xs font-mono text-muted-foreground w-5">{s.rank}</span>
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-foreground truncate">{s.name}</div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-muted-foreground">{s.ticker}</span>
+                                  <Badge variant="secondary" className="text-[9px] px-1 py-0 font-mono h-4">
+                                    {s.exchange}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className={`text-sm font-mono transition-colors duration-300 ${ltpFlash === "up" ? "text-emerald-300" : ltpFlash === "down" ? "text-red-300" : "text-foreground"}`}>₹{s.ltp?.toLocaleString("en-IN") || "-"}</div>
+                              <span className={`text-xs font-mono font-medium transition-colors duration-300 ${chgFlash === "up" ? "text-emerald-300" : chgFlash === "down" ? "text-red-300" : (s.changePct || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                                {(s.changePct || 0) >= 0 ? "+" : ""}{(s.changePct || 0).toFixed(2)}%
+                              </span>
                             </div>
                           </div>
+                          <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-border/50">
+                            <span className="text-[10px] font-mono text-muted-foreground">
+                              Vol: {s.volume ? (s.volume / 100000).toFixed(1) + "L" : "-"}
+                            </span>
+                            <span className="text-[10px] font-mono text-muted-foreground">
+                              {s.valueCr ? "₹" + (s.valueCr / 100).toFixed(0) + " Cr" : "-"}
+                            </span>
+                          </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-sm font-mono text-foreground">₹{s.ltp?.toLocaleString("en-IN") || "-"}</div>
-                          <span className={`text-xs font-mono font-medium ${(s.changePct || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                            {(s.changePct || 0) >= 0 ? "+" : ""}{(s.changePct || 0).toFixed(2)}%
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
-                  {/* Sector Volume */}
+                  {/* Live Sector Volume */}
                   {intraSectors.length > 0 && (
-                    <div>
+                    <div className="rounded-xl border border-border p-4">
                       <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                         <BarChart3 className="w-4 h-4 text-primary" />
-                        Sector Volume Distribution
+                        Live Sector Volume
+                        {intraMarketOpen && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold tracking-wider text-red-500 bg-red-500/10 border border-red-500/20 rounded-md px-1.5 py-0.5">
+                            <span className="w-1 h-1 rounded-full bg-red-500 animate-pulse" />
+                            LIVE
+                          </span>
+                        )}
                       </h3>
                       <div className="grid gap-2">
                         {intraSectors.map((sec: any) => {
                           const maxVol = Math.max(...intraSectors.map((s2: any) => parseFloat(s2.volumePct) || 0));
                           const pct = parseFloat(sec.volumePct) || 0;
                           const barW = maxVol > 0 ? (pct / maxVol) * 100 : 0;
+                          const isUp = (sec.changePct || 0) >= 0;
                           return (
                             <div key={sec.sector} className="flex items-center gap-3">
                               <div className="w-20 sm:w-28 text-xs text-muted-foreground truncate shrink-0" title={sec.sector}>
@@ -2395,13 +2502,13 @@ export default function Home() {
                               </div>
                               <div className="flex-1 h-6 bg-secondary rounded-full overflow-hidden relative">
                                 <div
-                                  className={`h-full rounded-full transition-all duration-500 ${pct > 0 ? "bg-gradient-to-r from-blue-500/60 to-cyan-400/60" : "bg-zinc-600/30"}`}
+                                  className={`h-full rounded-full transition-all duration-700 ${isUp ? "bg-gradient-to-r from-emerald-500/50 to-cyan-400/50" : "bg-gradient-to-r from-red-500/40 to-orange-400/40"}`}
                                   style={{ width: `${barW}%` }}
                                 />
                                 <div className="absolute inset-0 flex items-center justify-between px-3">
                                   <span className="text-[10px] font-mono text-foreground/80">{pct}%</span>
-                                  <span className={`text-[10px] font-mono ${(sec.changePct || 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                                    {(sec.changePct || 0) >= 0 ? "+" : ""}{(sec.changePct || 0).toFixed(1)}%
+                                  <span className={`text-[10px] font-mono font-medium ${isUp ? "text-emerald-400" : "text-red-400"}`}>
+                                    {isUp ? "+" : ""}{(sec.changePct || 0).toFixed(1)}%
                                   </span>
                                 </div>
                               </div>
@@ -2412,7 +2519,7 @@ export default function Home() {
                           );
                         })}
                       </div>
-                      <p className="text-[10px] text-muted-foreground/50 mt-2">A/D = Advances / Declines</p>
+                      <p className="text-[10px] text-muted-foreground/50 mt-2">A/D = Advances / Declines · Volume % = share of total market volume</p>
                     </div>
                   )}
 
