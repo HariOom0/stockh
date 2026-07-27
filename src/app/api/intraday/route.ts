@@ -125,7 +125,10 @@ async function fetchYahooBatch(signal: AbortSignal): Promise<IntraStock[]> {
       return {
         name: t.name,
         ticker: t.sym.replace(".NS", ""),
-        ...data,
+        ltp: data.price,
+        change: data.change,
+        changePct: data.changePct,
+        volume: data.volume,
         valueCr: Math.round((data.price * data.volume) / 10000000 * 100) / 100,
       };
     })
