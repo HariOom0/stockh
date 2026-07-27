@@ -45,66 +45,105 @@ function isMarketHoursIST(): boolean {
   return mins >= 555 && mins <= 930; // 9:15 AM to 3:30 PM IST
 }
 
-/** Nifty 50 tickers for Yahoo Finance fallback */
-const NIFTY50_TICKERS = [
-  "RELIANCE.NS","TCS.NS","HDFCBANK.NS","INFY.NS","ICICIBANK.NS",
-  "HINDUNILVR.NS","ITC.NS","SBIN.NS","BHARTIARTL.NS","LT.NS",
-  "KOTAKBANK.NS","AXISBANK.NS","ASIANPAINT.NS","BAJFINANCE.NS","MARUTI.NS",
-  "TITAN.NS","SUNPHARMA.NS","TATAMOTORS.NS","WIPRO.NS","ULTRACEMCO.NS",
-  "NESTLEIND.NS","NTPC.NS","POWERGRID.NS","TATASTEEL.NS","HCLTECH.NS",
-  "BAJAJFINSV.NS","ONGC.NS","COALINDIA.NS","INDUSINDBK.NS","DRREDDY.NS",
-  "GRASIM.NS","HDFCLIFE.NS","TECHM.NS","DIVISLAB.NS","BAJAJAUTO.NS",
-  "ADANIENT.NS","ADANIPORTS.NS","EICHERMOT.NS","TATACONSUM.NS","M_M.NS",
-  "HEROMOTOCO.NS","BPCL.NS","CIPLA.NS","BRITANNIA.NS","SIEMENS.NS",
-  "HINDALCO.NS","APOLLOHOSP.NS","SHRIRAMFIN.NS","LTIM.NS",
+/** Top ~35 most liquid NSE stocks (likely highest volume) */
+const LIQUID_TICKERS = [
+  { sym: "RELIANCE.NS", name: "Reliance Industries" },
+  { sym: "HDFCBANK.NS", name: "HDFC Bank" },
+  { sym: "ICICIBANK.NS", name: "ICICI Bank" },
+  { sym: "TCS.NS", name: "Tata Consultancy" },
+  { sym: "INFY.NS", name: "Infosys" },
+  { sym: "SBIN.NS", name: "State Bank of India" },
+  { sym: "BHARTIARTL.NS", name: "Bharti Airtel" },
+  { sym: "ITC.NS", name: "ITC" },
+  { sym: "KOTAKBANK.NS", name: "Kotak Mah. Bank" },
+  { sym: "LT.NS", name: "Larsen & Toubro" },
+  { sym: "AXISBANK.NS", name: "Axis Bank" },
+  { sym: "BAJFINANCE.NS", name: "Bajaj Finance" },
+  { sym: "TATAMOTORS.NS", name: "Tata Motors" },
+  { sym: "MARUTI.NS", name: "Maruti Suzuki" },
+  { sym: "TITAN.NS", name: "Titan Company" },
+  { sym: "SUNPHARMA.NS", name: "Sun Pharma" },
+  { sym: "WIPRO.NS", name: "Wipro" },
+  { sym: "HINDUNILVR.NS", name: "Hindustan Unilever" },
+  { sym: "ULTRACEMCO.NS", name: "UltraTech Cement" },
+  { sym: "NTPC.NS", name: "NTPC" },
+  { sym: "POWERGRID.NS", name: "Power Grid Corp" },
+  { sym: "TATASTEEL.NS", name: "Tata Steel" },
+  { sym: "HCLTECH.NS", name: "HCL Technologies" },
+  { sym: "ONGC.NS", name: "ONGC" },
+  { sym: "ADANIENT.NS", name: "Adani Enterprises" },
+  { sym: "ADANIPORTS.NS", name: "Adani Ports" },
+  { sym: "COALINDIA.NS", name: "Coal India" },
+  { sym: "BAJAJFINSV.NS", name: "Bajaj Finserv" },
+  { sym: "HINDALCO.NS", name: "Hindalco Industries" },
+  { sym: "NESTLEIND.NS", name: "Nestle India" },
+  { sym: "ASIANPAINT.NS", name: "Asian Paints" },
+  { sym: "EICHERMOT.NS", name: "Eicher Motors" },
+  { sym: "DRREDDY.NS", name: "Dr. Reddy's Labs" },
 ];
 
-// ─── Yahoo Finance fallback (works from any server) ────────────
-async function fetchYahooFallback(signal: AbortSignal): Promise<{ stocks: IntraStock[]; sectors: SectorData[] }> {
+// ─── Yahoo Finance v8 chart API (works from servers) ────────────
+async function fetchYahooChart(symbol: string, signal: AbortSignal): Promise<{
+  price: number; change: number; changePct: number; volume: number;
+} | null> {
   try {
-    const symbols = NIFTY50_TICKERS.join(",");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    // Link the parent signal
+    signal.addEventListener("abort", () => controller.abort());
+
     const res = await fetch(
-      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,regularMarketTime,shortName`,
+      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=1d`,
       {
-        headers: {
-          "User-Agent": "Mozilla/5.0",
-        },
-        signal,
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: controller.signal,
       }
     );
-    if (!res.ok) return { stocks: [], sectors: [] };
+    clearTimeout(timeout);
+    if (!res.ok) return null;
     const json = await res.json();
-    const quotes = json?.quoteResponse?.result;
-    if (!Array.isArray(quotes)) return { stocks: [], sectors: [] };
-
-    // Filter to stocks with actual volume data and market is open/has traded today
-    const validStocks = quotes
-      .filter((q: any) => {
-        const vol = q.regularMarketVolume || 0;
-        const price = q.regularMarketPrice || 0;
-        return vol > 0 && price > 0;
-      })
-      .map((q: any) => ({
-        name: (q.shortName || q.symbol || "").replace(/\.NS$/, ""),
-        ticker: (q.symbol || "").replace(/\.NS$/, ""),
-        ltp: q.regularMarketPrice || 0,
-        change: q.regularMarketChange || 0,
-        changePct: q.regularMarketChangePercent || 0,
-        volume: q.regularMarketVolume || 0,
-      }))
-      .sort((a: any, b: any) => b.volume - a.volume)
-      .slice(0, 10)
-      .map((s: any, i: number) => ({
-        rank: i + 1,
-        ...s,
-        exchange: "NSE" as const,
-        valueCr: Math.round((s.ltp * s.volume) / 10000000 * 100) / 100,
-      }));
-
-    return { stocks: validStocks, sectors: [] };
+    const meta = json?.chart?.result?.[0]?.meta;
+    if (!meta) return null;
+    return {
+      price: meta.regularMarketPrice || 0,
+      change: (meta.regularMarketPrice || 0) - (meta.chartPreviousClose || 0),
+      changePct: meta.chartPreviousClose
+        ? (((meta.regularMarketPrice || 0) - meta.chartPreviousClose) / meta.chartPreviousClose) * 100
+        : 0,
+      volume: meta.regularMarketVolume || 0,
+    };
   } catch {
-    return { stocks: [], sectors: [] };
+    return null;
   }
+}
+
+async function fetchYahooBatch(signal: AbortSignal): Promise<IntraStock[]> {
+  const results = await Promise.allSettled(
+    LIQUID_TICKERS.map(async (t) => {
+      const data = await fetchYahooChart(t.sym, signal);
+      if (!data || data.volume <= 0) return null;
+      return {
+        name: t.name,
+        ticker: t.sym.replace(".NS", ""),
+        ...data,
+        valueCr: Math.round((data.price * data.volume) / 10000000 * 100) / 100,
+      };
+    })
+  );
+
+  const stocks = results
+    .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled" && r.value !== null)
+    .map((r) => r.value)
+    .filter((s) => s.volume > 0)
+    .sort((a, b) => b.volume - a.volume)
+    .slice(0, 10)
+    .map((s, i) => ({
+      rank: i + 1,
+      exchange: "NSE" as const,
+      ...s,
+    }));
+
+  return stocks;
 }
 
 // ─── NSE direct fetch (may be blocked on cloud IPs) ─────────────
@@ -113,7 +152,6 @@ async function getNSESession(signal: AbortSignal): Promise<string> {
     headers: {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.9",
     },
     signal,
     redirect: "follow",
@@ -128,7 +166,6 @@ async function fetchNSEStocks(cookie: string, signal: AbortSignal): Promise<Intr
     "https://www.nseindia.com/api/live-market-analysis/most-active-securities-by-value",
     "https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%2050",
   ];
-
   for (const url of endpoints) {
     try {
       const res = await fetch(url, {
@@ -144,11 +181,11 @@ async function fetchNSEStocks(cookie: string, signal: AbortSignal): Promise<Intr
       const json = await res.json();
       const data = json?.data;
       if (!Array.isArray(data) || data.length < 3) continue;
-
       return data
-        .sort((a: any, b: any) =>
-          (parseInt(String(b.totalTradedVolume || "0").replace(/,/g, ""), 10) || 0) -
-          (parseInt(String(a.totalTradedVolume || "0").replace(/,/g, ""), 10) || 0)
+        .sort(
+          (a: any, b: any) =>
+            (parseInt(String(b.totalTradedVolume || "0").replace(/,/g, ""), 10) || 0) -
+            (parseInt(String(a.totalTradedVolume || "0").replace(/,/g, ""), 10) || 0)
         )
         .slice(0, 10)
         .map((s: any, i: number) => ({
@@ -219,15 +256,14 @@ export async function GET() {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
+  const timeout = setTimeout(() => controller.abort(), 20_000);
 
   try {
-    // Strategy: Try NSE first, fall back to Yahoo Finance if NSE is blocked
     let stocks: IntraStock[] = [];
     let sectors: SectorData[] = [];
     let dataSource = "nse";
 
-    // 1. Try NSE direct
+    // 1. Try NSE direct (best data but blocked on cloud)
     try {
       const cookie = await getNSESession(controller.signal);
       const [nseStocks, nseSectors] = await Promise.all([
@@ -240,15 +276,13 @@ export async function GET() {
       // NSE failed, will try Yahoo
     }
 
-    // 2. Fallback to Yahoo Finance if NSE returned empty
+    // 2. Fallback to Yahoo Finance chart API if NSE returned empty
     if (stocks.length < 3) {
-      const yahoo = await fetchYahooFallback(controller.signal);
-      if (yahoo.stocks.length >= 3) {
-        stocks = yahoo.stocks;
+      const yahooStocks = await fetchYahooBatch(controller.signal);
+      if (yahooStocks.length >= 3) {
+        stocks = yahooStocks;
         dataSource = "yahoo";
       }
-      // If NSE gave sectors but no stocks, keep sectors
-      if (sectors.length === 0) sectors = yahoo.sectors;
     }
 
     // Normalize sector percentages
