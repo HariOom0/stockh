@@ -372,7 +372,13 @@ export default function Home() {
       if (data.sectors) setIntraSectors(data.sectors);
       if (data.marketOpen !== undefined) setIntraMarketOpen(data.marketOpen);
       setIntraLastUpdate(data.now || new Date().toISOString());
-      setNextRefresh(900);
+      // Calculate remaining time from server cache timestamp
+      if (data.cacheTimestamp) {
+        const elapsed = Math.floor((Date.now() - data.cacheTimestamp) / 1000);
+        setNextRefresh(Math.max(0, 900 - elapsed));
+      } else {
+        setNextRefresh(900);
+      }
     } catch {
       setIntraError("Failed to fetch intraday data");
     } finally {
@@ -2212,13 +2218,28 @@ export default function Home() {
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
                   <p className="text-sm text-muted-foreground">Fetching live data from NSE...</p>
                 </div>
+              ) : !intraMarketOpen && intraStocks.length === 0 ? (
+                <Card className="border-border">
+                  <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-zinc-500/15 flex items-center justify-center">
+                      <Clock className="w-6 h-6 text-zinc-400" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-foreground">Market Closed</h3>
+                    <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
+                      Intraday data is available during market hours (9:15 AM - 3:30 PM IST, Mon-Fri). Come back during trading hours to see live volume data.
+                    </p>
+                    {intraError && (
+                      <p className="text-[10px] text-amber-400/70">Note: {intraError}</p>
+                    )}
+                  </CardContent>
+                </Card>
               ) : intraError && intraStocks.length === 0 ? (
                 <Card className="border-border">
                   <CardContent className="p-12 flex flex-col items-center text-center gap-3">
                     <AlertTriangle className="w-7 h-7 text-amber-400" />
                     <h3 className="text-sm font-semibold text-foreground">Data Unavailable</h3>
                     <p className="text-xs text-muted-foreground max-w-xs leading-relaxed">
-                      {intraError}. NSE may be blocking server requests. This works best during market hours (9:15 AM - 3:30 PM IST).
+                      {intraError}. This usually resolves during active market hours.
                     </p>
                     <Button variant="outline" size="sm" onClick={fetchIntraday}>
                       <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Retry
@@ -2342,7 +2363,7 @@ export default function Home() {
                   {intraLastUpdate && (
                     <p className="text-[10px] text-muted-foreground/40 text-center">
                       Last updated: {new Date(intraLastUpdate).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
-                      {intraStocks.length === 0 && " · No live data available (NSE may be unreachable from server)"}
+                      {!intraMarketOpen && " · Market closed — showing last available data"}
                     </p>
                   )}
                 </>
