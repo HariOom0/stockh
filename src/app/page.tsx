@@ -406,6 +406,7 @@ export default function Home() {
   const [intraError, setIntraError] = useState("");
   const [intraMarketOpen, setIntraMarketOpen] = useState(false);
   const [intraLastUpdate, setIntraLastUpdate] = useState<string>("");
+  const [intraDataSource, setIntraDataSource] = useState<string>("yahoo");
   const intraTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [nextRefresh, setNextRefresh] = useState(900);
   const intraCountdownRef = useRef<NodeJS.Timeout | null>(null);
@@ -432,6 +433,7 @@ export default function Home() {
       }
       if (data.sectors) setIntraSectors(data.sectors);
       if (data.marketOpen !== undefined) setIntraMarketOpen(data.marketOpen);
+      if (data.dataSource) setIntraDataSource(data.dataSource);
       setIntraLastUpdate(data.now || new Date().toISOString());
       // Sync timer to next 15-min IST boundary
       setNextRefresh(getSecondsToNextRefreshIST());
@@ -491,6 +493,7 @@ export default function Home() {
       if (data.sectors && data.sectors.length > 0) {
         setIntraSectors(data.sectors);
       }
+      if (data.dataSource) setIntraDataSource(data.dataSource);
     } catch {
       // silent fail for live polling
     }
@@ -2325,13 +2328,21 @@ export default function Home() {
                     <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                       Live Intraday Volume
                       {intraMarketOpen && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wider text-red-500 bg-red-500/10 border border-red-500/20 rounded-md px-1.5 py-0.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                          LIVE
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold tracking-wider rounded-md px-1.5 py-0.5 ${intraDataSource === "nse" ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20" : "text-amber-400 bg-amber-500/10 border border-amber-500/20"}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${intraDataSource === "nse" ? "bg-emerald-400" : "bg-amber-400"} animate-pulse`} />
+                          {intraDataSource === "nse" ? "LIVE" : "DELAYED"}
                         </span>
                       )}
                     </h2>
-                    <p className="text-xs text-muted-foreground">Top 10 stocks by volume · Updates every 10s</p>
+                    <p className="text-xs text-muted-foreground">
+                      Top 10 stocks by volume · Updates every 10s
+                      {intraDataSource === "yahoo" && intraMarketOpen && (
+                        <span className="text-amber-400/70"> · Yahoo data ~15 min delayed</span>
+                      )}
+                      {intraDataSource === "nse" && (
+                        <span className="text-emerald-400/70"> · NSE real-time</span>
+                      )}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -2483,9 +2494,9 @@ export default function Home() {
                         <BarChart3 className="w-4 h-4 text-primary" />
                         Live Sector Volume
                         {intraMarketOpen && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold tracking-wider text-red-500 bg-red-500/10 border border-red-500/20 rounded-md px-1.5 py-0.5">
-                            <span className="w-1 h-1 rounded-full bg-red-500 animate-pulse" />
-                            LIVE
+                          <span className={`inline-flex items-center gap-1 text-[9px] font-bold tracking-wider rounded-md px-1.5 py-0.5 ${intraDataSource === "nse" ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20" : "text-amber-400 bg-amber-500/10 border border-amber-500/20"}`}>
+                            <span className={`w-1 h-1 rounded-full ${intraDataSource === "nse" ? "bg-emerald-400" : "bg-amber-400"} animate-pulse`} />
+                            {intraDataSource === "nse" ? "LIVE" : "DELAYED"}
                           </span>
                         )}
                       </h3>
