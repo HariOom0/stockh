@@ -406,7 +406,7 @@ export default function Home() {
   const [intraError, setIntraError] = useState("");
   const [intraMarketOpen, setIntraMarketOpen] = useState(false);
   const [intraLastUpdate, setIntraLastUpdate] = useState<string>("");
-  const [intraDataSource, setIntraDataSource] = useState<string>("yahoo");
+  const [intraDataSource, setIntraDataSource] = useState<string>("nse");
   const intraTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [nextRefresh, setNextRefresh] = useState(900);
   const intraCountdownRef = useRef<NodeJS.Timeout | null>(null);
@@ -2328,18 +2328,15 @@ export default function Home() {
                     <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                       Live Intraday Volume
                       {intraMarketOpen && (
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold tracking-wider rounded-md px-1.5 py-0.5 ${intraDataSource === "nse" ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20" : "text-amber-400 bg-amber-500/10 border border-amber-500/20"}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${intraDataSource === "nse" ? "bg-emerald-400" : "bg-amber-400"} animate-pulse`} />
-                          {intraDataSource === "nse" ? "LIVE" : "DELAYED"}
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold tracking-wider rounded-md px-1.5 py-0.5 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          NSE
                         </span>
                       )}
                     </h2>
                     <p className="text-xs text-muted-foreground">
                       Top 10 stocks by volume · Updates every 10s
-                      {intraDataSource === "yahoo" && intraMarketOpen && (
-                        <span className="text-amber-400/70"> · Yahoo data ~15 min delayed</span>
-                      )}
-                      {intraDataSource === "nse" && (
+                      {intraMarketOpen && (
                         <span className="text-emerald-400/70"> · NSE real-time</span>
                       )}
                     </p>
@@ -2494,9 +2491,9 @@ export default function Home() {
                         <BarChart3 className="w-4 h-4 text-primary" />
                         Live Sector Volume
                         {intraMarketOpen && (
-                          <span className={`inline-flex items-center gap-1 text-[9px] font-bold tracking-wider rounded-md px-1.5 py-0.5 ${intraDataSource === "nse" ? "text-emerald-400 bg-emerald-500/10 border border-emerald-500/20" : "text-amber-400 bg-amber-500/10 border border-amber-500/20"}`}>
-                            <span className={`w-1 h-1 rounded-full ${intraDataSource === "nse" ? "bg-emerald-400" : "bg-amber-400"} animate-pulse`} />
-                            {intraDataSource === "nse" ? "LIVE" : "DELAYED"}
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold tracking-wider rounded-md px-1.5 py-0.5 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+                            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                            NSE
                           </span>
                         )}
                       </h3>
