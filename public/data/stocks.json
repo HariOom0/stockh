@@ -1,807 +1,807 @@
 {
   "stocks": [
     {
-      "ticker": "ASTRAZEN",
-      "name": "Astrazeneca Pharma India",
-      "close": 8100.0,
-      "change": 0.06,
-      "volGainPct": 345.95,
+      "ticker": "DALMIASUG",
+      "name": "Dalmia Bharat Sugar And Industries",
+      "close": 411.85,
+      "change": 17.3,
+      "volGainPct": 385.79,
       "isPositive": true
     },
     {
-      "ticker": "AARTIIND",
-      "name": "Aarti Industries",
-      "close": 489.1,
-      "change": 1.85,
-      "volGainPct": 345.8,
+      "ticker": "NOCIL",
+      "name": "Nocil",
+      "close": 174.05,
+      "change": 6.01,
+      "volGainPct": 346.25,
       "isPositive": true
     },
     {
-      "ticker": "THERMAX",
-      "name": "Thermax",
-      "close": 4306.0,
-      "change": 1.28,
-      "volGainPct": 339.6,
+      "ticker": "BLUEDART",
+      "name": "Blue Dart Express",
+      "close": 5427.0,
+      "change": 5.16,
+      "volGainPct": 339.26,
       "isPositive": true
     },
     {
-      "ticker": "PUNJABCHEM",
-      "name": "Punjab Chemicals & Crop Protection",
-      "close": 1143.8,
-      "change": -5.1,
-      "volGainPct": 327.57,
+      "ticker": "VINDHYATEL",
+      "name": "Vindhya Telelinks",
+      "close": 2383.0,
+      "change": 19.9,
+      "volGainPct": 335.4,
+      "isPositive": true
+    },
+    {
+      "ticker": "ALPHAGEO",
+      "name": "Alphageo (india)",
+      "close": 264.15,
+      "change": 19.9,
+      "volGainPct": 305.72,
+      "isPositive": true
+    },
+    {
+      "ticker": "SHALPAINTS",
+      "name": "Shalimar Paints",
+      "close": 80.01,
+      "change": 19.9,
+      "volGainPct": 298.71,
+      "isPositive": true
+    },
+    {
+      "ticker": "KCP",
+      "name": "Kcp",
+      "close": 152.97,
+      "change": -5.3,
+      "volGainPct": 298.54,
       "isPositive": false
     },
     {
-      "ticker": "VOLTAMP",
-      "name": "Voltamp Transformers",
-      "close": 9923.0,
-      "change": 6.67,
-      "volGainPct": 325.01,
+      "ticker": "NAHARSPING",
+      "name": "Nahar Spinning Mills",
+      "close": 311.15,
+      "change": 10.6,
+      "volGainPct": 293.99,
       "isPositive": true
     },
     {
-      "ticker": "KIOCL",
-      "name": "Kiocl",
-      "close": 365.55,
-      "change": 2.62,
-      "volGainPct": 323.83,
+      "ticker": "JINDWORLD",
+      "name": "Jindal Worldwide",
+      "close": 40.41,
+      "change": 5.39,
+      "volGainPct": 290.98,
       "isPositive": true
     },
     {
-      "ticker": "QUESS",
-      "name": "Quess Corp",
-      "close": 332.55,
-      "change": 7.37,
-      "volGainPct": 318.57,
+      "ticker": "MUNJALSHOW",
+      "name": "Munjal Showa",
+      "close": 143.47,
+      "change": 4.45,
+      "volGainPct": 288.04,
       "isPositive": true
     },
     {
-      "ticker": "SUBROS",
-      "name": "Subros",
-      "close": 819.25,
-      "change": 4.58,
-      "volGainPct": 314.22,
+      "ticker": "INDTERRAIN",
+      "name": "Indian Terrain Fashions",
+      "close": 33.39,
+      "change": 19.9,
+      "volGainPct": 282.8,
       "isPositive": true
-    },
-    {
-      "ticker": "DENORA",
-      "name": "De Nora India",
-      "close": 906.4,
-      "change": 5.1,
-      "volGainPct": 313.7,
-      "isPositive": true
-    },
-    {
-      "ticker": "CENTURYPLY",
-      "name": "Century Plyboards (india)",
-      "close": 799.5,
-      "change": 0.72,
-      "volGainPct": 313.2,
-      "isPositive": true
-    },
-    {
-      "ticker": "ASTRAMICRO",
-      "name": "Astra Microwave Products",
-      "close": 1861.6,
-      "change": 7.85,
-      "volGainPct": 289.44,
-      "isPositive": true
-    },
-    {
-      "ticker": "THOMASCOOK",
-      "name": "Thomas Cook  (india)",
-      "close": 104.27,
-      "change": 4.97,
-      "volGainPct": 280.9,
-      "isPositive": true
-    },
-    {
-      "ticker": "RAJTV",
-      "name": "Raj Television Network",
-      "close": 11.32,
-      "change": -4.9,
-      "volGainPct": 279.11,
-      "isPositive": false
-    },
-    {
-      "ticker": "STAR",
-      "name": "Strides Shasun",
-      "close": 1025.0,
-      "change": -4.4,
-      "volGainPct": 265.65,
-      "isPositive": false
-    },
-    {
-      "ticker": "TAJGVK",
-      "name": "Taj Gvk Hotels & Resorts",
-      "close": 363.25,
-      "change": 0.66,
-      "volGainPct": 254.99,
-      "isPositive": true
-    },
-    {
-      "ticker": "SANGHVIMOV",
-      "name": "Sanghvi Movers",
-      "close": 409.8,
-      "change": -5.5,
-      "volGainPct": 247.45,
-      "isPositive": false
-    },
-    {
-      "ticker": "SHREECEM",
-      "name": "Shree Cements",
-      "close": 26055.0,
-      "change": -1.5,
-      "volGainPct": 245.78,
-      "isPositive": false
-    },
-    {
-      "ticker": "JPPOWER",
-      "name": "Jaiprakash Power Ventures",
-      "close": 18.29,
-      "change": 5.6,
-      "volGainPct": 216.54,
-      "isPositive": true
-    },
-    {
-      "ticker": "XPROINDIA",
-      "name": "Xpro India",
-      "close": 1500.4,
-      "change": 7.57,
-      "volGainPct": 208.2,
-      "isPositive": true
-    },
-    {
-      "ticker": "ZEEMEDIA",
-      "name": "Zee Media Corporation",
-      "close": 7.5,
-      "change": 0.53,
-      "volGainPct": 200.34,
-      "isPositive": true
-    },
-    {
-      "ticker": "STCINDIA",
-      "name": "The State Trading Corporation Of India",
-      "close": 120.5,
-      "change": 2.68,
-      "volGainPct": 200.09,
-      "isPositive": true
-    },
-    {
-      "ticker": "FMNL",
-      "name": "Future Market Networks",
-      "close": 9.47,
-      "change": 2.82,
-      "volGainPct": 199.83,
-      "isPositive": true
-    },
-    {
-      "ticker": "NELCO",
-      "name": "Nelco",
-      "close": 1015.65,
-      "change": 9.23,
-      "volGainPct": 197.92,
-      "isPositive": true
-    },
-    {
-      "ticker": "A2ZINFRA",
-      "name": "A2z Infra Engineering",
-      "close": 15.55,
-      "change": 6.65,
-      "volGainPct": 197.11,
-      "isPositive": true
-    },
-    {
-      "ticker": "TVTODAY",
-      "name": "Tv Today Network",
-      "close": 113.69,
-      "change": 0.0,
-      "volGainPct": 194.8,
-      "isPositive": false
-    },
-    {
-      "ticker": "20MICRONS",
-      "name": "20 Microns",
-      "close": 192.46,
-      "change": -3.8,
-      "volGainPct": 194.32,
-      "isPositive": false
-    },
-    {
-      "ticker": "BAJFINANCE",
-      "name": "Bajaj Finance",
-      "close": 1141.2,
-      "change": 8.32,
-      "volGainPct": 193.78,
-      "isPositive": true
-    },
-    {
-      "ticker": "CINELINE",
-      "name": "Cineline India",
-      "close": 87.8,
-      "change": 8.39,
-      "volGainPct": 183.6,
-      "isPositive": true
-    },
-    {
-      "ticker": "MAHSEAMLES",
-      "name": "Maharashtra Seamless",
-      "close": 565.35,
-      "change": -1.2,
-      "volGainPct": 177.35,
-      "isPositive": false
-    },
-    {
-      "ticker": "63MOONS",
-      "name": "63 Moons Technologies",
-      "close": 931.4,
-      "change": 9.91,
-      "volGainPct": 176.41,
-      "isPositive": true
-    },
-    {
-      "ticker": "DELTACORP",
-      "name": "Delta Corp",
-      "close": 62.97,
-      "change": 1.63,
-      "volGainPct": 175.12,
-      "isPositive": true
-    },
-    {
-      "ticker": "DBSTOCKBRO",
-      "name": "Db (international) Stock Brokers",
-      "close": 34.46,
-      "change": 2.13,
-      "volGainPct": 166.24,
-      "isPositive": true
-    },
-    {
-      "ticker": "ASTEC",
-      "name": "Astec Lifesciences",
-      "close": 655.35,
-      "change": 4.52,
-      "volGainPct": 164.8,
-      "isPositive": true
-    },
-    {
-      "ticker": "MSPL",
-      "name": "Msp Steel & Power",
-      "close": 34.31,
-      "change": -4.8,
-      "volGainPct": 163.13,
-      "isPositive": false
-    },
-    {
-      "ticker": "SATIN",
-      "name": "Satin Creditcare Network",
-      "close": 239.81,
-      "change": -6.8,
-      "volGainPct": 161.54,
-      "isPositive": false
-    },
-    {
-      "ticker": "PTC",
-      "name": "Ptc India",
-      "close": 175.52,
-      "change": 3.77,
-      "volGainPct": 159.47,
-      "isPositive": true
-    },
-    {
-      "ticker": "KIRLOSBROS",
-      "name": "Kirloskar Brothers",
-      "close": 1870.1,
-      "change": -0.1,
-      "volGainPct": 158.32,
-      "isPositive": false
-    },
-    {
-      "ticker": "FLEXITUFF",
-      "name": "Flexituff International",
-      "close": 4.3,
-      "change": -4.4,
-      "volGainPct": 157.96,
-      "isPositive": false
-    },
-    {
-      "ticker": "KAJARIACER",
-      "name": "Kajaria Ceramics",
-      "close": 1198.3,
-      "change": 0.52,
-      "volGainPct": 156.56,
-      "isPositive": true
-    },
-    {
-      "ticker": "SJVN",
-      "name": "Sjvn",
-      "close": 68.62,
-      "change": 0.24,
-      "volGainPct": 153.72,
-      "isPositive": true
-    },
-    {
-      "ticker": "JINDRILL",
-      "name": "Jindal Drilling And Industries",
-      "close": 616.2,
-      "change": 2.6,
-      "volGainPct": 153.33,
-      "isPositive": true
-    },
-    {
-      "ticker": "SUNDARMFIN",
-      "name": "Sundaram Finance",
-      "close": 4665.6,
-      "change": 3.89,
-      "volGainPct": 152.61,
-      "isPositive": true
-    },
-    {
-      "ticker": "GMDCLTD",
-      "name": "Gujarat Mineral Development Corporation",
-      "close": 564.25,
-      "change": 0.82,
-      "volGainPct": 152.51,
-      "isPositive": true
-    },
-    {
-      "ticker": "MIRZAINT",
-      "name": "Mirza International",
-      "close": 33.27,
-      "change": -3.3,
-      "volGainPct": 149.48,
-      "isPositive": false
-    },
-    {
-      "ticker": "RPPINFRA",
-      "name": "R.p.p. Infra Projects",
-      "close": 60.16,
-      "change": -1.4,
-      "volGainPct": 148.51,
-      "isPositive": false
-    },
-    {
-      "ticker": "LICHSGFIN",
-      "name": "Lic Housing Finance",
-      "close": 523.1,
-      "change": -3.2,
-      "volGainPct": 146.08,
-      "isPositive": false
-    },
-    {
-      "ticker": "BAJAJFINSV",
-      "name": "Bajaj Finserv",
-      "close": 2029.1,
-      "change": 6.26,
-      "volGainPct": 144.95,
-      "isPositive": true
-    },
-    {
-      "ticker": "NITCO",
-      "name": "Nitco",
-      "close": 107.6,
-      "change": 7.18,
-      "volGainPct": 144.38,
-      "isPositive": true
-    },
-    {
-      "ticker": "ZEEL",
-      "name": "Zee Entertainment Enterprises",
-      "close": 114.55,
-      "change": 2.08,
-      "volGainPct": 142.11,
-      "isPositive": true
-    },
-    {
-      "ticker": "GAIL",
-      "name": "Gail (india)",
-      "close": 181.44,
-      "change": 4.49,
-      "volGainPct": 141.6,
-      "isPositive": true
-    },
-    {
-      "ticker": "TIMKEN",
-      "name": "Timken India",
-      "close": 3145.4,
-      "change": 1.54,
-      "volGainPct": 140.73,
-      "isPositive": true
-    },
-    {
-      "ticker": "NILAINFRA",
-      "name": "Nila Infrastructures",
-      "close": 7.38,
-      "change": 1.93,
-      "volGainPct": 137.73,
-      "isPositive": true
-    },
-    {
-      "ticker": "ASHOKLEY",
-      "name": "Ashok Leyland",
-      "close": 166.18,
-      "change": 5.11,
-      "volGainPct": 137.2,
-      "isPositive": true
-    },
-    {
-      "ticker": "IMFA",
-      "name": "Indian Metals & Ferro Alloys",
-      "close": 1448.6,
-      "change": 4.76,
-      "volGainPct": 137.07,
-      "isPositive": true
-    },
-    {
-      "ticker": "CENTEXT",
-      "name": "Century Extrusions",
-      "close": 19.87,
-      "change": 7.87,
-      "volGainPct": 136.33,
-      "isPositive": true
-    },
-    {
-      "ticker": "COMPUSOFT",
-      "name": "Compucom Software",
-      "close": 13.43,
-      "change": 2.91,
-      "volGainPct": 136.17,
-      "isPositive": true
-    },
-    {
-      "ticker": "SCHNEIDER",
-      "name": "Schneider Electric Infrastructure",
-      "close": 1355.3,
-      "change": 4.38,
-      "volGainPct": 133.97,
-      "isPositive": true
-    },
-    {
-      "ticker": "FIEMIND",
-      "name": "Fiem Industries",
-      "close": 2323.3,
-      "change": -1.8,
-      "volGainPct": 133.43,
-      "isPositive": false
-    },
-    {
-      "ticker": "KAMATHOTEL",
-      "name": "Kamat Hotels (i)",
-      "close": 166.99,
-      "change": -0.0,
-      "volGainPct": 130.28,
-      "isPositive": false
-    },
-    {
-      "ticker": "APOLLOTYRE",
-      "name": "Apollo Tyres",
-      "close": 428.15,
-      "change": 1.16,
-      "volGainPct": 128.76,
-      "isPositive": true
-    },
-    {
-      "ticker": "HINDCOPPER",
-      "name": "Hindustan Copper",
-      "close": 491.6,
-      "change": 2.36,
-      "volGainPct": 124.82,
-      "isPositive": true
-    },
-    {
-      "ticker": "FILATEX",
-      "name": "Filatex India",
-      "close": 73.52,
-      "change": 7.57,
-      "volGainPct": 121.4,
-      "isPositive": true
-    },
-    {
-      "ticker": "BANSWRAS",
-      "name": "Banswara Syntex",
-      "close": 123.66,
-      "change": -2.3,
-      "volGainPct": 118.04,
-      "isPositive": false
-    },
-    {
-      "ticker": "NUCLEUS",
-      "name": "Nucleus Software Exports",
-      "close": 686.05,
-      "change": -7.0,
-      "volGainPct": 116.94,
-      "isPositive": false
-    },
-    {
-      "ticker": "AYMSYNTEX",
-      "name": "Aym Syntex",
-      "close": 251.81,
-      "change": 2.58,
-      "volGainPct": 116.31,
-      "isPositive": true
-    },
-    {
-      "ticker": "TVSELECT",
-      "name": "Tvs Electronics",
-      "close": 489.3,
-      "change": 1.68,
-      "volGainPct": 116.1,
-      "isPositive": true
-    },
-    {
-      "ticker": "ABAN",
-      "name": "Aban Offshore",
-      "close": 15.79,
-      "change": 4.98,
-      "volGainPct": 115.86,
-      "isPositive": true
-    },
-    {
-      "ticker": "IFCI",
-      "name": "Ifci",
-      "close": 76.54,
-      "change": 4.1,
-      "volGainPct": 115.85,
-      "isPositive": true
-    },
-    {
-      "ticker": "ESCORTS",
-      "name": "Escorts",
-      "close": 3086.0,
-      "change": 2.4,
-      "volGainPct": 115.19,
-      "isPositive": true
-    },
-    {
-      "ticker": "INTELLECT",
-      "name": "Intellect Design Arena",
-      "close": 719.9,
-      "change": 2.04,
-      "volGainPct": 113.46,
-      "isPositive": true
-    },
-    {
-      "ticker": "LINDEINDIA",
-      "name": "Linde India",
-      "close": 6745.0,
-      "change": 1.62,
-      "volGainPct": 109.81,
-      "isPositive": true
-    },
-    {
-      "ticker": "BALKRISIND",
-      "name": "Balkrishna Industries",
-      "close": 2473.5,
-      "change": 7.22,
-      "volGainPct": 109.78,
-      "isPositive": true
-    },
-    {
-      "ticker": "LUMAXTECH",
-      "name": "Lumax Auto Technologies",
-      "close": 1568.3,
-      "change": 3.41,
-      "volGainPct": 108.79,
-      "isPositive": true
-    },
-    {
-      "ticker": "SUNDARAM",
-      "name": "Sundaram Multi Pap",
-      "close": 1.23,
-      "change": -0.8,
-      "volGainPct": 108.64,
-      "isPositive": false
     },
     {
       "ticker": "BALRAMCHIN",
       "name": "Balrampur Chini Mills",
-      "close": 586.2,
-      "change": -1.6,
-      "volGainPct": 107.63,
+      "close": 646.8,
+      "change": 10.3,
+      "volGainPct": 274.54,
+      "isPositive": true
+    },
+    {
+      "ticker": "ADVENZYMES",
+      "name": "Advanced Enzyme Technologies",
+      "close": 323.75,
+      "change": 2.74,
+      "volGainPct": 265.61,
+      "isPositive": true
+    },
+    {
+      "ticker": "UTTAMSUGAR",
+      "name": "Uttam Sugar Mills",
+      "close": 240.45,
+      "change": 8.15,
+      "volGainPct": 259.77,
+      "isPositive": true
+    },
+    {
+      "ticker": "MUTHOOTFIN",
+      "name": "Muthoot Finance",
+      "close": 2890.9,
+      "change": -7.3,
+      "volGainPct": 254.75,
       "isPositive": false
     },
     {
-      "ticker": "MMTC",
-      "name": "Mmtc",
-      "close": 62.66,
-      "change": 4.27,
-      "volGainPct": 107.08,
+      "ticker": "IGPL",
+      "name": "Ig Petrochemicals",
+      "close": 496.65,
+      "change": 5.38,
+      "volGainPct": 251.15,
       "isPositive": true
     },
     {
-      "ticker": "HINDOILEXP",
-      "name": "Hindustan Oil Exploration Company",
-      "close": 161.29,
-      "change": 1.27,
-      "volGainPct": 106.07,
+      "ticker": "ASIANHOTNR",
+      "name": "Asian Hotels (north)",
+      "close": 303.35,
+      "change": 1.08,
+      "volGainPct": 250.3,
       "isPositive": true
     },
     {
-      "ticker": "CARBORUNIV",
-      "name": "Carborundum Universal",
-      "close": 1063.8,
-      "change": 1.21,
-      "volGainPct": 104.11,
-      "isPositive": true
-    },
-    {
-      "ticker": "VIVIDHA",
-      "name": "Visagar Polytex",
-      "close": 0.52,
-      "change": 1.96,
-      "volGainPct": 103.8,
-      "isPositive": true
-    },
-    {
-      "ticker": "AIAENG",
-      "name": "Aia Engineering",
-      "close": 4591.0,
-      "change": 0.6,
-      "volGainPct": 100.09,
-      "isPositive": true
-    },
-    {
-      "ticker": "PILITA",
-      "name": "Pil Italica Lifestyle",
-      "close": 8.62,
-      "change": -0.1,
-      "volGainPct": 98.384,
-      "isPositive": false
-    },
-    {
-      "ticker": "KIRIINDUS",
-      "name": "Kiri Industries",
-      "close": 414.65,
-      "change": 1.03,
-      "volGainPct": 96.959,
-      "isPositive": true
-    },
-    {
-      "ticker": "TTL",
-      "name": "T T",
-      "close": 6.42,
-      "change": 3.04,
-      "volGainPct": 96.644,
-      "isPositive": true
-    },
-    {
-      "ticker": "GANECOS",
-      "name": "Ganesha Ecosphere",
-      "close": 1183.8,
-      "change": -1.7,
-      "volGainPct": 95.987,
-      "isPositive": false
-    },
-    {
-      "ticker": "IITL",
-      "name": "Industrial Investment Trust",
-      "close": 127.68,
-      "change": -6.0,
-      "volGainPct": 93.852,
-      "isPositive": false
-    },
-    {
-      "ticker": "AMRUTANJAN",
-      "name": "Amrutanjan Health Care",
-      "close": 515.0,
-      "change": -0.1,
-      "volGainPct": 91.015,
-      "isPositive": false
-    },
-    {
-      "ticker": "ABFRL",
-      "name": "Aditya Birla Fashion And Retail",
-      "close": 60.24,
-      "change": 2.2,
-      "volGainPct": 90.863,
-      "isPositive": true
-    },
-    {
-      "ticker": "SCI",
-      "name": "Shipping Corporation Of India",
-      "close": 291.45,
-      "change": 4.66,
-      "volGainPct": 90.283,
-      "isPositive": true
-    },
-    {
-      "ticker": "JKTYRE",
-      "name": "Jk Tyre & Industries",
-      "close": 399.75,
-      "change": 0.62,
-      "volGainPct": 90.03,
+      "ticker": "RANEHOLDIN",
+      "name": "Rane Holdings",
+      "close": 1872.6,
+      "change": 7.09,
+      "volGainPct": 250.28,
       "isPositive": true
     },
     {
       "ticker": "APLAPOLLO",
       "name": "Apl Apollo Tubes",
-      "close": 1819.5,
-      "change": -3.8,
-      "volGainPct": 89.578,
-      "isPositive": false
-    },
-    {
-      "ticker": "IVC",
-      "name": "Il&fs Investment Managers",
-      "close": 8.4,
-      "change": 1.44,
-      "volGainPct": 89.527,
+      "close": 1941.5,
+      "change": 6.7,
+      "volGainPct": 237.5,
       "isPositive": true
     },
     {
-      "ticker": "ORIENTALTL",
-      "name": "Oriental Trimex",
-      "close": 5.13,
+      "ticker": "DHANUKA",
+      "name": "Dhanuka Agritech",
+      "close": 1023.3,
+      "change": 0.13,
+      "volGainPct": 237.19,
+      "isPositive": true
+    },
+    {
+      "ticker": "RAMANEWS",
+      "name": "Shree Rama Newsprint",
+      "close": 30.85,
+      "change": 8.66,
+      "volGainPct": 233.42,
+      "isPositive": true
+    },
+    {
+      "ticker": "LUMAXIND",
+      "name": "Lumax Industries",
+      "close": 5772.5,
+      "change": 9.23,
+      "volGainPct": 232.33,
+      "isPositive": true
+    },
+    {
+      "ticker": "JAMNAAUTO",
+      "name": "Jamna Auto Industries",
+      "close": 140.86,
+      "change": 7.37,
+      "volGainPct": 226.57,
+      "isPositive": true
+    },
+    {
+      "ticker": "JMFINANCIL",
+      "name": "Jm Financial",
+      "close": 120.89,
+      "change": -1.0,
+      "volGainPct": 224.5,
+      "isPositive": false
+    },
+    {
+      "ticker": "KIOCL",
+      "name": "Kiocl",
+      "close": 394.9,
+      "change": 8.02,
+      "volGainPct": 221.68,
+      "isPositive": true
+    },
+    {
+      "ticker": "DONEAR",
+      "name": "Donear Industries",
+      "close": 84.44,
+      "change": -0.3,
+      "volGainPct": 221.64,
+      "isPositive": false
+    },
+    {
+      "ticker": "XPROINDIA",
+      "name": "Xpro India",
+      "close": 1302.8,
+      "change": -13.0,
+      "volGainPct": 220.57,
+      "isPositive": false
+    },
+    {
+      "ticker": "DHAMPURSUG",
+      "name": "Dhampur Sugar Mills",
+      "close": 143.84,
+      "change": 6.17,
+      "volGainPct": 206.23,
+      "isPositive": true
+    },
+    {
+      "ticker": "RSWM",
+      "name": "Rswm",
+      "close": 224.76,
+      "change": 4.74,
+      "volGainPct": 198.76,
+      "isPositive": true
+    },
+    {
+      "ticker": "RANASUG",
+      "name": "Rana Sugars",
+      "close": 12.52,
+      "change": 6.01,
+      "volGainPct": 198.48,
+      "isPositive": true
+    },
+    {
+      "ticker": "BFINVEST",
+      "name": "Bf Investment",
+      "close": 483.0,
+      "change": 6.18,
+      "volGainPct": 193.33,
+      "isPositive": true
+    },
+    {
+      "ticker": "NH",
+      "name": "Narayana Hrudayalaya",
+      "close": 1919.7,
+      "change": -5.3,
+      "volGainPct": 185.07,
+      "isPositive": false
+    },
+    {
+      "ticker": "GSS",
+      "name": "Gss Infotech",
+      "close": 13.79,
+      "change": 9.7,
+      "volGainPct": 182.82,
+      "isPositive": true
+    },
+    {
+      "ticker": "BBTC",
+      "name": "Bombay Burmah Trading Corporation",
+      "close": 1537.2,
+      "change": 2.67,
+      "volGainPct": 178.89,
+      "isPositive": true
+    },
+    {
+      "ticker": "SUNDARMFIN",
+      "name": "Sundaram Finance",
+      "close": 4828.7,
+      "change": 3.49,
+      "volGainPct": 175.53,
+      "isPositive": true
+    },
+    {
+      "ticker": "FDC",
+      "name": "Fdc",
+      "close": 404.65,
+      "change": -1.2,
+      "volGainPct": 174.35,
+      "isPositive": false
+    },
+    {
+      "ticker": "GENUSPAPER",
+      "name": "Genus Paper & Boards",
+      "close": 12.47,
+      "change": 3.22,
+      "volGainPct": 173.16,
+      "isPositive": true
+    },
+    {
+      "ticker": "LCCINFOTEC",
+      "name": "Lcc Infotech",
+      "close": 4.14,
+      "change": -0.9,
+      "volGainPct": 171.26,
+      "isPositive": false
+    },
+    {
+      "ticker": "SUPRAJIT",
+      "name": "Suprajit Engineering",
+      "close": 512.7,
+      "change": 1.6,
+      "volGainPct": 165.69,
+      "isPositive": true
+    },
+    {
+      "ticker": "APTECHT",
+      "name": "Aptech",
+      "close": 95.27,
+      "change": 3.92,
+      "volGainPct": 165.51,
+      "isPositive": true
+    },
+    {
+      "ticker": "PTC",
+      "name": "Ptc India",
+      "close": 180.11,
+      "change": 2.61,
+      "volGainPct": 164.94,
+      "isPositive": true
+    },
+    {
+      "ticker": "RAJTV",
+      "name": "Raj Television Network",
+      "close": 10.76,
+      "change": -4.9,
+      "volGainPct": 163.58,
+      "isPositive": false
+    },
+    {
+      "ticker": "JYOTISTRUC",
+      "name": "Jyoti Structures",
+      "close": 11.6,
+      "change": 7.4,
+      "volGainPct": 162.56,
+      "isPositive": true
+    },
+    {
+      "ticker": "GUJALKALI",
+      "name": "Gujarat Alkalies And Chemicals",
+      "close": 697.25,
+      "change": 3.94,
+      "volGainPct": 161.99,
+      "isPositive": true
+    },
+    {
+      "ticker": "KOTARISUG",
+      "name": "Kothari Sugars And Chemicals",
+      "close": 26.13,
+      "change": 3.36,
+      "volGainPct": 161.92,
+      "isPositive": true
+    },
+    {
+      "ticker": "RENUKA",
+      "name": "Shree Renuka Sugars",
+      "close": 22.33,
+      "change": 2.1,
+      "volGainPct": 161.49,
+      "isPositive": true
+    },
+    {
+      "ticker": "VIPIND",
+      "name": "Vip Industries",
+      "close": 310.4,
+      "change": 3.83,
+      "volGainPct": 152.66,
+      "isPositive": true
+    },
+    {
+      "ticker": "VIVIMEDLAB",
+      "name": "Vivimed Labs",
+      "close": 4.98,
       "change": -1.9,
-      "volGainPct": 88.74,
+      "volGainPct": 152.09,
       "isPositive": false
     },
     {
-      "ticker": "RTNPOWER",
-      "name": "Rattanindia Power",
-      "close": 8.71,
-      "change": 3.81,
-      "volGainPct": 88.48,
-      "isPositive": true
-    },
-    {
-      "ticker": "AVANTIFEED",
-      "name": "Avanti Feeds",
-      "close": 899.6,
-      "change": -3.3,
-      "volGainPct": 88.26,
+      "ticker": "MAITHANALL",
+      "name": "Maithan Alloys",
+      "close": 963.9,
+      "change": -2.0,
+      "volGainPct": 151.82,
       "isPositive": false
     },
     {
-      "ticker": "TORNTPHARM",
-      "name": "Torrent Pharmaceuticals",
-      "close": 5122.8,
-      "change": 5.14,
-      "volGainPct": 87.294,
-      "isPositive": true
-    },
-    {
-      "ticker": "SADBHIN",
-      "name": "Sadbhav Infrastructure Project",
-      "close": 2.64,
-      "change": 4.76,
-      "volGainPct": 86.385,
-      "isPositive": true
-    },
-    {
-      "ticker": "BALMLAWRIE",
-      "name": "Balmer Lawrie & Company",
-      "close": 172.2,
-      "change": -2.2,
-      "volGainPct": 86.051,
+      "ticker": "ZEEL",
+      "name": "Zee Entertainment Enterprises",
+      "close": 98.14,
+      "change": -14.0,
+      "volGainPct": 144.81,
       "isPositive": false
+    },
+    {
+      "ticker": "ATULAUTO",
+      "name": "Atul Auto",
+      "close": 563.35,
+      "change": 9.29,
+      "volGainPct": 143.93,
+      "isPositive": true
+    },
+    {
+      "ticker": "JISLJALEQS",
+      "name": "Jain Irrigation Systems",
+      "close": 31.33,
+      "change": 4.64,
+      "volGainPct": 142.48,
+      "isPositive": true
+    },
+    {
+      "ticker": "KABRAEXTRU",
+      "name": "Kabra Extrusion Technik",
+      "close": 418.6,
+      "change": 5.98,
+      "volGainPct": 141.98,
+      "isPositive": true
+    },
+    {
+      "ticker": "ESCORTS",
+      "name": "Escorts",
+      "close": 3135.5,
+      "change": 1.6,
+      "volGainPct": 141.25,
+      "isPositive": true
+    },
+    {
+      "ticker": "DBL",
+      "name": "Dilip Buildcon",
+      "close": 444.35,
+      "change": 3.52,
+      "volGainPct": 139.66,
+      "isPositive": true
+    },
+    {
+      "ticker": "KDDL",
+      "name": "Kddl",
+      "close": 3463.2,
+      "change": 4.88,
+      "volGainPct": 138.85,
+      "isPositive": true
+    },
+    {
+      "ticker": "HIKAL",
+      "name": "Hikal",
+      "close": 229.9,
+      "change": 3.88,
+      "volGainPct": 138.67,
+      "isPositive": true
+    },
+    {
+      "ticker": "INSECTICID",
+      "name": "Insecticides (india)",
+      "close": 663.6,
+      "change": 3.49,
+      "volGainPct": 137.69,
+      "isPositive": true
+    },
+    {
+      "ticker": "INVENTURE",
+      "name": "Inventure Growth & Securities",
+      "close": 0.91,
+      "change": 1.11,
+      "volGainPct": 137.4,
+      "isPositive": true
+    },
+    {
+      "ticker": "ESTER",
+      "name": "Ester Industries",
+      "close": 86.67,
+      "change": -1.3,
+      "volGainPct": 137.16,
+      "isPositive": false
+    },
+    {
+      "ticker": "BATAINDIA",
+      "name": "Bata India",
+      "close": 709.65,
+      "change": 1.93,
+      "volGainPct": 136.79,
+      "isPositive": true
+    },
+    {
+      "ticker": "INDORAMA",
+      "name": "Indo Rama Synthetics (india)",
+      "close": 63.49,
+      "change": 12.8,
+      "volGainPct": 132.14,
+      "isPositive": true
+    },
+    {
+      "ticker": "SAKHTISUG",
+      "name": "Sakthi Sugars",
+      "close": 17.44,
+      "change": 3.25,
+      "volGainPct": 131.16,
+      "isPositive": true
+    },
+    {
+      "ticker": "BAJAJHIND",
+      "name": "Bajaj Hindusthan Sugar",
+      "close": 17.52,
+      "change": 4.59,
+      "volGainPct": 130.47,
+      "isPositive": true
+    },
+    {
+      "ticker": "SIYSIL",
+      "name": "Siyaram Silk Mills",
+      "close": 629.3,
+      "change": 4.48,
+      "volGainPct": 128.11,
+      "isPositive": true
+    },
+    {
+      "ticker": "ALEMBICLTD",
+      "name": "Alembic",
+      "close": 91.67,
+      "change": 0.59,
+      "volGainPct": 127.21,
+      "isPositive": true
+    },
+    {
+      "ticker": "FILATEX",
+      "name": "Filatex India",
+      "close": 76.7,
+      "change": 4.32,
+      "volGainPct": 126.25,
+      "isPositive": true
+    },
+    {
+      "ticker": "GABRIEL",
+      "name": "Gabriel India",
+      "close": 1527.4,
+      "change": 5.93,
+      "volGainPct": 125.03,
+      "isPositive": true
+    },
+    {
+      "ticker": "RELIGARE",
+      "name": "Religare Enterprises",
+      "close": 261.1,
+      "change": 3.14,
+      "volGainPct": 124.42,
+      "isPositive": true
+    },
+    {
+      "ticker": "TRF",
+      "name": "Trf",
+      "close": 228.56,
+      "change": 1.16,
+      "volGainPct": 122.27,
+      "isPositive": true
+    },
+    {
+      "ticker": "VASCONEQ",
+      "name": "Vascon Engineers",
+      "close": 33.26,
+      "change": 4.1,
+      "volGainPct": 121.27,
+      "isPositive": true
+    },
+    {
+      "ticker": "MINDACORP",
+      "name": "Minda Corporation",
+      "close": 727.6,
+      "change": 3.8,
+      "volGainPct": 121.08,
+      "isPositive": true
+    },
+    {
+      "ticker": "REDINGTON",
+      "name": "Redington (india)",
+      "close": 347.85,
+      "change": 8.14,
+      "volGainPct": 120.02,
+      "isPositive": true
     },
     {
       "ticker": "NITINSPIN",
       "name": "Nitin Spinners",
-      "close": 544.2,
-      "change": 3.6,
-      "volGainPct": 83.297,
+      "close": 572.35,
+      "change": 5.17,
+      "volGainPct": 119.49,
       "isPositive": true
     },
     {
-      "ticker": "VEDL",
-      "name": "Vedanta",
-      "close": 264.25,
-      "change": -1.2,
-      "volGainPct": 80.803,
+      "ticker": "ORIENTPPR",
+      "name": "Orient Paper & Industries",
+      "close": 19.05,
+      "change": 3.7,
+      "volGainPct": 118.99,
+      "isPositive": true
+    },
+    {
+      "ticker": "ABB",
+      "name": "Abb India",
+      "close": 7601.0,
+      "change": 4.34,
+      "volGainPct": 118.95,
+      "isPositive": true
+    },
+    {
+      "ticker": "FORTIS",
+      "name": "Fortis Healthcare",
+      "close": 940.0,
+      "change": -0.5,
+      "volGainPct": 118.35,
       "isPositive": false
     },
     {
-      "ticker": "KIRLOSENG",
-      "name": "Kirloskar Oil Engines",
-      "close": 2189.8,
-      "change": 2.66,
-      "volGainPct": 78.283,
+      "ticker": "MANINFRA",
+      "name": "Man Infraconstruction",
+      "close": 99.82,
+      "change": 1.77,
+      "volGainPct": 118.29,
       "isPositive": true
+    },
+    {
+      "ticker": "SUNFLAG",
+      "name": "Sunflag Iron And Steel Company",
+      "close": 366.85,
+      "change": 0.42,
+      "volGainPct": 118.12,
+      "isPositive": true
+    },
+    {
+      "ticker": "PREMIERPOL",
+      "name": "Premier Polyfilm",
+      "close": 73.56,
+      "change": 5.41,
+      "volGainPct": 117.9,
+      "isPositive": true
+    },
+    {
+      "ticker": "MANINDS",
+      "name": "Man Industries (india)",
+      "close": 548.6,
+      "change": 3.06,
+      "volGainPct": 117.19,
+      "isPositive": true
+    },
+    {
+      "ticker": "LGBBROSLTD",
+      "name": "Lg Balakrishnan & Bros",
+      "close": 1532.4,
+      "change": -3.5,
+      "volGainPct": 116.31,
+      "isPositive": false
+    },
+    {
+      "ticker": "MTNL",
+      "name": "Mahanagar Telephone Nigam",
+      "close": 28.11,
+      "change": 3.99,
+      "volGainPct": 116.04,
+      "isPositive": true
+    },
+    {
+      "ticker": "GTLINFRA",
+      "name": "Gtl Infrastructure",
+      "close": 1.31,
+      "change": 6.5,
+      "volGainPct": 115.55,
+      "isPositive": true
+    },
+    {
+      "ticker": "KRBL",
+      "name": "Krbl",
+      "close": 373.7,
+      "change": 6.43,
+      "volGainPct": 114.74,
+      "isPositive": true
+    },
+    {
+      "ticker": "SHOPERSTOP",
+      "name": "Shoppers Stop",
+      "close": 403.35,
+      "change": 3.52,
+      "volGainPct": 114.26,
+      "isPositive": true
+    },
+    {
+      "ticker": "MANAPPURAM",
+      "name": "Manappuram Finance",
+      "close": 365.0,
+      "change": -1.8,
+      "volGainPct": 114.02,
+      "isPositive": false
+    },
+    {
+      "ticker": "VISHNU",
+      "name": "Vishnu Chemicals",
+      "close": 599.7,
+      "change": -2.2,
+      "volGainPct": 112.43,
+      "isPositive": false
+    },
+    {
+      "ticker": "EVEREADY",
+      "name": "Eveready Industries India",
+      "close": 355.65,
+      "change": 3.73,
+      "volGainPct": 111.91,
+      "isPositive": true
+    },
+    {
+      "ticker": "VRLLOG",
+      "name": "Vrl Logistics",
+      "close": 272.1,
+      "change": 2.42,
+      "volGainPct": 110.77,
+      "isPositive": true
+    },
+    {
+      "ticker": "JUBLFOOD",
+      "name": "Jubilant Foodworks",
+      "close": 470.0,
+      "change": 7.24,
+      "volGainPct": 109.06,
+      "isPositive": true
+    },
+    {
+      "ticker": "REPRO",
+      "name": "Repro India",
+      "close": 398.7,
+      "change": 5.29,
+      "volGainPct": 108.69,
+      "isPositive": true
+    },
+    {
+      "ticker": "MANALIPETC",
+      "name": "Manali Petrochemicals",
+      "close": 66.64,
+      "change": 2.69,
+      "volGainPct": 106.94,
+      "isPositive": true
+    },
+    {
+      "ticker": "KOLTEPATIL",
+      "name": "Kolte - Patil Developers",
+      "close": 391.4,
+      "change": 1.63,
+      "volGainPct": 106.54,
+      "isPositive": true
+    },
+    {
+      "ticker": "SANGHVIMOV",
+      "name": "Sanghvi Movers",
+      "close": 437.5,
+      "change": 6.75,
+      "volGainPct": 106.23,
+      "isPositive": true
+    },
+    {
+      "ticker": "GHCL",
+      "name": "Ghcl",
+      "close": 444.1,
+      "change": 1.36,
+      "volGainPct": 104.75,
+      "isPositive": true
+    },
+    {
+      "ticker": "TARAPUR",
+      "name": "Tarapur Transformers",
+      "close": 15.77,
+      "change": -5.0,
+      "volGainPct": 104.36,
+      "isPositive": false
+    },
+    {
+      "ticker": "A2ZINFRA",
+      "name": "A2z Infra Engineering",
+      "close": 17.1,
+      "change": 9.96,
+      "volGainPct": 103.95,
+      "isPositive": true
+    },
+    {
+      "ticker": "SUNDRMFAST",
+      "name": "Sundram Fasteners",
+      "close": 993.25,
+      "change": 1.61,
+      "volGainPct": 103.69,
+      "isPositive": true
+    },
+    {
+      "ticker": "SEAMECLTD",
+      "name": "Seamec",
+      "close": 1457.2,
+      "change": -0.3,
+      "volGainPct": 103.52,
+      "isPositive": false
     }
   ],
-  "tradingDate": "2026-07-31",
-  "lastUpdated": "2026-07-31T21:21:20.808940+05:30",
+  "tradingDate": "2026-08-03",
+  "lastUpdated": "2026-08-03T21:42:51.301755+05:30",
   "source": "chartink_eod_scanner"
 }
