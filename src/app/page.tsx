@@ -406,7 +406,7 @@ export default function Home() {
   const [intraError, setIntraError] = useState("");
   const [intraMarketOpen, setIntraMarketOpen] = useState(false);
   const [intraLastUpdate, setIntraLastUpdate] = useState<string>("");
-  const [intraDataSource, setIntraDataSource] = useState<string>("nse");
+  const [intraDataSource, setIntraDataSource] = useState<string>("tradingview");
   const intraTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [nextRefresh, setNextRefresh] = useState(900);
   const intraCountdownRef = useRef<NodeJS.Timeout | null>(null);
@@ -415,6 +415,8 @@ export default function Home() {
   const [flashCells, setFlashCells] = useState<Record<string, "up" | "down">>({});
   const prevStocksRef = useRef<Record<string, { ltp: number; changePct: number; volume: number }>>({});
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  // Ref to access latest intraStocks without causing re-renders in callbacks
+  const intraStocksRef = useRef<any[]>([]);
 
   const fetchIntraday = useCallback(async () => {
     setIntraLoading(true);
@@ -445,29 +447,31 @@ export default function Home() {
   }, []);
 
   // ─── Live polling: update LTP, Change%, Volume every 10s ────────
+  // Uses ref instead of state dependency to avoid infinite re-render loop
   const fetchLivePrices = useCallback(async () => {
-    if (intraStocks.length === 0) return;
-    const tickers = intraStocks.map((s: any) => s.ticker).join(",");
-    if (!tickers) return;
+    const currentStocks = intraStocksRef.current;
+    if (currentStocks.length === 0) return;
+    // Live route ignores tickers param now — fetches all liquid stocks from TradingView
+    // But we still pass tickers for potential future use
     try {
-      const res = await fetch(`/api/intraday/live?tickers=${encodeURIComponent(tickers)}`, {
+      const res = await fetch("/api/intraday/live", {
         cache: "no-store",
       });
       const data = await res.json();
       if (data.stocks && data.stocks.length > 0) {
+        const liveMap: Record<string, any> = {};
+        data.stocks.forEach((s: any) => { liveMap[s.ticker] = s; });
         setIntraStocks((prev) => {
-          const liveMap: Record<string, any> = {};
-          data.stocks.forEach((s: any) => { liveMap[s.ticker] = s; });
           const next = prev.map((s: any) => {
             const live = liveMap[s.ticker];
             if (!live) return s;
             // Detect changes for flash animation
-            const prev = prevStocksRef.current[s.ticker];
+            const pRef = prevStocksRef.current[s.ticker];
             const flashes: Record<string, "up" | "down"> = {};
-            if (prev) {
-              if (live.ltp !== prev.ltp) flashes[`${s.ticker}-ltp`] = live.ltp > prev.ltp ? "up" : "down";
-              if (live.changePct !== prev.changePct) flashes[`${s.ticker}-chg`] = live.changePct > prev.changePct ? "up" : "down";
-              if (live.volume !== prev.volume) flashes[`${s.ticker}-vol`] = "up"; // volume only goes up
+            if (pRef) {
+              if (live.ltp !== pRef.ltp) flashes[`${s.ticker}-ltp`] = live.ltp > pRef.ltp ? "up" : "down";
+              if (live.changePct !== pRef.changePct) flashes[`${s.ticker}-chg`] = live.changePct > pRef.changePct ? "up" : "down";
+              if (live.volume !== pRef.volume) flashes[`${s.ticker}-vol`] = "up";
             }
             if (Object.keys(flashes).length > 0) {
               setFlashCells((f) => ({ ...f, ...flashes }));
@@ -479,7 +483,6 @@ export default function Home() {
                 });
               }, 800);
             }
-            // Update ref for next comparison
             prevStocksRef.current[s.ticker] = {
               ltp: live.ltp,
               changePct: live.changePct,
@@ -497,7 +500,7 @@ export default function Home() {
     } catch {
       // silent fail for live polling
     }
-  }, [intraStocks]);
+  }, []);
 
   useEffect(() => {
     if (viewMode !== "intraday") return;
@@ -532,6 +535,11 @@ export default function Home() {
       if (intraLiveRef.current) clearInterval(intraLiveRef.current);
     };
   }, [viewMode, fetchIntraday, fetchLivePrices]);
+
+  // Keep intraStocksRef in sync with state
+  useEffect(() => {
+    intraStocksRef.current = intraStocks;
+  }, [intraStocks]);
 
   // Close mobile more menu when clicking outside
   useEffect(() => {

@@ -6,27 +6,6 @@ export const dynamic = "force-dynamic";
 let cached: { data: any; timestamp: number } | null = null;
 const CACHE_TTL = 15 * 60 * 1000; // 15 min
 
-type IntraStock = {
-  rank: number;
-  name: string;
-  ticker: string;
-  exchange: "NSE";
-  ltp: number;
-  change: number;
-  changePct: number;
-  volume: number;
-  valueCr: number;
-};
-
-type SectorData = {
-  sector: string;
-  volume: number;
-  changePct: number;
-  advance: number;
-  decline: number;
-  volumePct: string;
-};
-
 function isMarketHoursIST(): boolean {
   const now = new Date();
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -45,120 +24,126 @@ function isMarketHoursIST(): boolean {
   return mins >= 555 && mins <= 930; // 9:15 AM to 3:30 PM IST
 }
 
-// ─── NSE session management ──────────────────────────────────────
-const NSE_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Accept-Encoding": "gzip, deflate, br",
-  Connection: "keep-alive",
-  "Upgrade-Insecure-Requests": "1",
+/** ~35 most liquid NSE stocks */
+const LIQUID_TICKERS = [
+  "NSE:RELIANCE", "NSE:HDFCBANK", "NSE:ICICIBANK", "NSE:TCS", "NSE:INFY",
+  "NSE:SBIN", "NSE:BHARTIARTL", "NSE:ITC", "NSE:KOTAKBANK", "NSE:LT",
+  "NSE:AXISBANK", "NSE:BAJFINANCE", "NSE:TATAMOTORS", "NSE:MARUTI", "NSE:TITAN",
+  "NSE:SUNPHARMA", "NSE:WIPRO", "NSE:HINDUNILVR", "NSE:ULTRACEMCO", "NSE:NTPC",
+  "NSE:POWERGRID", "NSE:TATASTEEL", "NSE:HCLTECH", "NSE:ONGC",
+  "NSE:ADANIENT", "NSE:ADANIPORTS", "NSE:COALINDIA", "NSE:BAJAJFINSV",
+  "NSE:HINDALCO", "NSE:NESTLEIND", "NSE:ASIANPAINT", "NSE:EICHERMOT",
+  "NSE:DRREDDY", "NSE:TATACONSUM",
+];
+
+/** NSE sector index symbols on TradingView */
+const SECTOR_SYMBOLS = [
+  { symbol: "NSE:BANKNIFTY", name: "Bank" },
+  { symbol: "NSE:FINNIFTY", name: "Financial Services" },
+  { symbol: "NSE:CNXIT", name: "IT" },
+  { symbol: "NSE:CNXPHARMA", name: "Pharma" },
+  { symbol: "NSE:CNXAUTO", name: "Auto" },
+  { symbol: "NSE:CNXFMCG", name: "FMCG" },
+  { symbol: "NSE:CNXMETAL", name: "Metal" },
+  { symbol: "NSE:CNXENERGY", name: "Energy" },
+  { symbol: "NSE:CNXINFRA", name: "Infrastructure" },
+  { symbol: "NSE:CNXMEDIA", name: "Media" },
+  { symbol: "NSE:CNXREALTY", name: "Realty" },
+  { symbol: "NSE:NIFTYPSUBANK", name: "Pvt Bank" },
+];
+
+const TV_HEADERS = {
+  "Content-Type": "application/json",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  Origin: "https://www.tradingview.com",
 };
 
-const NSE_API_HEADERS = (cookie: string) => ({
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-  Accept: "application/json, text/plain, */*",
-  "Accept-Language": "en-US,en;q=0.9",
-  Cookie: cookie,
-  Referer: "https://www.nseindia.com/market-data/live-market",
-  "X-Requested-With": "XMLHttpRequest",
-  Origin: "https://www.nseindia.com",
-});
-
-async function getNSESession(signal: AbortSignal): Promise<string> {
-  const res = await fetch("https://www.nseindia.com", {
-    headers: NSE_HEADERS,
+async function fetchTVStocks(signal: AbortSignal): Promise<any[]> {
+  const res = await fetch("https://scanner.tradingview.com/india/scan", {
+    method: "POST",
+    headers: TV_HEADERS,
+    body: JSON.stringify({
+      symbols: { tickers: LIQUID_TICKERS },
+      columns: ["description", "close", "change", "change_abs", "volume"],
+    }),
     signal,
-    redirect: "follow",
   });
-  const cookies =
-    res.headers.get("set-cookie") || "";
-  return (
-    cookies
-      .split(",")
-      .map((c) => c.split(";")[0].trim())
-      .filter((c) => c.length > 0)
-      .join("; ") || ""
-  );
+  if (!res.ok) return [];
+  const json = await res.json();
+  if (!json.data) return [];
+
+  return json.data
+    .filter((r: any) => r.d && r.d[1] > 0) // must have a valid price
+    .map((r: any) => {
+      const ltp = r.d[1] || 0;
+      const changePct = r.d[2] || 0;
+      const changeAbs = r.d[3] || 0;
+      const volume = r.d[4] || 0;
+      return {
+        ticker: (r.s || "").replace("NSE:", ""),
+        name: r.d[0] || r.s || "",
+        ltp: Math.round(ltp * 100) / 100,
+        change: Math.round(changeAbs * 100) / 100,
+        changePct: Math.round(changePct * 10000) / 10000,
+        volume,
+        valueCr: Math.round((ltp * volume) / 10000000 * 100) / 100,
+      };
+    })
+    .filter((s: any) => s.volume > 0)
+    .sort((a: any, b: any) => b.volume - a.volume)
+    .slice(0, 10)
+    .map((s: any, i: number) => ({
+      rank: i + 1,
+      exchange: "NSE" as const,
+      ...s,
+    }));
 }
 
-async function fetchNSEStocks(
-  cookie: string,
-  signal: AbortSignal
-): Promise<IntraStock[]> {
-  const endpoints = [
-    "https://www.nseindia.com/api/live-market-analysis/most-active-securities-by-volume",
-    "https://www.nseindia.com/api/live-market-analysis/volume-gainers",
-    "https://www.nseindia.com/api/live-market-analysis/most-active-securities-by-value",
-    "https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%2050",
-  ];
-  for (const url of endpoints) {
-    try {
-      const res = await fetch(url, {
-        headers: NSE_API_HEADERS(cookie),
-        signal,
-      });
-      if (!res.ok) continue;
-      const json = await res.json();
-      const data = json?.data;
-      if (!Array.isArray(data) || data.length < 3) continue;
-      return data
-        .sort(
-          (a: any, b: any) =>
-            (parseInt(String(b.totalTradedVolume || "0").replace(/,/g, ""), 10) || 0) -
-            (parseInt(String(a.totalTradedVolume || "0").replace(/,/g, ""), 10) || 0)
-        )
-        .slice(0, 10)
-        .map((s: any, i: number) => ({
-          rank: i + 1,
-          name: String(s.symbol || ""),
-          ticker: String(s.symbol || ""),
-          exchange: "NSE" as const,
-          ltp: parseFloat(s.ltp || s.lastPrice) || 0,
-          change: parseFloat(s.change) || 0,
-          changePct: parseFloat(s.pChange) || 0,
-          volume: parseInt(String(s.totalTradedVolume || "0").replace(/,/g, ""), 10) || 0,
-          valueCr: parseFloat(s.totalTradedValue) || 0,
-        }));
-    } catch {
-      continue;
-    }
+async function fetchTVSectors(signal: AbortSignal): Promise<any[]> {
+  const tickers = SECTOR_SYMBOLS.map((s) => s.symbol);
+  const res = await fetch("https://scanner.tradingview.com/india/scan", {
+    method: "POST",
+    headers: TV_HEADERS,
+    body: JSON.stringify({
+      symbols: { tickers },
+      columns: ["description", "close", "change", "change_abs", "volume"],
+    }),
+    signal,
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  if (!json.data) return [];
+
+  // Build map of symbol -> data
+  const tvMap: Record<string, any> = {};
+  for (const r of json.data) {
+    if (r.d && r.d[1] > 0) tvMap[r.s] = r;
   }
-  return [];
-}
 
-async function fetchNSSectors(
-  cookie: string,
-  signal: AbortSignal
-): Promise<SectorData[]> {
-  try {
-    const res = await fetch(
-      "https://www.nseindia.com/api/live-market-analysis/sector-indices-v2",
-      {
-        headers: NSE_API_HEADERS(cookie),
-        signal,
-      }
-    );
-    if (!res.ok) return [];
-    const json = await res.json();
-    const data = json?.data;
-    if (!Array.isArray(data)) return [];
-    return data
-      .map((s: any) => ({
-        sector: String(s.abbreviation || s.name || ""),
-        volume: parseInt(String(s.totalTradedVolume || "0").replace(/,/g, ""), 10) || 0,
-        changePct: parseFloat(s.pChange) || 0,
-        advance: parseInt(s.advances || 0, 10),
-        decline: parseInt(s.declines || 0, 10),
+  // Use our known sector names, falling back to TV description
+  const results = SECTOR_SYMBOLS
+    .map((sec) => {
+      const r = tvMap[sec.symbol];
+      if (!r) return null;
+      return {
+        sector: sec.name,
+        changePct: Math.round((r.d[2] || 0) * 10000) / 10000,
+        volume: r.d[4] || 0,
+        advance: 0,
+        decline: 0,
         volumePct: "0",
-      }))
-      .filter((s) => s.volume > 0)
-      .sort((a, b) => b.volume - a.volume);
-  } catch {
-    return [];
-  }
+      };
+    })
+    .filter(Boolean);
+
+  // Calculate volume percentages
+  const totalVol = results.reduce((sum: number, s: any) => sum + (s.volume || 0), 0);
+  return results
+    .map((s: any) => ({
+      ...s,
+      volumePct: totalVol > 0 ? ((s.volume / totalVol) * 100).toFixed(1) : "0",
+    }))
+    .sort((a: any, b: any) => b.volume - a.volume);
 }
 
 export async function GET() {
@@ -177,44 +162,23 @@ export async function GET() {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const timeout = setTimeout(() => controller.abort(), 15_000);
 
   try {
-    let stocks: IntraStock[] = [];
-    let sectors: SectorData[] = [];
-    let dataSource = "nse";
-
-    // NSE Direct only - no Yahoo fallback (Yahoo data is inaccurate for NSE stocks)
-    try {
-      const cookie = await getNSESession(controller.signal);
-      if (cookie) {
-        const [nseStocks, nseSectors] = await Promise.all([
-          fetchNSEStocks(cookie, controller.signal),
-          fetchNSSectors(cookie, controller.signal),
-        ]);
-        stocks = nseStocks;
-        sectors = nseSectors;
-      }
-    } catch {
-      // NSE failed
-    }
-
-    // Normalize sector percentages
-    const totalSectorVol = sectors.reduce((sum, s) => sum + s.volume, 0);
-    const sectorPct = sectors.slice(0, 12).map((s) => ({
-      ...s,
-      volumePct: totalSectorVol > 0 ? ((s.volume / totalSectorVol) * 100).toFixed(1) : "0",
-    }));
+    const [stocks, sectors] = await Promise.all([
+      fetchTVStocks(controller.signal),
+      fetchTVSectors(controller.signal),
+    ]);
 
     const data = {
       marketOpen,
       stocks,
-      sectors: sectorPct,
-      dataSource,
+      sectors,
+      dataSource: "tradingview",
       totalStocksFetched: stocks.length,
     };
 
-    if (stocks.length > 0 || sectorPct.length > 0) {
+    if (stocks.length > 0 || sectors.length > 0) {
       cached = { data, timestamp: now };
     }
 
@@ -224,7 +188,7 @@ export async function GET() {
       cacheTimestamp: now,
       now: new Date().toISOString(),
     });
-  } catch {
+  } catch (err) {
     if (cached) {
       return NextResponse.json({
         ...cached.data,
@@ -239,7 +203,7 @@ export async function GET() {
       marketOpen,
       stocks: [],
       sectors: [],
-      error: "NSE data unavailable. Please try again later.",
+      error: "Data unavailable. Please try again later.",
       cacheTimestamp: now,
       now: new Date().toISOString(),
     });
