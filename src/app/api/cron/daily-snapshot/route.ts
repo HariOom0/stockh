@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isMarketClosed, getTradingDate } from "@/lib/trading-calendar";
+import { isMarketClosedAsync, getTradingDate, refreshTradingDayCache } from "@/lib/trading-calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -33,10 +33,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, skipped: true, reason: "Before 7:00 PM IST" });
   }
 
+  // Refresh TradingView cache to get accurate trading day info
+  await refreshTradingDayCache();
+
   const tradingDate = getTradingDate();
 
-  if (isMarketClosed(tradingDate)) {
-    return NextResponse.json({ ok: true, skipped: true, reason: "Trading date " + tradingDate + " is not a trading day" });
+  // Use async TradingView-based check instead of hardcoded holidays
+  const closed = await isMarketClosedAsync(tradingDate);
+  if (closed) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "Trading date " + tradingDate + " is not a trading day (TradingView check)" });
   }
 
   const dbUrl = process.env.DATABASE_URL;

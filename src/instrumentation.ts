@@ -2,7 +2,7 @@
  * Next.js instrumentation — runs once when the server starts.
  * Schedules daily auto-save at 7:00 PM IST on trading days.
  */
-import { isMarketClosed } from "@/lib/trading-calendar";
+import { isMarketClosedAsync, refreshTradingDayCache } from "@/lib/trading-calendar";
 
 export async function register() {
   if (typeof window !== "undefined") return;
@@ -61,7 +61,7 @@ function scheduleDailySnapshot() {
     }
   }
 
-  function scheduleNext() {
+  async function scheduleNext() {
     const delay = msUntilNext7PM();
     console.log(`[AutoSnapshot] Next in ${Math.round(delay / 60000)} min`);
     setTimeout(async () => {
@@ -72,7 +72,10 @@ function scheduleDailySnapshot() {
         day: "2-digit",
       }).format(new Date());
 
-      if (isMarketClosed(istDate)) {
+      // Refresh cache then check async
+      await refreshTradingDayCache();
+      const closed = await isMarketClosedAsync(istDate);
+      if (closed) {
         console.log(`[AutoSnapshot] Skipping ${istDate} — market closed`);
       } else {
         await triggerSnapshot();

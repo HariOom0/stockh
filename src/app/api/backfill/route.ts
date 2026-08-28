@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isMarketClosed } from "@/lib/trading-calendar";
+import { isMarketClosedAsync } from "@/lib/trading-calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,8 @@ export async function POST(request: Request) {
     }
 
     // Reject non-trading days
-    if (isMarketClosed(date)) {
+    const closed = await isMarketClosedAsync(date);
+    if (closed) {
       return NextResponse.json({
         ok: false,
         error: `${date} is not a trading day (weekend or NSE holiday)`,

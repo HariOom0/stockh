@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isMarketClosed } from "@/lib/trading-calendar";
+import { isMarketClosedAsync, refreshTradingDayCache } from "@/lib/trading-calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +10,9 @@ export async function GET() {
   }
 
   try {
+    // Refresh cache from TradingView before cleanup
+    await refreshTradingDayCache();
+
     const { db } = await import("@/lib/db");
     const snapshots = await db.dailyStockSnapshot.findMany({
       select: { date: true },
@@ -17,7 +20,8 @@ export async function GET() {
 
     const toDelete: string[] = [];
     for (const s of snapshots) {
-      if (isMarketClosed(s.date)) {
+      const closed = await isMarketClosedAsync(s.date);
+      if (closed) {
         toDelete.push(s.date);
       }
     }

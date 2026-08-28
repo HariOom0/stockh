@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { isMarketClosed } from "@/lib/trading-calendar";
+import { refreshTradingDayCache } from "@/lib/trading-calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,6 @@ function hasValidDbUrl(): boolean {
 }
 
 let seeded = false;
-let cleaned = false;
 
 async function ensureSeeded() {
   if (seeded || !hasValidDbUrl()) return;
@@ -37,27 +36,6 @@ async function ensureSeeded() {
   }
 }
 
-async function ensureCleaned() {
-  if (cleaned || !hasValidDbUrl()) return;
-  cleaned = true;
-  try {
-    const { db } = await import("@/lib/db");
-    const all = await db.dailyStockSnapshot.findMany({ select: { date: true } });
-    let deleted = 0;
-    for (const snap of all) {
-      if (isMarketClosed(snap.date)) {
-        await db.dailyStockSnapshot.delete({ where: { date: snap.date } });
-        console.log(`[Cleanup] Deleted non-trading day: ${snap.date}`);
-        deleted++;
-      }
-    }
-    if (deleted > 0) console.log(`[Cleanup] Removed ${deleted} invalid entries`);
-  } catch (err: any) {
-    console.warn("[Cleanup] Failed:", err.message);
-    cleaned = false;
-  }
-}
-
 export async function GET(request: Request) {
   if (!hasValidDbUrl()) {
     return NextResponse.json({ error: "Database not configured.", snapshots: [] }, { status: 503 });
@@ -65,7 +43,8 @@ export async function GET(request: Request) {
   try {
     const { db } = await import("@/lib/db");
     await ensureSeeded();
-    await ensureCleaned();
+    // Refresh trading day cache in background (non-blocking)
+    refreshTradingDayCache().catch(() => {});
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
     if (date) {

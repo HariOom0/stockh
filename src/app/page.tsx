@@ -74,6 +74,7 @@ interface StockDetail {
   nseCode?: string;
   sector?: string;
   industry?: string;
+  industryPE?: number;
   about?: string;
   indices?: string[];
   metrics: Record<string, string>;
