@@ -77,10 +77,20 @@ export async function GET() {
   const tradingDate = getTradingDate();
   const now = Date.now();
 
+  // Return cached if still fresh for the same trading date
   if (cachedData && now - cachedData.timestamp < CACHE_TTL && cachedData.tradingDate === tradingDate) {
     return NextResponse.json({ stocks: cachedData.stocks, cached: true, lastUpdated: cachedData.timestamp, tradingDate });
   }
 
+  // 1. Try live Chartink scrape first (most current data)
+  const scraped = await scrapeChartink();
+  if (scraped.length > 0) {
+    const stocks = applyFilter(scraped);
+    cachedData = { stocks, timestamp: now, tradingDate };
+    return NextResponse.json({ stocks, cached: false, lastUpdated: now, tradingDate, source: "live" });
+  }
+
+  // 2. Try DB for the computed trading date
   if (hasValidDbUrl()) {
     try {
       const { db } = await import("@/lib/db");
@@ -90,18 +100,29 @@ export async function GET() {
         cachedData = { stocks, timestamp: now, tradingDate };
         return NextResponse.json({ stocks, cached: false, lastUpdated: snapshot.createdAt.getTime(), tradingDate, source: "database" });
       }
+
+      // 2b. No data for today — get the MOST RECENT DB entry
+      const latestSnap = await db.dailyStockSnapshot.findFirst({
+        orderBy: { date: "desc" },
+        select: { date: true, stocksJson: true, createdAt: true },
+      });
+      if (latestSnap) {
+        const stocks: StockData[] = JSON.parse(latestSnap.stocksJson);
+        cachedData = { stocks, timestamp: now, tradingDate: latestSnap.date };
+        return NextResponse.json({
+          stocks,
+          cached: false,
+          lastUpdated: latestSnap.createdAt.getTime(),
+          tradingDate: latestSnap.date,
+          source: "database",
+        });
+      }
     } catch (err: any) {
       console.warn("[DB] lookup failed:", err.message);
     }
   }
 
-  const scraped = await scrapeChartink();
-  if (scraped.length > 0) {
-    const stocks = applyFilter(scraped);
-    cachedData = { stocks, timestamp: now, tradingDate };
-    return NextResponse.json({ stocks, cached: false, lastUpdated: now, tradingDate, source: "live" });
-  }
-
+  // 3. Static fallback (last resort)
   try {
     const raw = readFileSync(join(process.cwd(), "public", "data", "stocks.json"), "utf-8");
     const data = JSON.parse(raw);
@@ -112,9 +133,9 @@ export async function GET() {
         volGainPct: Number(s.volGainPct) || 0, isPositive: (Number(s.change) || 0) > 0,
       }));
       const stocks = applyFilter(allStocks);
-      const sourceDate = data.tradingDate || tradingDate;
-      cachedData = { stocks, timestamp: now, tradingDate: sourceDate };
-      return NextResponse.json({ stocks, cached: true, lastUpdated: data.lastUpdated ? new Date(data.lastUpdated).getTime() : now, tradingDate: sourceDate, source: "static" });
+      const staticDate = data.tradingDate || tradingDate;
+      cachedData = { stocks, timestamp: now, tradingDate: staticDate };
+      return NextResponse.json({ stocks, cached: true, lastUpdated: data.lastUpdated ? new Date(data.lastUpdated).getTime() : now, tradingDate: staticDate, source: "static" });
     }
   } catch (err: any) {
     console.error("[Static] failed:", err.message);
