@@ -1,6 +1,6 @@
 /**
  * Next.js instrumentation — runs once when the server starts.
- * Schedules daily auto-save at 7:15 PM IST on trading days.
+ * Schedules daily auto-save at 7:00 PM IST on trading days.
  */
 import { isMarketClosed } from "@/lib/trading-calendar";
 
@@ -10,7 +10,7 @@ export async function register() {
 }
 
 function scheduleDailySnapshot() {
-  function msUntilNext715PM(): number {
+  function msUntilNext7PM(): number {
     const now = new Date();
     const istFormatter = new Intl.DateTimeFormat("en-US", {
       timeZone: "Asia/Kolkata",
@@ -29,13 +29,14 @@ function scheduleDailySnapshot() {
     const istMinute = get("minute");
     const istSecond = get("second");
 
-    if (istHour > 19 || (istHour === 19 && istMinute >= 15)) {
+    // If past 7 PM, wait until tomorrow
+    if (istHour > 19 || (istHour === 19 && istMinute >= 0)) {
       return 24 * 60 * 60 * 1000;
     }
 
     const msUntilTarget =
       (19 - istHour) * 60 * 60 * 1000 +
-      (15 - istMinute) * 60 * 1000 -
+      (0 - istMinute) * 60 * 1000 -
       istSecond * 1000;
 
     return Math.max(msUntilTarget, 60 * 1000);
@@ -46,12 +47,14 @@ function scheduleDailySnapshot() {
       const baseUrl = process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
         : "http://localhost:3000";
-      const res = await fetch(`${baseUrl}/api/volume-shockers`, { cache: "no-store" });
+      const res = await fetch(`${baseUrl}/api/cron/daily-snapshot`, {
+        cache: "no-store",
+      });
       const data = await res.json();
-      if (res.ok && data.stocks) {
-        console.log(`[AutoSnapshot] ${data.stocks.length} stocks for ${data.tradingDate}`);
+      if (data.ok && !data.skipped) {
+        console.log(`[AutoSnapshot] Saved ${data.stockCount} stocks for ${data.tradingDate}`);
       } else {
-        console.error(`[AutoSnapshot] Error:`, data.error || res.status);
+        console.log(`[AutoSnapshot] Skipped: ${data.reason || "unknown"}`);
       }
     } catch (err) {
       console.error("[AutoSnapshot] Failed:", err);
@@ -59,7 +62,7 @@ function scheduleDailySnapshot() {
   }
 
   function scheduleNext() {
-    const delay = msUntilNext715PM();
+    const delay = msUntilNext7PM();
     console.log(`[AutoSnapshot] Next in ${Math.round(delay / 60000)} min`);
     setTimeout(async () => {
       const istDate = new Intl.DateTimeFormat("en-CA", {

@@ -264,6 +264,7 @@ export interface StockDetail {
   nseCode?: string;
   sector?: string;
   industry?: string;
+  industryPE?: number;
   about?: string;
   indices?: string[];
   metrics: Record<string, string>;
@@ -664,6 +665,13 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     }
   }
 
+  // Calculate Industry P/E from peer P/E ratios
+  try {
+    detail.industryPE = await fetchIndustryPE(detail.peers, ticker);
+  } catch {
+    // Industry PE is optional
+  }
+
   return detail;
 }
 
@@ -709,4 +717,65 @@ async function fetchSectorPeers(
   });
 
   return peers.slice(0, 15);
+}
+
+// ─── Industry P/E from peer ratios ───────────────────────────────
+
+async function fetchPeerPE(peerTicker: string): Promise<number | null> {
+  try {
+    const res = await fetch(`https://www.screener.in/company/${peerTicker}/`, {
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const match = html.match(/Stock P\/E[\s\S]*?number[^>]*>([^<]+)/);
+    if (match) {
+      const pe = parseFloat(match[1].replace(/,/g, ""));
+      return pe > 0 ? pe : null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch P/E for up to 10 peers in parallel (max 3 concurrent),
+ * then return the median as the Industry P/E.
+ */
+async function fetchIndustryPE(
+  peers: { ticker: string }[],
+  currentTicker: string
+): Promise<number | undefined> {
+  const eligible = peers
+    .filter((p) => p.ticker !== currentTicker.toUpperCase())
+    .slice(0, 10);
+  if (eligible.length < 2) return undefined;
+
+  // Concurrency-limited parallel fetch
+  const BATCH = 3;
+  const peValues: number[] = [];
+  for (let i = 0; i < eligible.length; i += BATCH) {
+    const batch = eligible.slice(i, i + BATCH);
+    const results = await Promise.allSettled(
+      batch.map((p) => fetchPeerPE(p.ticker))
+    );
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value !== null) {
+        peValues.push(r.value);
+      }
+    }
+  }
+
+  if (peValues.length < 2) return undefined;
+
+  // Median
+  peValues.sort((a, b) => a - b);
+  const mid = Math.floor(peValues.length / 2);
+  const median = peValues.length % 2 === 0
+    ? (peValues[mid - 1] + peValues[mid]) / 2
+    : peValues[mid];
+
+  return Math.round(median * 100) / 100;
 }

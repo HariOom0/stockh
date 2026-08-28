@@ -2072,6 +2072,12 @@ export default function Home() {
                               <span className="text-xs font-semibold font-mono text-foreground">{val}</span>
                             </div>
                           ))}
+                          {stockDetail.industryPE != null && (
+                            <div className="flex items-center justify-between px-3 py-2 bg-primary/10 border-t border-border">
+                              <span className="text-xs font-semibold text-primary">Industry P/E</span>
+                              <span className="text-xs font-bold font-mono text-primary">{stockDetail.industryPE}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

@@ -3,7 +3,7 @@ import { isMarketClosed, getTradingDate } from "@/lib/trading-calendar";
 
 export const dynamic = "force-dynamic";
 
-function isAfter730PMIST(): boolean {
+function isAfter7PMIST(): boolean {
   const now = new Date();
   const istHour = parseInt(
     new Intl.DateTimeFormat("en-US", {
@@ -20,25 +20,23 @@ function isAfter730PMIST(): boolean {
     }).format(now),
     10
   );
-  return istHour > 19 || (istHour === 19 && istMinute >= 30);
+  return istHour > 19 || (istHour === 19 && istMinute >= 0);
 }
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (process.env.CRON_SECRET && authHeader !== "Bearer " + process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!isAfter730PMIST()) {
-    return NextResponse.json({ ok: true, skipped: true, reason: "Before 7:30 PM IST" });
+  if (!isAfter7PMIST()) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "Before 7:00 PM IST" });
   }
 
-  const istDate = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
+  const tradingDate = getTradingDate();
 
-  if (isMarketClosed(istDate)) {
-    return NextResponse.json({ ok: true, skipped: true, reason: `${istDate} is not a trading day` });
+  if (isMarketClosed(tradingDate)) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "Trading date " + tradingDate + " is not a trading day" });
   }
 
   const dbUrl = process.env.DATABASE_URL;
@@ -46,29 +44,32 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "DATABASE_URL not configured" }, { status: 503 });
   }
 
-  const tradingDate = getTradingDate();
-
-  if (isMarketClosed(tradingDate)) {
-    return NextResponse.json({ ok: true, skipped: true, reason: `Trading date ${tradingDate} is not a trading day` });
-  }
-
   try {
     const { db } = await import("@/lib/db");
     const existing = await db.dailyStockSnapshot.findUnique({ where: { date: tradingDate } });
     if (existing) {
-      return NextResponse.json({ ok: true, skipped: true, reason: `Data already exists for ${tradingDate}` });
+      return NextResponse.json({ ok: true, skipped: true, reason: "Data already exists for " + tradingDate });
     }
   } catch {
     // continue
   }
 
   try {
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/volume-shockers`, { cache: "no-store", signal: AbortSignal.timeout(30_000) });
+    const baseUrl = process.env.VERCEL_URL
+      ? "https://" + process.env.VERCEL_URL
+      : "http://localhost:3000";
+    const res = await fetch(baseUrl + "/api/volume-shockers", { cache: "no-store", signal: AbortSignal.timeout(30_000) });
     const data = await res.json();
 
-    if (!data.stocks?.length) {
+    if (!data.stocks || !data.stocks.length) {
       return NextResponse.json({ ok: false, error: "No stocks returned from scraper" });
+    }
+
+    if (data.tradingDate && data.tradingDate !== tradingDate) {
+      return NextResponse.json({
+        ok: true, skipped: true,
+        reason: "Date mismatch: API says " + data.tradingDate + ", cron computed " + tradingDate,
+      });
     }
 
     const { db } = await import("@/lib/db");
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
       update: { stockCount: data.stocks.length, stocksJson: JSON.stringify(data.stocks) },
       create: { date: tradingDate, stockCount: data.stocks.length, stocksJson: JSON.stringify(data.stocks) },
     });
-    console.log(`[Cron] Saved ${data.stocks.length} stocks for ${tradingDate}`);
+    console.log("[Cron] Saved " + data.stocks.length + " stocks for " + tradingDate);
 
     return NextResponse.json({
       ok: true,
