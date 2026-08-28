@@ -1238,26 +1238,7 @@ export default function Home() {
             )}
           </AnimatePresence>
 
-          {/* ─── SEARCH ───────────────────────────────────────────── */}
-          {viewMode !== "search" && (
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search stocks by name or ticker..."
-              className="pl-9 bg-secondary border-border"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-          )}
+
 
           {/* ─── LOADING ──────────────────────────────────────────── */}
           {loading && viewMode !== "search" && (
