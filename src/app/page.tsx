@@ -666,11 +666,14 @@ export default function Home() {
       setStockDetail(null);
       return;
     }
+    const controller = new AbortController();
     setDetailLoading(true);
     setDetailError("");
-    fetch(`/api/stock-detail?ticker=${selectedStock.ticker}`)
+    setStockDetail(null);
+    fetch(`/api/stock-detail?ticker=${selectedStock.ticker}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => {
+        if (controller.signal.aborted) return;
         if (data.error) throw new Error(data.error);
         setStockDetail(data);
         // Also update sectorMap if we have sector info
@@ -688,9 +691,13 @@ export default function Home() {
         }
       })
       .catch((err) => {
+        if (controller.signal.aborted) return;
         setDetailError(err instanceof Error ? err.message : "Failed to load");
       })
-      .finally(() => setDetailLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setDetailLoading(false);
+      });
+    return () => controller.abort();
   }, [selectedStock]);
 
   // Reset isSearchedStock when closing detail panel

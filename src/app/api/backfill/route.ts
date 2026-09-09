@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl || (!dbUrl.startsWith("postgresql://") && !dbUrl.startsWith("postgres://"))) {
+  if (!dbUrl || (!dbUrl.startsWith("postgresql://") && !dbUrl.startsWith("postgres://") && !dbUrl.startsWith("file:"))) {
     return NextResponse.json({ error: "DATABASE_URL not configured" }, { status: 503 });
   }
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { stocks, date } = body;
 
-    if (!date || !stocks || !Array.isArray(stocks) || stocks.length === 0) {
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !stocks || !Array.isArray(stocks)) {
       return NextResponse.json({ error: "Missing date or stocks" }, { status: 400 });
     }
 
@@ -35,21 +35,19 @@ export async function POST(request: Request) {
     }
 
     // Apply site filter: volume > 190% AND positive gain
+    const seen = new Set<string>();
     const filtered = stocks
       .filter((s: any) => (Number(s.volGainPct) || 0) > 190 && (Number(s.change) || 0) > 0)
-      .map((s: any, i: number) => ({
-        sr: i + 1,
+      .map((s: any) => ({
         name: String(s.name || ""),
-        ticker: String(s.ticker || ""),
+        ticker: String(s.ticker || "").trim().toUpperCase(),
         close: Number(s.close) || 0,
         change: Number(s.change) || 0,
         volGainPct: Number(s.volGainPct) || 0,
         isPositive: true,
-      }));
-
-    if (filtered.length === 0) {
-      return NextResponse.json({ ok: true, date, stockCount: 0, message: "No stocks passed the filter" });
-    }
+      }))
+      .filter((s: any) => s.ticker && s.name && !seen.has(s.ticker) && !!seen.add(s.ticker))
+      .map((s: any, i: number) => ({ ...s, sr: i + 1 }));
 
     const { db } = await import("@/lib/db");
     const result = await db.dailyStockSnapshot.upsert({

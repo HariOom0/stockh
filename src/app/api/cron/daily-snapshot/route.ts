@@ -45,18 +45,8 @@ export async function GET(request: Request) {
   }
 
   const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl || (!dbUrl.startsWith("postgresql://") && !dbUrl.startsWith("postgres://"))) {
+  if (!dbUrl || (!dbUrl.startsWith("postgresql://") && !dbUrl.startsWith("postgres://") && !dbUrl.startsWith("file:"))) {
     return NextResponse.json({ ok: false, error: "DATABASE_URL not configured" }, { status: 503 });
-  }
-
-  try {
-    const { db } = await import("@/lib/db");
-    const existing = await db.dailyStockSnapshot.findUnique({ where: { date: tradingDate } });
-    if (existing) {
-      return NextResponse.json({ ok: true, skipped: true, reason: "Data already exists for " + tradingDate });
-    }
-  } catch {
-    // continue
   }
 
   try {
@@ -66,7 +56,7 @@ export async function GET(request: Request) {
     const res = await fetch(baseUrl + "/api/volume-shockers", { cache: "no-store", signal: AbortSignal.timeout(30_000) });
     const data = await res.json();
 
-    if (!data.stocks || !data.stocks.length) {
+    if (!res.ok || !data.stocks || !data.stocks.length) {
       return NextResponse.json({ ok: false, error: "No stocks returned from scraper" });
     }
 

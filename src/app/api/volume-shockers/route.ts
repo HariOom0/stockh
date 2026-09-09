@@ -1,76 +1,26 @@
 import { NextResponse } from "next/server";
 import { readFileSync } from "fs";
 import { join } from "path";
-import * as cheerio from "cheerio";
+import { fetchVolumeShockers, type VolumeShockerStock } from "@/lib/scraper";
 import { getTradingDate } from "@/lib/trading-calendar";
 
 export const dynamic = "force-dynamic";
 
 let cachedData: { stocks: any[]; timestamp: number; tradingDate: string } | null = null;
+let scrapeInFlight: Promise<StockData[]> | null = null;
 const CACHE_TTL = 30 * 60 * 1000;
 
-type StockData = {
-  sr: number;
-  name: string;
-  ticker: string;
-  close: number;
-  change: number;
-  volGainPct: number;
-  isPositive: boolean;
-};
+type StockData = VolumeShockerStock;
 
 function hasValidDbUrl(): boolean {
   const url = process.env.DATABASE_URL;
-  return !!url && (url.startsWith("postgresql://") || url.startsWith("postgres://"));
+  return !!url && (url.startsWith("postgresql://") || url.startsWith("postgres://") || url.startsWith("file:"));
 }
 
 function applyFilter(stocks: StockData[]): StockData[] {
   return stocks
     .filter((s) => s.volGainPct > 190 && s.change > 0)
     .map((s, i) => ({ ...s, sr: i + 1 }));
-}
-
-async function scrapeChartink(): Promise<StockData[]> {
-  try {
-    const resp = await fetch("https://chartink.com/eodscanner/Volume-Shockers.html", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!resp.ok) return [];
-    const html = await resp.text();
-    if (!html.includes("stocklisttable")) return [];
-    const $ = cheerio.load(html);
-    const stocks: StockData[] = [];
-    $("#stocklisttable tbody tr").each((_, row) => {
-      const cells = $(row).find("td");
-      if (cells.length < 6) return;
-      const link = cells.eq(1).find("a[href*='/stocks/']");
-      if (!link.length) return;
-      const href = link.attr("href") || "";
-      const m = href.match(/\/stocks\/([A-Z0-9]+)\.html/);
-      if (!m) return;
-      const close = parseFloat(cells.eq(3).text().trim()) || 0;
-      const cm = cells.eq(4).text().trim().match(/([+-]?[\d.]+)%/);
-      const vm = cells.eq(5).text().trim().match(/([\d.]+)%/);
-      const change = cm ? parseFloat(cm[1]) : 0;
-      const volGainPct = vm ? parseFloat(vm[1]) : 0;
-      if (close > 0) {
-        stocks.push({
-          sr: 0, ticker: m[1],
-          name: link.text().trim().replace(/\s*(Ltd|Limited)\.?\s*$/i, ""),
-          close, change, volGainPct, isPositive: change > 0,
-        });
-      }
-    });
-    stocks.forEach((s, i) => (s.sr = i + 1));
-    return stocks;
-  } catch {
-    return [];
-  }
 }
 
 export async function GET() {
@@ -83,7 +33,15 @@ export async function GET() {
   }
 
   // 1. Try live Chartink scrape first (most current data)
-  const scraped = await scrapeChartink();
+  // The page mounts several consumers at once. Collapse concurrent cache
+  // misses into one Chartink request rather than hitting the upstream scanner
+  // repeatedly while the first response is still in flight.
+  if (!scrapeInFlight) {
+    scrapeInFlight = fetchVolumeShockers().finally(() => {
+      scrapeInFlight = null;
+    });
+  }
+  const scraped = await scrapeInFlight;
   if (scraped.length > 0) {
     const stocks = applyFilter(scraped);
     cachedData = { stocks, timestamp: now, tradingDate };

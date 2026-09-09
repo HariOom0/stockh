@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 function hasValidDbUrl(): boolean {
   const url = process.env.DATABASE_URL;
   if (!url) return false;
-  return url.startsWith("postgresql://") || url.startsWith("postgres://");
+  return url.startsWith("postgresql://") || url.startsWith("postgres://") || url.startsWith("file:");
 }
 
 let seeded = false;

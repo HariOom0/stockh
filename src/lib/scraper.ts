@@ -1,5 +1,4 @@
 import * as cheerio from "cheerio";
-import { execSync } from "child_process";
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
@@ -7,9 +6,6 @@ const USER_AGENT =
 // ─── Chartink EOD Scanner URL (the page the user wants to match) ─────
 const CHARTINK_EOD_URL =
   "https://chartink.com/eodscanner/Volume-Shockers.html";
-
-// ─── Path to the Python scraper script ─────
-const PYTHON_SCRAPER_PATH = "/opt/render/project/src/scripts/scrape_chartink.py";
 
 // ═══════════════════════════════════════════════════════════════════════
 // Volume Shocker Types
@@ -26,94 +22,7 @@ export interface VolumeShockerStock {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Method 1: Python subprocess with curl_cffi (bypasses Cloudflare TLS)
-// ═══════════════════════════════════════════════════════════════════════
-
-/**
- * Scrape the Chartink EOD Volume Shockers page using a Python subprocess
- * with curl_cffi which mimics Chrome's TLS fingerprint to bypass Cloudflare.
- *
- * Why Python? Node.js doesn't have a reliable TLS-impersonation library.
- * curl_cffi (Python) uses the same approach as curl-impersonate to perfectly
- * mimic Chrome's TLS handshake, JA3, and HTTP/2 fingerprints.
- *
- * Fallback: If the pre-compiled Python binary isn't available, falls back
- * to direct Node.js fetch (may be blocked by Cloudflare).
- */
-async function fetchViaPythonSubprocess(): Promise<VolumeShockerStock[]> {
-  console.log("[Chartink] Attempting Python curl_cffi scraper...");
-
-  // Try the pre-compiled binary first, then system python3
-  const pythonPaths = [
-    "/opt/render/project/src/scripts/scrape_chartink.elf",
-    PYTHON_SCRAPER_PATH,
-  ];
-
-  let result: string | null = null;
-
-  for (const pyPath of pythonPaths) {
-    try {
-      let cmd: string;
-      if (pyPath.endsWith(".elf")) {
-        // Pre-compiled standalone binary — run directly
-        cmd = `"${pyPath}" "${CHARTINK_EOD_URL}"`;
-      } else {
-        // Python script — run with system python3
-        cmd = `python3 "${pyPath}" "${CHARTINK_EOD_URL}"`;
-      }
-
-      console.log(`[Chartink] Trying: ${cmd}`);
-      result = execSync(cmd, {
-        encoding: "utf8",
-        timeout: 45_000,
-        maxBuffer: 5 * 1024 * 1024,
-      });
-
-      if (result) break;
-    } catch (err: any) {
-      console.warn(
-        `[Chartink] Python path ${pyPath} failed: ${err.message?.substring(0, 200)}`
-      );
-    }
-  }
-
-  if (!result) {
-    console.warn("[Chartink] All Python scraper paths failed");
-    return [];
-  }
-
-  // Parse JSON output
-  try {
-    const data = JSON.parse(result.trim());
-    if (!Array.isArray(data)) {
-      console.warn("[Chartink] Python scraper returned non-array:", typeof data);
-      return [];
-    }
-
-    const stocks: VolumeShockerStock[] = data
-      .filter(
-        (s: any) => s.ticker && s.name && s.close && s.close > 0
-      )
-      .map((s: any, i: number) => ({
-        sr: i + 1,
-        name: String(s.name || ""),
-        ticker: String(s.ticker || ""),
-        close: Number(s.close) || 0,
-        change: Number(s.change) || 0,
-        volGainPct: Number(s.volGainPct) || 0,
-        isPositive: (Number(s.change) || 0) > 0,
-      }));
-
-    console.log(`[Chartink] Python scraper returned ${stocks.length} stocks`);
-    return stocks;
-  } catch (parseErr: any) {
-    console.error(`[Chartink] Failed to parse Python output: ${parseErr.message}`);
-    return [];
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Method 2: Direct Node.js fetch with browser headers (Cloudflare may block)
+// Direct Node.js fetch with browser headers
 // ═══════════════════════════════════════════════════════════════════════
 
 async function fetchViaNodeFetch(): Promise<VolumeShockerStock[]> {
@@ -138,7 +47,8 @@ async function fetchViaNodeFetch(): Promise<VolumeShockerStock[]> {
         "Upgrade-Insecure-Requests": "1",
       },
       redirect: "follow",
-      signal: AbortSignal.timeout(30_000),
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
     });
 
     if (!resp.ok) {
@@ -169,29 +79,41 @@ async function fetchViaNodeFetch(): Promise<VolumeShockerStock[]> {
 function parseChartinkHTML(html: string): VolumeShockerStock[] {
   const $ = cheerio.load(html);
   const stocks: VolumeShockerStock[] = [];
+  const headerCells = $("#stocklisttable tr").first().find("th, td");
+  const headerIndex = (label: string, fallback: number) => {
+    const index = headerCells.toArray().findIndex((cell) =>
+      $(cell).text().trim().toLowerCase().includes(label)
+    );
+    return index >= 0 ? index : fallback;
+  };
+  const nameIndex = headerIndex("stock name", 1);
+  const closeIndex = headerIndex("close", 3);
+  const changeIndex = headerIndex("change", 4);
+  const volumeIndex = headerIndex("vol gain", 5);
+  const number = (value: string) => Number.parseFloat(value.replace(/[^0-9+-.]/g, "")) || 0;
 
   $("#stocklisttable tbody tr").each((_, row) => {
     const cells = $(row).find("td");
-    if (cells.length < 6) return;
+    if (cells.length <= Math.max(nameIndex, closeIndex, changeIndex, volumeIndex)) return;
 
-    const link = cells.eq(1).find("a[href*='/stocks/']");
+    const link = cells.eq(nameIndex).find("a[href*='/stocks/']").first();
     if (link.length === 0) return;
 
     const href = link.attr("href") || "";
-    const tickerMatch = href.match(/\/stocks\/([A-Z0-9]+)\.html/);
+    const tickerMatch = href.match(/\/stocks\/([^/?#]+?)(?:\.html)?(?:[?#]|$)/i);
     if (!tickerMatch) return;
 
-    const ticker = tickerMatch[1];
+    const ticker = decodeURIComponent(tickerMatch[1]).trim().toUpperCase();
     const name = (link.text().trim() || "").replace(
       /\s*(Ltd|Limited)\.?\s*$/i,
       ""
     );
 
-    const closeText = cells.eq(3).text().trim();
-    const changeText = cells.eq(4).text().trim();
-    const volText = cells.eq(5).text().trim();
+    const closeText = cells.eq(closeIndex).text().trim();
+    const changeText = cells.eq(changeIndex).text().trim();
+    const volText = cells.eq(volumeIndex).text().trim();
 
-    const close = parseFloat(closeText) || 0;
+    const close = number(closeText);
     // Change format: [16.9%] or [-5.2%]
     const changeMatch = changeText.match(/([+-]?[\d.]+)%/);
     const change = changeMatch ? parseFloat(changeMatch[1]) : 0;
@@ -223,26 +145,10 @@ function parseChartinkHTML(html: string): VolumeShockerStock[] {
 // ═══════════════════════════════════════════════════════════════════════
 
 export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
-  // Method 1: Python curl_cffi (most reliable for Cloudflare bypass)
-  try {
-    const stocks = await fetchViaPythonSubprocess();
-    if (stocks.length > 0) {
-      console.log(
-        `[Scraper] Returning ${stocks.length} stocks from Python curl_cffi`
-      );
-      return stocks;
-    }
-  } catch (err: any) {
-    console.error(`[Scraper] Python method failed: ${err.message}`);
-  }
-
-  // Method 2: Direct Node.js fetch (may be blocked by Cloudflare)
   try {
     const stocks = await fetchViaNodeFetch();
     if (stocks.length > 0) {
-      console.log(
-        `[Scraper] Returning ${stocks.length} stocks from Node.js fetch`
-      );
+      console.log(`[Scraper] Returning ${stocks.length} stocks from Chartink`);
       return stocks;
     }
   } catch (err: any) {
@@ -665,7 +571,8 @@ export async function fetchStockDetail(ticker: string): Promise<StockDetail> {
     }
   }
 
-  // Calculate Industry P/E from peer P/E ratios
+  // Industry P/E is optional. Keep the peer sample small and parallel so it
+  // cannot make an otherwise complete detail response wait on a long chain.
   try {
     detail.industryPE = await fetchIndustryPE(detail.peers, ticker);
   } catch {
@@ -725,7 +632,7 @@ async function fetchPeerPE(peerTicker: string): Promise<number | null> {
   try {
     const res = await fetch(`https://www.screener.in/company/${peerTicker}/`, {
       headers: { "User-Agent": USER_AGENT },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(5_000),
     });
     if (!res.ok) return null;
     const html = await res.text();
@@ -741,7 +648,7 @@ async function fetchPeerPE(peerTicker: string): Promise<number | null> {
 }
 
 /**
- * Fetch P/E for up to 10 peers in parallel (max 3 concurrent),
+ * Fetch P/E for a small peer sample in parallel,
  * then return the median as the Industry P/E.
  */
 async function fetchIndustryPE(
@@ -750,23 +657,13 @@ async function fetchIndustryPE(
 ): Promise<number | undefined> {
   const eligible = peers
     .filter((p) => p.ticker !== currentTicker.toUpperCase())
-    .slice(0, 10);
+    .slice(0, 5);
   if (eligible.length < 2) return undefined;
 
-  // Concurrency-limited parallel fetch
-  const BATCH = 3;
-  const peValues: number[] = [];
-  for (let i = 0; i < eligible.length; i += BATCH) {
-    const batch = eligible.slice(i, i + BATCH);
-    const results = await Promise.allSettled(
-      batch.map((p) => fetchPeerPE(p.ticker))
-    );
-    for (const r of results) {
-      if (r.status === "fulfilled" && r.value !== null) {
-        peValues.push(r.value);
-      }
-    }
-  }
+  const results = await Promise.allSettled(eligible.map((p) => fetchPeerPE(p.ticker)));
+  const peValues = results.flatMap((result) =>
+    result.status === "fulfilled" && result.value !== null ? [result.value] : []
+  );
 
   if (peValues.length < 2) return undefined;
 
