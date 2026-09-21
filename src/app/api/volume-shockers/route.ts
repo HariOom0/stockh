@@ -23,6 +23,33 @@ function applyFilter(stocks: StockData[]): StockData[] {
     .map((s, i) => ({ ...s, sr: i + 1 }));
 }
 
+function readStaticData(now: number, fallbackDate: string) {
+  try {
+    const raw = readFileSync(join(process.cwd(), "public", "data", "stocks.json"), "utf-8");
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data.stocks) || data.stocks.length === 0) return null;
+
+    const allStocks: StockData[] = data.stocks.map((s: any, i: number) => ({
+      sr: i + 1,
+      name: String(s.name || ""),
+      ticker: String(s.ticker || ""),
+      close: Number(s.close) || 0,
+      change: Number(s.change) || 0,
+      volGainPct: Number(s.volGainPct) || 0,
+      isPositive: (Number(s.change) || 0) > 0,
+    }));
+
+    return {
+      stocks: applyFilter(allStocks),
+      date: data.tradingDate || fallbackDate,
+      lastUpdated: data.lastUpdated ? new Date(data.lastUpdated).getTime() : now,
+    };
+  } catch (err: any) {
+    console.error("[Static] failed:", err.message);
+    return null;
+  }
+}
+
 export async function GET() {
   const tradingDate = getTradingDate();
   const now = Date.now();
@@ -59,11 +86,25 @@ export async function GET() {
         return NextResponse.json({ stocks, cached: false, lastUpdated: snapshot.createdAt.getTime(), tradingDate, source: "database" });
       }
 
-      // 2b. No data for today — get the MOST RECENT DB entry
+      // 2b. No data for today — choose the newest DB or bundled snapshot.
+      // The bundled data can be newer than the last successful cron run.
       const latestSnap = await db.dailyStockSnapshot.findFirst({
         orderBy: { date: "desc" },
         select: { date: true, stocksJson: true, createdAt: true },
       });
+      const staticData = readStaticData(now, tradingDate);
+
+      if (staticData && (!latestSnap || staticData.date >= latestSnap.date)) {
+        cachedData = { stocks: staticData.stocks, timestamp: now, tradingDate: staticData.date };
+        return NextResponse.json({
+          stocks: staticData.stocks,
+          cached: true,
+          lastUpdated: staticData.lastUpdated,
+          tradingDate: staticData.date,
+          source: "static",
+        });
+      }
+
       if (latestSnap) {
         const stocks: StockData[] = JSON.parse(latestSnap.stocksJson);
         cachedData = { stocks, timestamp: now, tradingDate: latestSnap.date };
@@ -81,22 +122,16 @@ export async function GET() {
   }
 
   // 3. Static fallback (last resort)
-  try {
-    const raw = readFileSync(join(process.cwd(), "public", "data", "stocks.json"), "utf-8");
-    const data = JSON.parse(raw);
-    if (data.stocks?.length > 0) {
-      const allStocks: StockData[] = data.stocks.map((s: any, i: number) => ({
-        sr: i + 1, name: String(s.name || ""), ticker: String(s.ticker || ""),
-        close: Number(s.close) || 0, change: Number(s.change) || 0,
-        volGainPct: Number(s.volGainPct) || 0, isPositive: (Number(s.change) || 0) > 0,
-      }));
-      const stocks = applyFilter(allStocks);
-      const staticDate = data.tradingDate || tradingDate;
-      cachedData = { stocks, timestamp: now, tradingDate: staticDate };
-      return NextResponse.json({ stocks, cached: true, lastUpdated: data.lastUpdated ? new Date(data.lastUpdated).getTime() : now, tradingDate: staticDate, source: "static" });
-    }
-  } catch (err: any) {
-    console.error("[Static] failed:", err.message);
+  const staticData = readStaticData(now, tradingDate);
+  if (staticData) {
+    cachedData = { stocks: staticData.stocks, timestamp: now, tradingDate: staticData.date };
+    return NextResponse.json({
+      stocks: staticData.stocks,
+      cached: true,
+      lastUpdated: staticData.lastUpdated,
+      tradingDate: staticData.date,
+      source: "static",
+    });
   }
 
   return NextResponse.json({ error: "No data available.", stocks: [], cached: false, tradingDate }, { status: 503 });
