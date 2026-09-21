@@ -31,31 +31,6 @@ async function ensureSeeded() {
       console.log(`[Seed] ${date}: ${stocks.length} stocks`);
     }
 
-    // Also backfill the latest bundled dataset. This makes history durable
-    // even when the scheduled live scraper was blocked by Chartink.
-    const staticPath = join(process.cwd(), "public", "data", "stocks.json");
-    const staticData = JSON.parse(readFileSync(staticPath, "utf-8"));
-    const staticDate = staticData.tradingDate;
-    if (staticDate && Array.isArray(staticData.stocks) && staticData.stocks.length > 0) {
-      const existing = await db.dailyStockSnapshot.findUnique({ where: { date: staticDate } });
-      if (!existing) {
-        const stocks = staticData.stocks
-          .filter((stock: any) => Number(stock.volGainPct) > 190 && Number(stock.change) > 0)
-          .map((stock: any, index: number) => ({
-            sr: index + 1,
-            name: String(stock.name || ""),
-            ticker: String(stock.ticker || "").toUpperCase(),
-            close: Number(stock.close) || 0,
-            change: Number(stock.change) || 0,
-            volGainPct: Number(stock.volGainPct) || 0,
-            isPositive: true,
-          }));
-        await db.dailyStockSnapshot.create({
-          data: { date: staticDate, stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
-        });
-        console.log(`[Seed] ${staticDate}: ${stocks.length} stocks from bundled dataset`);
-      }
-    }
   } catch (err: any) {
     console.warn("[Seed] Failed:", err.message);
     seeded = false;
