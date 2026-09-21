@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { isMarketClosedAsync, getTradingDate, refreshTradingDayCache } from "@/lib/trading-calendar";
 import { fetchVolumeShockers } from "@/lib/scraper";
 
@@ -55,9 +57,35 @@ export async function GET(request: Request) {
     // invocation may run on a different serverless instance, and the
     // deployment URL is not guaranteed to be reachable from that instance.
     const scraped = await fetchVolumeShockers();
-    const stocks = scraped
+    let stocks = scraped
       .filter((stock) => stock.volGainPct > 190 && stock.change > 0)
       .map((stock, index) => ({ ...stock, sr: index + 1 }));
+
+    // Chartink can block serverless requests. If that happens, persist the
+    // bundled dataset only when it belongs to this exact trading date; never
+    // write an older snapshot under today's date.
+    if (!stocks.length) {
+      try {
+        const raw = readFileSync(join(process.cwd(), "public", "data", "stocks.json"), "utf-8");
+        const fallback = JSON.parse(raw);
+        if (fallback.tradingDate === tradingDate && Array.isArray(fallback.stocks)) {
+          stocks = fallback.stocks
+            .filter((stock: any) => Number(stock.volGainPct) > 190 && Number(stock.change) > 0)
+            .map((stock: any, index: number) => ({
+              sr: index + 1,
+              name: String(stock.name || ""),
+              ticker: String(stock.ticker || "").toUpperCase(),
+              close: Number(stock.close) || 0,
+              change: Number(stock.change) || 0,
+              volGainPct: Number(stock.volGainPct) || 0,
+              isPositive: true,
+            }));
+          console.warn(`[Cron] Live scrape unavailable; using bundled ${tradingDate} dataset`);
+        }
+      } catch (fallbackError) {
+        console.error("[Cron] Bundled fallback failed:", fallbackError);
+      }
+    }
 
     if (!stocks.length) {
       return NextResponse.json({ ok: false, error: "No stocks returned from scraper" });
@@ -75,7 +103,7 @@ export async function GET(request: Request) {
       ok: true,
       tradingDate,
       stockCount: stocks.length,
-      source: "live",
+      source: scraped.length > 0 ? "live" : "static",
     });
   } catch (error) {
     console.error("[Cron] Failed:", error);
