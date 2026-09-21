@@ -50,10 +50,33 @@ export async function POST(request: Request) {
       .map((s: any, i: number) => ({ ...s, sr: i + 1 }));
 
     const { db } = await import("@/lib/db");
+    const latest = await db.dailyStockSnapshot.findFirst({
+      where: { NOT: { date } },
+      orderBy: { date: "desc" },
+      select: { date: true, stocksJson: true },
+    });
+    const stocksJson = JSON.stringify(filtered);
+
+    // A manually rerun workflow can execute after midnight and calculate the
+    // next calendar date even though it is still saving the prior day's data.
+    // Do not create a second history entry when the complete filtered dataset
+    // is identical to the latest saved snapshot.
+    if (latest && latest.stocksJson === stocksJson) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "Identical dataset already saved",
+        date,
+        duplicateOf: latest.date,
+        totalReceived: stocks.length,
+        filteredCount: filtered.length,
+      });
+    }
+
     const result = await db.dailyStockSnapshot.upsert({
       where: { date },
-      update: { stockCount: filtered.length, stocksJson: JSON.stringify(filtered) },
-      create: { date, stockCount: filtered.length, stocksJson: JSON.stringify(filtered) },
+      update: { stockCount: filtered.length, stocksJson },
+      create: { date, stockCount: filtered.length, stocksJson },
     });
 
     return NextResponse.json({ ok: true, date, totalReceived: stocks.length, filteredCount: filtered.length, id: result.id });

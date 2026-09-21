@@ -1,10 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/daily-snapshot",
-      "schedule": "30 13 * * 1-5"
-    }
-  ],
   "functions": {
     "src/app/api/volume-shockers/route.ts": {
       "memory": 1024,

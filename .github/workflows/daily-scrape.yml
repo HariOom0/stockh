@@ -1,5 +1,8 @@
 name: Daily Stock Data Scrape
 
+# This workflow is the single scheduled writer for database history.
+# Do not add a second Vercel cron for /api/cron/daily-snapshot.
+
 on:
   schedule:
     # 14:00 UTC = 7:30 PM IST — after market close + data settle time

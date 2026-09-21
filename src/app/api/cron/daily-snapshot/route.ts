@@ -6,6 +6,9 @@ import { fetchVolumeShockers } from "@/lib/scraper";
 
 export const dynamic = "force-dynamic";
 
+// The scheduled writer is .github/workflows/daily-scrape.yml. This endpoint
+// remains available for an explicitly authorized manual recovery run only.
+
 function isAfter7PMIST(): boolean {
   const now = new Date();
   const istHour = parseInt(
@@ -92,10 +95,27 @@ export async function GET(request: Request) {
     }
 
     const { db } = await import("@/lib/db");
+    const stocksJson = JSON.stringify(stocks);
+    const latest = await db.dailyStockSnapshot.findFirst({
+      where: { NOT: { date: tradingDate } },
+      orderBy: { date: "desc" },
+      select: { date: true, stocksJson: true },
+    });
+    if (latest && latest.stocksJson === stocksJson) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "Identical dataset already saved",
+        tradingDate,
+        duplicateOf: latest.date,
+        stockCount: stocks.length,
+      });
+    }
+
     await db.dailyStockSnapshot.upsert({
       where: { date: tradingDate },
-      update: { stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
-      create: { date: tradingDate, stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
+      update: { stockCount: stocks.length, stocksJson },
+      create: { date: tradingDate, stockCount: stocks.length, stocksJson },
     });
     console.log("[Cron] Saved " + stocks.length + " stocks for " + tradingDate);
 
