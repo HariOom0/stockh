@@ -320,14 +320,10 @@ export default function Home() {
     if (selectedStock) {
       window.history.pushState({ stockPanel: true }, "");
       panelHistoryRef.current = true;
-      document.body.style.overflow = "hidden";
-    } else {
-      if (panelHistoryRef.current) {
-        panelHistoryRef.current = false;
-      }
-      document.body.style.overflow = "";
+    } else if (panelHistoryRef.current) {
+      panelHistoryRef.current = false;
     }
-    return () => { document.body.style.overflow = ""; };
+    return undefined;
   }, [selectedStock]);
 
   useEffect(() => {
@@ -1886,10 +1882,10 @@ export default function Home() {
         <AnimatePresence>
           {selectedStock && (
             <motion.div
-              initial={{ x: "100%" }}
+              initial={false}
               animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "tween", duration: 0.25, ease: "easeOut" }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0 }}
               className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-background border-l border-border shadow-2xl flex flex-col safe-area-bottom"
             >
               {/* Panel Header */}
@@ -2559,9 +2555,10 @@ export default function Home() {
         <AnimatePresence>
           {selectedStock && (
             <motion.div
-              initial={{ opacity: 0 }}
+              initial={false}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0 }}
               className="fixed inset-0 z-40 bg-black/60"
               onClick={() => setSelectedStock(null)}
             />
