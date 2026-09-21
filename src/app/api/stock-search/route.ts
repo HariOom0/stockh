@@ -6,6 +6,7 @@ const USER_AGENT =
 // In-memory cache for search results
 const searchCache = new Map<string, { data: SearchResult[]; timestamp: number }>();
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const searchInFlight = new Map<string, Promise<SearchResult[]>>();
 
 export interface SearchResult {
   name: string;
@@ -134,7 +135,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const results = await searchScreener(trimmedQuery);
+    let request = searchInFlight.get(cacheKey);
+    if (!request) {
+      request = searchScreener(trimmedQuery);
+      searchInFlight.set(cacheKey, request);
+      request.finally(() => searchInFlight.delete(cacheKey)).catch(() => undefined);
+    }
+    const results = await request;
 
     if (results.length === 0) {
       return NextResponse.json({ results: [], cached: false });

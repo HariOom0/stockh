@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const data = await fetchWithConcurrency(tickers, 3);
+    const data = await fetchWithConcurrency(tickers, 6);
     cache.set(cacheKey, { data, timestamp: now });
     return NextResponse.json({ stocks: data, cached: false });
   } catch (error) {

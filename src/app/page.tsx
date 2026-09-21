@@ -399,6 +399,7 @@ export default function Home() {
   const [searchError, setSearchError] = useState("");
   const [isSearchedStock, setIsSearchedStock] = useState(false);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
 
   // ─── Intraday state ───────────────────────────────────────────
   const [intraStocks, setIntraStocks] = useState<any[]>([]);
@@ -707,16 +708,23 @@ export default function Home() {
 
   // ─── Universal Stock Search ─────────────────────────────────────
   const performSearch = useCallback(async (query: string) => {
+    searchAbortRef.current?.abort();
     if (query.trim().length < 2) {
+      setSearchLoading(false);
       setSearchResults([]);
       setSearchError("");
       return;
     }
     setSearchLoading(true);
     setSearchError("");
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
     try {
-      const res = await fetch(`/api/stock-search?q=${encodeURIComponent(query.trim())}`);
+      const res = await fetch(`/api/stock-search?q=${encodeURIComponent(query.trim())}`, {
+        signal: controller.signal,
+      });
       const data = await res.json();
+      if (controller.signal.aborted) return;
       if (data.error) {
         setSearchError(data.error);
         setSearchResults([]);
@@ -727,10 +735,11 @@ export default function Home() {
         }
       }
     } catch {
+      if (controller.signal.aborted) return;
       setSearchError("Search failed. Please try again.");
       setSearchResults([]);
     } finally {
-      setSearchLoading(false);
+      if (!controller.signal.aborted) setSearchLoading(false);
     }
   }, []);
 
