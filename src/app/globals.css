@@ -134,6 +134,7 @@
 html {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
+  scrollbar-gutter: stable;
 }
 
 /* Prevent overscroll bounce on iOS */
