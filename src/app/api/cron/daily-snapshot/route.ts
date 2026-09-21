@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isMarketClosedAsync, getTradingDate, refreshTradingDayCache } from "@/lib/trading-calendar";
+import { fetchVolumeShockers } from "@/lib/scraper";
 
 export const dynamic = "force-dynamic";
 
@@ -50,36 +51,31 @@ export async function GET(request: Request) {
   }
 
   try {
-    const baseUrl = process.env.VERCEL_URL
-      ? "https://" + process.env.VERCEL_URL
-      : "http://localhost:3000";
-    const res = await fetch(baseUrl + "/api/volume-shockers", { cache: "no-store", signal: AbortSignal.timeout(30_000) });
-    const data = await res.json();
+    // Scrape directly instead of calling the app over HTTP. A Vercel cron
+    // invocation may run on a different serverless instance, and the
+    // deployment URL is not guaranteed to be reachable from that instance.
+    const scraped = await fetchVolumeShockers();
+    const stocks = scraped
+      .filter((stock) => stock.volGainPct > 190 && stock.change > 0)
+      .map((stock, index) => ({ ...stock, sr: index + 1 }));
 
-    if (!res.ok || !data.stocks || !data.stocks.length) {
+    if (!stocks.length) {
       return NextResponse.json({ ok: false, error: "No stocks returned from scraper" });
-    }
-
-    if (data.tradingDate && data.tradingDate !== tradingDate) {
-      return NextResponse.json({
-        ok: true, skipped: true,
-        reason: "Date mismatch: API says " + data.tradingDate + ", cron computed " + tradingDate,
-      });
     }
 
     const { db } = await import("@/lib/db");
     await db.dailyStockSnapshot.upsert({
       where: { date: tradingDate },
-      update: { stockCount: data.stocks.length, stocksJson: JSON.stringify(data.stocks) },
-      create: { date: tradingDate, stockCount: data.stocks.length, stocksJson: JSON.stringify(data.stocks) },
+      update: { stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
+      create: { date: tradingDate, stockCount: stocks.length, stocksJson: JSON.stringify(stocks) },
     });
-    console.log("[Cron] Saved " + data.stocks.length + " stocks for " + tradingDate);
+    console.log("[Cron] Saved " + stocks.length + " stocks for " + tradingDate);
 
     return NextResponse.json({
       ok: true,
       tradingDate,
-      stockCount: data.stocks.length,
-      source: data.source || "unknown",
+      stockCount: stocks.length,
+      source: "live",
     });
   } catch (error) {
     console.error("[Cron] Failed:", error);
