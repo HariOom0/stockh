@@ -106,7 +106,7 @@ jobs:
       - name: Save to DB via backfill API
         run: |
           python3 << 'PYEOF'
-          import json, urllib.request
+          import json, urllib.error, urllib.request
 
           with open('/tmp/stocks.json') as f:
               stocks = json.load(f)
@@ -122,12 +122,27 @@ jobs:
               method="POST"
           )
           try:
-              resp = urllib.request.urlopen(req, timeout=30)
-              print(f"DB save: {resp.status} - {resp.read().decode()}")
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  save_data = json.loads(resp.read().decode())
+                  print(f"DB save: {resp.status} - {save_data}")
+                  if resp.status != 200 or not save_data.get("ok"):
+                      raise RuntimeError(f"DB save was not successful: {save_data}")
+
+              history_url = "https://stockh.vercel.app/api/stock-history?date=" + trading_date
+              with urllib.request.urlopen(history_url, timeout=30) as history_resp:
+                  history_data = json.loads(history_resp.read().decode())
+                  print(f"History read-back: {history_data}")
+                  if history_data.get("date") != trading_date:
+                      raise RuntimeError(f"History date mismatch: {history_data}")
+                  if history_data.get("stockCount") != save_data.get("filteredCount"):
+                      raise RuntimeError(
+                          f"History count mismatch: saved {save_data.get('filteredCount')}, read {history_data.get('stockCount')}"
+                      )
+              print("PASS: persisted stock data was read back from history")
           except urllib.error.HTTPError as e:
-              print(f"DB save failed: {e.code} - {e.read().decode()}")
+              raise SystemExit(f"DB save/history verification failed: {e.code} - {e.read().decode()}")
           except Exception as e:
-              print(f"DB save failed: {e}")
+              raise SystemExit(f"DB save/history verification failed: {e}")
           PYEOF
 
       - name: Update static file and push

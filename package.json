@@ -7,6 +7,7 @@
     "build": "npx prisma generate && (if [ -n \"$DATABASE_URL\" ]; then npx prisma db push --accept-data-loss; else echo 'DATABASE_URL is not set; skipping Prisma db push'; fi) && next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
     "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
+    "test:history": "npx prisma generate && node --test tests/history-persistence.test.mjs",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
