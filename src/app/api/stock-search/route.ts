@@ -39,8 +39,9 @@ async function searchScreener(query: string): Promise<SearchResult[]> {
           return data
             .filter((item: Record<string, string>) => item.url)
             .map((item: Record<string, string>) => {
-              // Extract ticker from URL like "/company/RELIANCE/consolidated/" or "/company/TCS/"
-              const urlMatch = item.url.match(/\/company\/([A-Z0-9]+)/);
+              // Extract ticker from URLs such as "/company/RELIANCE/".
+              // Some valid Screener tickers contain hyphens.
+              const urlMatch = item.url.match(/\/company\/([A-Z0-9-]+)/i);
               const ticker = urlMatch ? urlMatch[1] : "";
               return {
                 name: item.name || ticker,
