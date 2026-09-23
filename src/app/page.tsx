@@ -1358,7 +1358,7 @@ export default function Home() {
                         <span className="flex items-center justify-end gap-1">Change <SortIcon field="change" /></span>
                       </th>
                       <th className="text-right px-4 py-3 font-medium text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => toggleSort("volGainPct")}>
-                        <span className="flex items-center justify-end gap-1">Vol Gain <SortIcon field="volGainPct" /></span>
+                        <span className="flex items-center justify-end gap-1">{viewMode === "ic" ? "Volume" : "Vol Gain"} <SortIcon field="volGainPct" /></span>
                       </th>
                       <th className="text-center px-4 py-3 font-medium text-muted-foreground w-20">Action</th>
                     </tr>
@@ -1389,7 +1389,7 @@ export default function Home() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono">
-                            {stock.volGainPct.toFixed(1)}%
+                            {viewMode === "ic" ? (stock.volume || 0).toLocaleString("en-IN") : `${stock.volGainPct.toFixed(1)}%`}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -1431,7 +1431,7 @@ export default function Home() {
                         </div>
                         <div className="flex items-center justify-between mt-2">
                           <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-xs">
-                            Vol: {stock.volGainPct.toFixed(1)}%
+                            {viewMode === "ic" ? `Volume: ${(stock.volume || 0).toLocaleString("en-IN")}` : `Vol: ${stock.volGainPct.toFixed(1)}%`}
                           </Badge>
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Eye className="w-3 h-3" /> View Details
