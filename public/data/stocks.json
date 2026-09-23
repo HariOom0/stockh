@@ -803,5 +803,117 @@
   ],
   "tradingDate": "2026-09-23",
   "lastUpdated": "2026-09-23T23:42:27.763336+05:30",
-  "source": "chartink_eod_scanner"
+  "source": "chartink_eod_scanner",
+  "icStocks": [
+    {
+      "sr": 1,
+      "name": "Whirlpool Of India Limited",
+      "ticker": "WHIRLPOOL",
+      "close": 865.25,
+      "change": 19.99861313362458,
+      "volGainPct": 311.46,
+      "isPositive": true,
+      "sma200": 841.7465000000012,
+      "marketCapCr": 9149.3620541
+    },
+    {
+      "sr": 2,
+      "name": "Man Industries (India) Limited",
+      "ticker": "MANINDS",
+      "close": 986.7,
+      "change": 16.096011295446534,
+      "volGainPct": 272.52,
+      "isPositive": true,
+      "sma200": 508.8082499999995,
+      "marketCapCr": 6373.937978
+    },
+    {
+      "sr": 3,
+      "name": "Everest Kanto Cylinder Limited",
+      "ticker": "EKC",
+      "close": 113.66,
+      "change": 12.74675131435373,
+      "volGainPct": 393.19,
+      "isPositive": true,
+      "sma200": 112.61105000000003,
+      "marketCapCr": 1132.1755058
+    },
+    {
+      "sr": 4,
+      "name": "Delta Corp. Ltd. (India)",
+      "ticker": "DELTACORP",
+      "close": 68.65,
+      "change": 11.138092925368305,
+      "volGainPct": 197.47,
+      "isPositive": true,
+      "sma200": 64.45210000000003,
+      "marketCapCr": 1653.4864662
+    },
+    {
+      "sr": 5,
+      "name": "Mukand Limited",
+      "ticker": "MUKANDLTD",
+      "close": 157.11,
+      "change": 11.102468000848608,
+      "volGainPct": 341.18,
+      "isPositive": true,
+      "sma200": 133.9062,
+      "marketCapCr": 2047.5020367
+    },
+    {
+      "sr": 6,
+      "name": "Elecon Engineering Co. Ltd.",
+      "ticker": "ELECON",
+      "close": 466.6,
+      "change": 10.949946498632745,
+      "volGainPct": 386.87,
+      "isPositive": true,
+      "sma200": 456.0599999999998,
+      "marketCapCr": 9433.7730405
+    },
+    {
+      "sr": 7,
+      "name": "RPG Life Sciences Limited",
+      "ticker": "RPGLIFE",
+      "close": 3025.4,
+      "change": 10.138701809312316,
+      "volGainPct": 273.24,
+      "isPositive": true,
+      "sma200": 2305.4155,
+      "marketCapCr": 4543.1845942
+    },
+    {
+      "sr": 8,
+      "name": "Sunflag Iron & Steel Co. Ltd.",
+      "ticker": "SUNFLAG",
+      "close": 390.55,
+      "change": 9.998591747641177,
+      "volGainPct": 181.75,
+      "isPositive": true,
+      "sma200": 303.56174999999956,
+      "marketCapCr": 6404.0983334
+    },
+    {
+      "sr": 9,
+      "name": "Kabra ExtrusionTechnik Ltd.",
+      "ticker": "KABRAEXTRU",
+      "close": 732.85,
+      "change": 9.996247654784243,
+      "volGainPct": 89.805,
+      "isPositive": true,
+      "sma200": 305.7799,
+      "marketCapCr": 2330.4148109
+    },
+    {
+      "sr": 10,
+      "name": "Pearl Global Industries Limited",
+      "ticker": "PGIL",
+      "close": 1300.8,
+      "change": 8.862666331910608,
+      "volGainPct": 146.92,
+      "isPositive": true,
+      "sma200": 890.1022500000004,
+      "marketCapCr": 11035.3833488
+    }
+  ]
 }
