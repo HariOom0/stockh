@@ -58,6 +58,8 @@ interface Stock {
   change: number;
   volGainPct: number;
   isPositive: boolean;
+  sma200?: number;
+  marketCapCr?: number;
 }
 
 interface SectorInsight {
@@ -128,7 +130,7 @@ interface SearchResult {
   ticker: string;
 }
 
-type ViewMode = "list" | "suggestions" | "search" | "history" | "intraday";
+type ViewMode = "list" | "ic" | "suggestions" | "search" | "history" | "intraday";
 
 // ─── IST-aligned 15-min refresh timer ────────────────────────────────
 // Returns seconds until the next 15-min boundary aligned to market open (9:15 AM IST).
@@ -311,6 +313,9 @@ export default function Home() {
   const [sortBy, setSortBy] = useState<"volGainPct" | "change" | "close" | "name">("volGainPct");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+  const [icStocks, setIcStocks] = useState<Stock[]>([]);
+  const [icLoading, setIcLoading] = useState(false);
+  const [icError, setIcError] = useState("");
 
   // ─── Browser back-button integration for detail panel ─────────
   // When a stock is selected, push a history entry so the mobile
@@ -378,10 +383,11 @@ export default function Home() {
 
   // ─── Suggestions state ───────────────────────────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const [historyDates, setHistoryDates] = useState<{ date: string; stockCount: number }[]>([]);
+  const [historyDates, setHistoryDates] = useState<{ date: string; stockCount: number; icStockCount?: number }[]>([]);
   const [historyError, setHistoryError] = useState("");
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null);
   const [historyStocks, setHistoryStocks] = useState<Stock[]>([]);
+  const [historyListMode, setHistoryListMode] = useState<"stocks" | "ic">("stocks");
   const [historyLoading, setHistoryLoading] = useState(false);
   const [sectorMap, setSectorMap] = useState<Map<string, StockSectorMap>>(new Map());
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
@@ -571,6 +577,21 @@ export default function Home() {
       setError(err instanceof Error ? err.message : "Failed to load stocks");
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const fetchICStocks = useCallback(async () => {
+    setIcLoading(true);
+    setIcError("");
+    try {
+      const res = await fetch("/api/ic-stocks", { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load IC stocks");
+      setIcStocks(Array.isArray(data.stocks) ? data.stocks : []);
+    } catch (err) {
+      setIcError(err instanceof Error ? err.message : "Failed to load IC stocks");
+    } finally {
+      setIcLoading(false);
     }
   }, []);
 
@@ -877,6 +898,9 @@ export default function Home() {
     if (mode === "history") {
       fetchHistoryDates();
     }
+    if (mode === "ic") {
+      fetchICStocks();
+    }
     if (mode === "intraday") {
       fetchIntraday();
     }
@@ -904,8 +928,9 @@ export default function Home() {
     try {
       const res = await fetch(`/api/stock-history?date=${date}`, { cache: "no-store" });
       const data = await res.json();
-      if (data.stocks) {
-        const stocks: Stock[] = data.stocks.map((s: Record<string, unknown>, i: number) => ({
+      const sourceStocks = historyListMode === "ic" ? (data.icStocks || []) : (data.stocks || []);
+      if (sourceStocks.length > 0) {
+        const stocks: Stock[] = sourceStocks.map((s: Record<string, unknown>, i: number) => ({
           sr: i + 1,
           name: s.name as string,
           ticker: s.ticker as string,
@@ -915,7 +940,7 @@ export default function Home() {
           isPositive: s.isPositive as boolean,
         }));
         setHistoryStocks(stocks);
-      }
+      } else setHistoryStocks([]);
     } catch (err) {
       console.error("Failed to fetch history stocks:", err);
     } finally {
@@ -925,8 +950,11 @@ export default function Home() {
 
   // Filter history stocks same way: vol > 190% AND positive gain
   const filteredHistoryStocks = useMemo(() => {
+    if (historyListMode === "ic") return historyStocks;
     return historyStocks.filter((s) => s.volGainPct > 190 && s.change > 0);
-  }, [historyStocks]);
+  }, [historyListMode, historyStocks]);
+
+  const listStocks = viewMode === "ic" ? icStocks : filteredStocks;
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr + "T00:00:00");
@@ -1021,6 +1049,19 @@ export default function Home() {
                   <span className="flex items-center gap-1.5">
                     <BarChart3 className="w-3.5 h-3.5" />
                     Stocks
+                  </span>
+                </button>
+                <button
+                  onClick={() => handleViewSwitch("ic")}
+                  className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap shrink-0 ${
+                    viewMode === "ic"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5" />
+                    IC
                   </span>
                 </button>
                 <button
@@ -1284,7 +1325,22 @@ export default function Home() {
           {/* ═══════════════════════════════════════════════════════════
               LIST VIEW (original)
              ═══════════════════════════════════════════════════════════ */}
-          {!loading && !error && viewMode === "list" && (
+          {viewMode === "ic" && icLoading && (
+            <div className="flex flex-col items-center py-16 gap-4">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Loading IC stocks...</p>
+            </div>
+          )}
+          {viewMode === "ic" && icError && !icLoading && (
+            <Card className="border-destructive/30 bg-destructive/5">
+              <CardContent className="p-6 flex flex-col items-center text-center gap-3">
+                <AlertTriangle className="w-8 h-8 text-destructive" />
+                <p className="text-sm text-destructive">{icError}</p>
+                <Button variant="outline" size="sm" onClick={fetchICStocks}>Try Again</Button>
+              </CardContent>
+            </Card>
+          )}
+          {!loading && !error && ((viewMode === "list") || (viewMode === "ic" && !icLoading && !icError)) && (
             <>
               {/* Desktop Table */}
               <div className="hidden md:block rounded-xl border border-border overflow-hidden">
@@ -1308,7 +1364,7 @@ export default function Home() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStocks.map((stock, idx) => (
+                    {listStocks.map((stock, idx) => (
                       <motion.tr
                         key={stock.ticker}
                         initial={{ opacity: 0, y: 8 }}
@@ -1321,6 +1377,9 @@ export default function Home() {
                         <td className="px-4 py-3">
                           <div className="font-medium text-foreground group-hover:text-primary transition-colors">{stock.name}</div>
                           <div className="text-xs text-muted-foreground">{stock.ticker}</div>
+                          {viewMode === "ic" && stock.sma200 && (
+                            <div className="text-[10px] text-primary/80 mt-0.5">SMA200 {stock.sma200.toFixed(2)} · ₹{(stock.marketCapCr || 0).toFixed(0)} Cr</div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right font-mono">{stock.close.toFixed(2)}</td>
                         <td className="px-4 py-3 text-right">
@@ -1342,16 +1401,16 @@ export default function Home() {
                     ))}
                   </tbody>
                 </table>
-                {filteredStocks.length === 0 && (
+                {listStocks.length === 0 && (
                   <div className="p-12 text-center text-muted-foreground">
-                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match the filter (volume &gt; 190% and positive gain)."}
+                    {viewMode === "ic" ? "No stocks currently meet the IC conditions." : stocks.length === 0 ? "No volume shockers found today." : "No stocks match the filter (volume &gt; 190% and positive gain)."}
                   </div>
                 )}
               </div>
 
               {/* Mobile Cards */}
               <div className="md:hidden space-y-2">
-                {filteredStocks.map((stock, idx) => (
+                {listStocks.map((stock, idx) => (
                   <motion.div key={stock.ticker} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03, duration: 0.2 }}>
                     <Card className="border-border hover:border-primary/30 transition-colors cursor-pointer" onClick={() => setSelectedStock(stock)}>
                       <CardContent className="p-4">
@@ -1359,6 +1418,9 @@ export default function Home() {
                           <div className="min-w-0">
                             <p className="font-medium text-foreground truncate">{stock.name}</p>
                             <p className="text-xs text-muted-foreground">{stock.ticker}</p>
+                            {viewMode === "ic" && stock.sma200 && (
+                              <p className="text-[10px] text-primary/80 mt-0.5">SMA200 {stock.sma200.toFixed(2)} · ₹{(stock.marketCapCr || 0).toFixed(0)} Cr</p>
+                            )}
                           </div>
                           <div className="text-right shrink-0">
                             <p className="font-mono font-medium">{stock.close.toFixed(2)}</p>
@@ -1379,9 +1441,9 @@ export default function Home() {
                     </Card>
                   </motion.div>
                 ))}
-                {filteredStocks.length === 0 && (
+                {listStocks.length === 0 && (
                   <div className="p-12 text-center text-muted-foreground">
-                    {stocks.length === 0 ? "No volume shockers found today." : "No stocks match your search."}
+                    {viewMode === "ic" ? "No stocks currently meet the IC conditions." : stocks.length === 0 ? "No volume shockers found today." : "No stocks match your search."}
                   </div>
                 )}
               </div>
@@ -1719,6 +1781,17 @@ export default function Home() {
               {/* Date list */}
               {!selectedHistoryDate && (
                 <div>
+                  <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary w-fit mb-4">
+                    {(["stocks", "ic"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setHistoryListMode(mode)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${historyListMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                      >
+                        {mode === "ic" ? "IC History" : "Stocks History"}
+                      </button>
+                    ))}
+                  </div>
                   {historyDates.length === 0 ? (
                     <Card className="border-border">
                       <CardContent className="p-12 flex flex-col items-center text-center gap-3">
@@ -1761,6 +1834,7 @@ export default function Home() {
                           </p>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {h.stockCount} stock{h.stockCount !== 1 ? "s" : ""}
+                            {historyListMode === "ic" && h.icStockCount != null ? ` · ${h.icStockCount} IC` : ""}
                           </p>
                         </button>
                       ))}
@@ -1779,7 +1853,7 @@ export default function Home() {
                     </Button>
                     <div>
                       <h2 className="text-sm font-semibold text-foreground">{formatDate(selectedHistoryDate)}</h2>
-                      <p className="text-xs text-muted-foreground">{filteredHistoryStocks.length} volume shockers (vol &gt; 190% &amp; positive)</p>
+                      <p className="text-xs text-muted-foreground">{filteredHistoryStocks.length} {historyListMode === "ic" ? "IC stocks (close &gt; SMA200, daily change ≥ 8%, market cap &gt; ₹1,000 Cr)" : "volume shockers (vol &gt; 190% &amp; positive)"}</p>
                     </div>
                   </div>
 

@@ -54,11 +54,17 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "No data for this date" }, { status: 404 });
       }
       const stocks = JSON.parse(snapshot.stocksJson);
-      return NextResponse.json({ date: snapshot.date, stockCount: snapshot.stockCount, stocks });
+      return NextResponse.json({
+        date: snapshot.date,
+        stockCount: snapshot.stockCount,
+        stocks,
+        icStockCount: snapshot.icStockCount || 0,
+        icStocks: snapshot.icStocksJson ? JSON.parse(snapshot.icStocksJson) : [],
+      });
     }
     const snapshots = await db.dailyStockSnapshot.findMany({
       orderBy: { date: "desc" },
-      select: { date: true, stockCount: true, createdAt: true },
+      select: { date: true, stockCount: true, icStockCount: true, createdAt: true },
     });
     return NextResponse.json({ snapshots });
   } catch (error) {

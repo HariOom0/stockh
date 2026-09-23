@@ -106,6 +106,21 @@ jobs:
           print(f'OK: {len(data)} stocks')
           "
 
+      - name: Calculate IC stocks from existing list
+        run: python3 scripts/filter_ic.py < /tmp/stocks.json > /tmp/ic-stocks.json
+
+      - name: Validate IC result
+        run: |
+          python3 -c "
+          import json, sys
+          with open('/tmp/ic-stocks.json') as f:
+              data = json.load(f)
+          if isinstance(data, dict) and 'error' in data:
+              print('IC_ERROR: ' + data['error'])
+              sys.exit(1)
+          print(f'OK: {len(data)} IC stocks')
+          "
+
       - name: Save to DB via backfill API
         run: |
           python3 << 'PYEOF'
@@ -113,11 +128,13 @@ jobs:
 
           with open('/tmp/stocks.json') as f:
               stocks = json.load(f)
+          with open('/tmp/ic-stocks.json') as f:
+              ic_stocks = json.load(f)
 
           trading_date = "${{ env.TRADING_DATE }}"
           print(f"Saving {len(stocks)} stocks for {trading_date}")
 
-          payload = json.dumps({"date": trading_date, "stocks": stocks}).encode()
+          payload = json.dumps({"date": trading_date, "stocks": stocks, "icStocks": ic_stocks}).encode()
           req = urllib.request.Request(
               "https://stockh.vercel.app/api/backfill",
               data=payload,
@@ -141,6 +158,10 @@ jobs:
                       raise RuntimeError(
                           f"History count mismatch: saved {save_data.get('filteredCount')}, read {history_data.get('stockCount')}"
                       )
+                  if history_data.get("icStockCount") != save_data.get("icCount"):
+                      raise RuntimeError(
+                          f"IC count mismatch: saved {save_data.get('icCount')}, read {history_data.get('icStockCount')}"
+                      )
               print("PASS: persisted stock data was read back from history")
           except urllib.error.HTTPError as e:
               raise SystemExit(f"DB save/history verification failed: {e.code} - {e.read().decode()}")
@@ -156,6 +177,8 @@ jobs:
 
           with open('/tmp/stocks.json') as f:
               stocks = json.load(f)
+          with open('/tmp/ic-stocks.json') as f:
+              ic_stocks = json.load(f)
 
           ist = timezone(timedelta(hours=5, minutes=30))
           now = datetime.now(ist).isoformat()
@@ -165,7 +188,8 @@ jobs:
               "stocks": stocks,
               "tradingDate": trading_date,
               "lastUpdated": now,
-              "source": "chartink_eod_scanner"
+              "source": "chartink_eod_scanner",
+              "icStocks": ic_stocks
           }
 
           with open('public/data/stocks.json', 'w') as f:
