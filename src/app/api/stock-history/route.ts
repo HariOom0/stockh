@@ -48,18 +48,21 @@ export async function GET(request: Request) {
     refreshTradingDayCache().catch(() => {});
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
+    const kind = searchParams.get("kind");
     if (date) {
       const snapshot = await db.dailyStockSnapshot.findUnique({ where: { date } });
       if (!snapshot) {
         return NextResponse.json({ error: "No data for this date" }, { status: 404 });
       }
       const stocks = JSON.parse(snapshot.stocksJson);
+      const icOnly = kind === "ic";
       return NextResponse.json({
         date: snapshot.date,
-        stockCount: snapshot.stockCount,
-        stocks,
-        icStockCount: snapshot.icStockCount || 0,
-        icStocks: snapshot.icStocksJson ? JSON.parse(snapshot.icStocksJson) : [],
+        stockCount: icOnly ? snapshot.icStockCount || 0 : snapshot.stockCount,
+        stocks: icOnly ? (snapshot.icStocksJson ? JSON.parse(snapshot.icStocksJson) : []) : stocks,
+        ...(icOnly
+          ? { icOnly: true }
+          : { icStockCount: snapshot.icStockCount || 0, icStocks: snapshot.icStocksJson ? JSON.parse(snapshot.icStocksJson) : [] }),
       });
     }
     const snapshots = await db.dailyStockSnapshot.findMany({

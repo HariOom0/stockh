@@ -926,9 +926,9 @@ export default function Home() {
     setSelectedHistoryDate(date);
     setHistoryLoading(true);
     try {
-      const res = await fetch(`/api/stock-history?date=${date}`, { cache: "no-store" });
+      const res = await fetch(`/api/stock-history?date=${date}&kind=${historyListMode}`, { cache: "no-store" });
       const data = await res.json();
-      const sourceStocks = historyListMode === "ic" ? (data.icStocks || []) : (data.stocks || []);
+      const sourceStocks = data.stocks || [];
       if (sourceStocks.length > 0) {
         const stocks: Stock[] = sourceStocks.map((s: Record<string, unknown>, i: number) => ({
           sr: i + 1,
@@ -1833,8 +1833,9 @@ export default function Home() {
                             {formatDate(h.date)}
                           </p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {h.stockCount} stock{h.stockCount !== 1 ? "s" : ""}
-                            {historyListMode === "ic" && h.icStockCount != null ? ` · ${h.icStockCount} IC` : ""}
+                            {historyListMode === "ic"
+                              ? `${h.icStockCount || 0} IC stock${(h.icStockCount || 0) !== 1 ? "s" : ""}`
+                              : `${h.stockCount} stock${h.stockCount !== 1 ? "s" : ""}`}
                           </p>
                         </button>
                       ))}
@@ -1873,7 +1874,7 @@ export default function Home() {
                               <th className="text-left px-4 py-3 font-medium text-muted-foreground">Stock</th>
                               <th className="text-right px-4 py-3 font-medium text-muted-foreground">Close</th>
                               <th className="text-right px-4 py-3 font-medium text-muted-foreground">Change</th>
-                              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Vol Gain</th>
+                              {historyListMode !== "ic" && <th className="text-right px-4 py-3 font-medium text-muted-foreground">Vol Gain</th>}
                               <th className="text-center px-4 py-3 font-medium text-muted-foreground w-20">Action</th>
                             </tr>
                           </thead>
@@ -1895,11 +1896,11 @@ export default function Home() {
                                     <ArrowUpRight className="w-3 h-3" />+{stock.change.toFixed(2)}%
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-right">
+                                {historyListMode !== "ic" && <td className="px-4 py-3 text-right">
                                   <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 font-mono">
                                     {stock.volGainPct.toFixed(1)}%
                                   </Badge>
-                                </td>
+                                </td>}
                                 <td className="px-4 py-3 text-center">
                                   <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedStock(stock); }}>
                                     <Eye className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
@@ -1928,11 +1929,11 @@ export default function Home() {
                                   </span>
                                 </div>
                               </div>
-                              <div className="mt-2 flex items-center gap-2">
+                              {historyListMode !== "ic" && <div className="mt-2 flex items-center gap-2">
                                 <Badge variant="secondary" className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] font-mono">
                                   Vol {stock.volGainPct.toFixed(1)}%
                                 </Badge>
-                              </div>
+                              </div>}
                             </CardContent>
                           </Card>
                         ))}
