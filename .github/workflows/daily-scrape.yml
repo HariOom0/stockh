@@ -12,6 +12,12 @@ on:
 permissions:
   contents: write
 
+# GitHub cron schedules are best-effort; prevent a delayed run and a manual
+# recovery run from executing at the same time.
+concurrency:
+  group: daily-stock-update
+  cancel-in-progress: false
+
 jobs:
   scrape-and-save:
     runs-on: ubuntu-latest
