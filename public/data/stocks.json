@@ -801,59 +801,99 @@
       "isPositive": true
     }
   ],
-  "tradingDate": "2026-09-24",
-  "lastUpdated": "2026-09-24T21:21:58.530359+05:30",
+  "tradingDate": "2026-09-25",
+  "lastUpdated": "2026-09-25T17:40:04.491249+05:30",
   "source": "chartink_eod_scanner",
   "icStocks": [
     {
       "sr": 1,
-      "name": "India Glycols Limited",
-      "ticker": "INDIAGLYCO",
-      "close": 306.0,
-      "change": 18.74,
-      "volGainPct": 205.16,
+      "name": "Shanti Gold International Ltd",
+      "ticker": "SHANTIGOLD",
+      "close": 325.68,
+      "change": 14.83,
+      "volGainPct": 0.0,
       "isPositive": true,
-      "volume": 4841031
+      "volume": 36407266
     },
     {
       "sr": 2,
-      "name": "Kabra Extrusion Technik Limited",
-      "ticker": "KABRAEXTRU",
-      "close": 806.1,
-      "change": 10.0,
-      "volGainPct": 83.453,
+      "name": "Antelopus Selan Energy Ltd",
+      "ticker": "ANTELOPUS",
+      "close": 1261.7,
+      "change": 11.56,
+      "volGainPct": 0.0,
       "isPositive": true,
-      "volume": 520858
+      "volume": 7877531
     },
     {
       "sr": 3,
-      "name": "Allied Blenders & Distillers Ltd",
-      "ticker": "ABDL",
-      "close": 712.15,
-      "change": 8.49,
+      "name": "SBC Exports Ltd",
+      "ticker": "SBC",
+      "close": 53.02,
+      "change": 10.44,
       "volGainPct": 0.0,
       "isPositive": true,
-      "volume": 6590774
+      "volume": 23868200
     },
     {
       "sr": 4,
-      "name": "Jagsonpal Pharmaceuticals Limited",
-      "ticker": "JAGSNPHARM",
-      "close": 243.97,
-      "change": 8.13,
-      "volGainPct": 390.28,
+      "name": "Avadh Sugar & Energy",
+      "ticker": "AVADHSUGAR",
+      "close": 796.5,
+      "change": 10.0,
+      "volGainPct": 0.0,
       "isPositive": true,
-      "volume": 9252736
+      "volume": 465223
     },
     {
       "sr": 5,
-      "name": "Raymond Limited",
-      "ticker": "RAYMOND",
-      "close": 1203.85,
-      "change": 8.0,
+      "name": "Shoppers Stop Limited",
+      "ticker": "SHOPERSTOP",
+      "close": 423.55,
+      "change": 10.0,
       "volGainPct": 0.0,
       "isPositive": true,
-      "volume": 7466499
+      "volume": 3588100
+    },
+    {
+      "sr": 6,
+      "name": "Anlon Healthcare Ltd",
+      "ticker": "AHCL",
+      "close": 31.51,
+      "change": 9.98,
+      "volGainPct": 0.0,
+      "isPositive": true,
+      "volume": 80210539
+    },
+    {
+      "sr": 7,
+      "name": "Bhageria Industries Limited",
+      "ticker": "BHAGERIA",
+      "close": 394.6,
+      "change": 9.72,
+      "volGainPct": 0.0,
+      "isPositive": true,
+      "volume": 933103
+    },
+    {
+      "sr": 8,
+      "name": "Quadrant Future Tek Ltd",
+      "ticker": "QUADFUTURE",
+      "close": 547.5,
+      "change": 9.41,
+      "volGainPct": 0.0,
+      "isPositive": true,
+      "volume": 1950037
+    },
+    {
+      "sr": 9,
+      "name": "Lloyds Engineering Works Ltd",
+      "ticker": "LLOYDSENGG",
+      "close": 98.56,
+      "change": 8.41,
+      "volGainPct": 0.0,
+      "isPositive": true,
+      "volume": 60674433
     }
   ]
 }
