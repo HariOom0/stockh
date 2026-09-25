@@ -6,7 +6,7 @@ import { fetchICStocks, fetchVolumeShockers } from "@/lib/scraper";
 
 export const dynamic = "force-dynamic";
 
-function isAfter5PMIST(): boolean {
+function isAfter9PMIST(): boolean {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Kolkata",
     hour: "numeric",
@@ -15,7 +15,7 @@ function isAfter5PMIST(): boolean {
   }).formatToParts(new Date());
   const hour = Number(parts.find((part) => part.type === "hour")?.value || 0);
   const minute = Number(parts.find((part) => part.type === "minute")?.value || 0);
-  return hour > 17 || (hour === 17 && minute >= 0);
+  return hour > 21 || (hour === 21 && minute >= 0);
 }
 
 function isAuthorized(request: Request): boolean {
@@ -27,8 +27,8 @@ export async function GET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!isAfter5PMIST()) {
-    return NextResponse.json({ ok: true, skipped: true, reason: "Before 5:00 PM IST" });
+  if (!isAfter9PMIST()) {
+    return NextResponse.json({ ok: true, skipped: true, reason: "Before 9:00 PM IST" });
   }
 
   await refreshTradingDayCache();
