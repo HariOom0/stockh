@@ -71,7 +71,7 @@ export async function GET(request: Request) {
       orderBy: { date: "desc" },
       select: { date: true, stocksJson: true, icStocksJson: true },
     });
-    if (latest && latest.stocksJson === stocksJson && latest.icStocksJson === icStocksJson) {
+    if (latest && latest.stocksJson === stocksJson) {
       return NextResponse.json({ ok: true, skipped: true, reason: "Identical dataset already saved", tradingDate, duplicateOf: latest.date, stockCount: stocks.length, icStockCount: icStocks.length });
     }
 
