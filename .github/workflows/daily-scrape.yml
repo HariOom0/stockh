@@ -4,9 +4,7 @@ name: Daily Stock Data Scrape
 # Do not add a second Vercel cron for /api/cron/daily-snapshot.
 
 on:
-  schedule:
-    # 11:30 UTC = 5:00 PM IST — after market close
-    - cron: '30 11 * * 1-5'
+  # Manual recovery only. The production schedule is Vercel Cron.
   workflow_dispatch:
 
 permissions:

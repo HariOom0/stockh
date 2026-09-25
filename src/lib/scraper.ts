@@ -159,6 +159,63 @@ export async function fetchVolumeShockers(): Promise<VolumeShockerStock[]> {
   return [];
 }
 
+export async function fetchICStocks(sourceStocks: VolumeShockerStock[] = []): Promise<VolumeShockerStock[]> {
+  const scanClause =
+    '{cash} ( daily close > daily sma ( close,200 ) and daily "close - 1 candle ago close / 1 candle ago close * 100" >= 8 and market cap > 1000 )';
+
+  try {
+    const page = await fetch("https://chartink.com/screener/", {
+      headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!page.ok) throw new Error(`Chartink screener returned ${page.status}`);
+    const html = await page.text();
+    const token = html.match(/<meta[^>]+name=["']csrf-token["'][^>]+content=["']([^"']+)/i)?.[1];
+    if (!token) throw new Error("Chartink CSRF token not found");
+
+    const response = await fetch("https://chartink.com/screener/process", {
+      method: "POST",
+      headers: {
+        "User-Agent": USER_AGENT,
+        "X-CSRF-TOKEN": token,
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({ scan_clause: scanClause }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) throw new Error(`Chartink IC scan returned ${response.status}`);
+    const rows = ((await response.json()) as { data?: Array<Record<string, unknown>> }).data || [];
+    const sourceByTicker = new Map(sourceStocks.map((stock) => [stock.ticker.toUpperCase(), stock]));
+    const results = rows
+      .map((row) => {
+        const ticker = String(row.nsecode || "").trim().toUpperCase();
+        const source = sourceByTicker.get(ticker);
+        const change = Number(row.per_chg) || 0;
+        return {
+          sr: 0,
+          name: String(row.name || source?.name || ticker),
+          ticker,
+          close: Number(row.close) || source?.close || 0,
+          change,
+          volGainPct: source?.volGainPct || 0,
+          isPositive: change > 0,
+          volume: Number(row.volume) || 0,
+        };
+      })
+      .filter((stock) => stock.ticker && stock.close > 0)
+      .sort((a, b) => b.change - a.change || a.ticker.localeCompare(b.ticker));
+    results.forEach((stock, index) => (stock.sr = index + 1));
+    console.log(`[Chartink] IC scan returned ${results.length} stocks`);
+    return results;
+  } catch (error: any) {
+    console.warn(`[Chartink] IC scan failed: ${error.message}`);
+    return [];
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // Stock Detail Scraper (Screener.in) — unchanged
 // ═══════════════════════════════════════════════════════════════════════
