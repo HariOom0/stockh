@@ -9,6 +9,11 @@ on:
     # 15:30 UTC = 9:00 PM IST — after market close and data settlement
     - cron: '30 15 * * 1-5'
   workflow_dispatch:
+    inputs:
+      trading_date:
+        description: 'Optional YYYY-MM-DD trading date for recovery runs'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -43,6 +48,17 @@ jobs:
 
           ist = timezone(timedelta(hours=5, minutes=30))
           now = datetime.now(ist)
+          requested_date = "${{ inputs.trading_date }}".strip()
+
+          if requested_date:
+              try:
+                  requested = datetime.strptime(requested_date, "%Y-%m-%d")
+              except ValueError:
+                  raise SystemExit("Invalid trading_date; use YYYY-MM-DD")
+              with open("/tmp/trading_date.txt", "w") as f:
+                  f.write(requested.strftime("%Y-%m-%d"))
+              print(f"Using requested recovery trading date: {requested.strftime('%Y-%m-%d')}")
+              raise SystemExit(0)
 
           # NSE 2026 holidays (weekdays only)
           holidays = set([
