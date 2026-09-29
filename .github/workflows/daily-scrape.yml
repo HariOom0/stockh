@@ -4,7 +4,10 @@ name: Daily Stock Data Scrape
 # Do not add a second Vercel cron for /api/cron/daily-snapshot.
 
 on:
-  # Manual recovery only. The production schedule is Vercel Cron.
+  # GitHub Actions is the proven scheduled writer for database history.
+  schedule:
+    # 15:30 UTC = 9:00 PM IST — after market close and data settlement
+    - cron: '30 15 * * 1-5'
   workflow_dispatch:
 
 permissions:
