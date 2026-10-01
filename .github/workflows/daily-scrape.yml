@@ -94,8 +94,9 @@ jobs:
               print(f"WARNING: Current IST time {now.strftime('%H:%M')} is before 5:00 PM")
               print("Will still proceed since cron is scheduled for 5:00 PM")
 
-          # Start from today's IST date, go backwards to find last trading day
-          candidate = now
+          # A delayed run before 5 AM belongs to the previous completed market day.
+          # This prevents a late 9 PM run from assigning yesterday's EOD data to today.
+          candidate = now - timedelta(days=1) if now.hour < 5 else now
           for _ in range(10):  # max 10 days back
               date_str = candidate.strftime("%Y-%m-%d")
               weekday = candidate.weekday()  # 0=Mon, 6=Sun
