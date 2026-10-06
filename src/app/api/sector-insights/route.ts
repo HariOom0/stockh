@@ -67,10 +67,14 @@ async function fetchHistory(symbol: string): Promise<{ values: number[]; dates: 
 }
 
 function trendFor(score: number, relative1W: number, relative1M: number): SectorInsight["trend"] {
-  if (score >= 1.5 && relative1W > 0 && relative1M > 0) return "Bullish";
-  if (score <= -1.5 && relative1W < 0 && relative1M < 0) return "Bearish";
-  if (relative1W >= 0.35 && relative1M <= 0) return "Rotating In";
-  if (relative1W <= -0.35 && relative1M >= 0) return "Rotating Out";
+  // Sector-relative moves are usually fractions of a percent, so a ±1.5
+  // threshold classified nearly everything as Neutral. Use modest thresholds
+  // and require the longer-term direction to agree before calling a leader or
+  // laggard; conflicting horizons are rotation signals.
+  if (relative1W >= 0.1 && relative1M < -0.1) return "Rotating In";
+  if (relative1W <= -0.1 && relative1M >= 0.1) return "Rotating Out";
+  if (score >= 0.15 && relative1M > 0) return "Bullish";
+  if (score <= -0.1 && relative1M < 0) return "Bearish";
   return "Neutral";
 }
 
