@@ -64,9 +64,17 @@ interface Stock {
 
 interface SectorInsight {
   sector: string;
+  symbol?: string;
   trend: string;
   description: string;
   confidence: string;
+  change1D?: number;
+  change1W?: number;
+  change1M?: number;
+  relative1W?: number;
+  relative1M?: number;
+  score?: number;
+  dataDate?: string;
 }
 
 interface StockDetail {
@@ -230,14 +238,27 @@ function matchSectorInsight(
 ): SectorInsight | null {
   if (!stockSector || insights.length === 0) return null;
   // Try exact match first, then partial match on first keyword
-  const lower = stockSector.toLowerCase();
+  const lower = stockSector.toLowerCase().replace(/&amp;/g, "&");
   const exact = insights.find(
     (s) => s.sector.toLowerCase() === lower
   );
   if (exact) return exact;
+  const aliases: Record<string, string[]> = {
+    "banking & finance": ["bank", "finance", "financial"],
+    "it & technology": ["it", "technology", "software", "computer"],
+    "pharma & healthcare": ["pharma", "healthcare", "health"],
+    "energy (oil & gas)": ["energy", "oil", "gas", "consumable fuels"],
+    "auto & ancillary": ["auto", "automobile", "ancillary"],
+    "fmcg & consumer": ["fmcg", "consumer", "food", "tobacco"],
+    "infrastructure & construction": ["infra", "infrastructure", "construction"],
+    "metals & mining": ["metal", "mining", "steel"],
+    "realty & housing": ["realty", "housing", "real estate"],
+    "media & entertainment": ["media", "entertainment"],
+  };
   const partial = insights.find((s) => {
+    const aliasWords = aliases[s.sector.toLowerCase()] || [];
     const keywords = s.sector.toLowerCase().split(/[\s&]+/).filter((w) => w.length > 2);
-    return keywords.some((kw) => lower.includes(kw));
+    return [...keywords, ...aliasWords].some((kw) => lower.includes(kw));
   });
   return partial || null;
 }
@@ -1177,8 +1198,7 @@ export default function Home() {
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      AI-powered sector rotation insights for the Indian stock market. Use this to assess
-                      whether the sector of a volume shocker stock is in favour.
+                      Live sector-index rotation calculated from 1-day, 1-week, and 1-month returns versus Nifty 50.
                     </p>
                   </CardHeader>
                   <CardContent>
@@ -1198,6 +1218,11 @@ export default function Home() {
                             <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
                               {s.description}
                             </p>
+                            <div className="grid grid-cols-3 gap-1 mt-2 text-[9px] text-muted-foreground">
+                              <span>1D <b className="text-foreground">{s.change1D?.toFixed(2)}%</b></span>
+                              <span>1W <b className="text-foreground">{s.change1W?.toFixed(2)}%</b></span>
+                              <span>1M <b className="text-foreground">{s.change1M?.toFixed(2)}%</b></span>
+                            </div>
                             <div className="flex items-center gap-1 mt-1.5">
                               <span className={`w-1.5 h-1.5 rounded-full ${confidenceDot(s.confidence)}`} />
                               <span className="text-[10px] text-muted-foreground">{s.confidence}</span>
@@ -2690,9 +2715,9 @@ export default function Home() {
                       <span className="text-sm text-muted-foreground">{selectedSectorInsight.confidence}</span>
                     </div>
                     <p className="text-xs text-muted-foreground/60 mt-1.5">
-                      {selectedSectorInsight.confidence === "High" && "Based on strong macro indicators, consistent data trends, and multiple confirming signals."}
-                      {selectedSectorInsight.confidence === "Medium" && "Based on mixed signals with some supporting data. Monitor for confirmation or reversal."}
-                      {selectedSectorInsight.confidence === "Low" && "Limited data or high uncertainty. Treat as directional guidance only."}
+                      {selectedSectorInsight.confidence === "High" && "Based on sufficient daily index history and a clear relative-strength signal versus Nifty 50."}
+                      {selectedSectorInsight.confidence === "Medium" && "Based on a usable history with a moderate relative-strength signal. Monitor for confirmation or reversal."}
+                      {selectedSectorInsight.confidence === "Low" && "The relative-strength signal is close to neutral. Treat this as directional guidance only."}
                     </p>
                   </div>
 
